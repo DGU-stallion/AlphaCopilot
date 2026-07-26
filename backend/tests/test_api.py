@@ -14,29 +14,29 @@ def test_health():
 
 
 @pytest.mark.parametrize("path", [
-    "/api/quote?codes=abc",
-    "/api/valuation?code=12",
-    "/api/margin?code=notcode",
-    "/api/holders?code=1234567",
-    "/api/announcements?code=",
+    "/api/research/quote?codes=abc",
+    "/api/research/valuation?code=12",
+    "/api/research/margin?code=notcode",
+    "/api/research/holders?code=1234567",
+    "/api/research/announcements?code=",
 ])
 def test_bad_code_400(path):
     assert client.get(path).status_code == 400
 
 
 def test_industry_top_range():
-    assert client.get("/api/industry?top=2").status_code == 422   # ge=5
-    assert client.get("/api/industry?top=999").status_code == 422  # le=50
+    assert client.get("/api/research/industry?top=2").status_code == 422   # ge=5
+    assert client.get("/api/research/industry?top=999").status_code == 422  # le=50
 
 
 def test_chat_empty_messages_400():
-    r = client.post("/api/chat", json={"messages": [], "llm": {"model": "x", "baseURL": "http://x", "apiKey": "k"}})
+    r = client.post("/api/research/chat", json={"messages": [], "llm": {"model": "x", "baseURL": "http://x", "apiKey": "k"}})
     assert r.status_code == 400
 
 
 def test_chat_api_missing_key_400():
     # API 接入缺 baseURL/apiKey → 400（在开流前拦下）
-    r = client.post("/api/chat", json={
+    r = client.post("/api/research/chat", json={
         "messages": [{"role": "user", "content": "hi"}],
         "llm": {"provider": "deepseek", "model": "deepseek-chat", "baseURL": "", "apiKey": ""},
     })
@@ -45,7 +45,7 @@ def test_chat_api_missing_key_400():
 
 def test_chat_cli_not_installed_400():
     # 订阅接入选一个本机没装的 CLI → 400 明确提示（不静默失败）
-    r = client.post("/api/chat", json={
+    r = client.post("/api/research/chat", json={
         "messages": [{"role": "user", "content": "hi"}],
         "llm": {"provider": "cli-qwen", "model": "qwen-code", "baseURL": "", "apiKey": ""},
     })
@@ -57,7 +57,7 @@ def test_global_stock_404(monkeypatch):
     """无法解析的美股/港股代码 → 404（不 500、不崩）。"""
     import gstock
     monkeypatch.setattr(gstock, "us_hk_stock", lambda q: {})
-    assert client.get("/api/global/stock?symbol=ZZZZ").status_code == 404
+    assert client.get("/api/research/global/stock?symbol=ZZZZ").status_code == 404
 
 
 def test_gstock_quote_full_null_shape():

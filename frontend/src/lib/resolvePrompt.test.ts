@@ -117,3 +117,68 @@ describe("API Path Prefix Correctness (Property 3)", () => {
     expect(url).not.toContain("/api/research");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Property 10: Prefill URL Encoding Round-trip
+// ---------------------------------------------------------------------------
+
+describe("Prefill URL Encoding Round-trip (Property 10)", () => {
+  it("basic ASCII prompt survives encode/decode", () => {
+    const prompt = "Analyze AAPL stock price";
+    const encoded = encodeURIComponent(prompt);
+    expect(decodeURIComponent(encoded)).toBe(prompt);
+  });
+
+  it("Chinese characters survive encode/decode", () => {
+    const prompt = "分析贵州茅台的技术面和基本面，给出投研观点";
+    const encoded = encodeURIComponent(prompt);
+    expect(decodeURIComponent(encoded)).toBe(prompt);
+  });
+
+  it("special characters survive encode/decode", () => {
+    const prompt = "price > 100 & volume < 5000 | ratio = 1.5 + (x - y)";
+    const encoded = encodeURIComponent(prompt);
+    expect(decodeURIComponent(encoded)).toBe(prompt);
+  });
+
+  it("whitespace (spaces, tabs, newlines) survives encode/decode", () => {
+    const prompt = "line 1\nline 2\ttab  spaces";
+    const encoded = encodeURIComponent(prompt);
+    expect(decodeURIComponent(encoded)).toBe(prompt);
+  });
+
+  it("empty string survives encode/decode", () => {
+    const prompt = "";
+    const encoded = encodeURIComponent(prompt);
+    expect(decodeURIComponent(encoded)).toBe(prompt);
+  });
+
+  it("emoji and extended Unicode survive encode/decode", () => {
+    const prompt = "🚀 分析 📈 趋势 — 「涨停板」";
+    const encoded = encodeURIComponent(prompt);
+    expect(decodeURIComponent(encoded)).toBe(prompt);
+  });
+
+  it("resolvePrompt output with Unicode context survives URL round-trip", () => {
+    const resolved = resolvePrompt("分析 {code} 的走势，关注 {indicator}", {
+      code: "600519",
+      indicator: "MACD & RSI > 70",
+    });
+    const encoded = encodeURIComponent(resolved);
+    expect(decodeURIComponent(encoded)).toBe(resolved);
+  });
+
+  it("full workflow: resolve → encode → URLSearchParams → decode", () => {
+    const template = "回测 {code} 从 {start} 到 {end}，初始资金 ¥100,000";
+    const context = { code: "000001", start: "2024-01-01", end: "2024-12-31" };
+    const resolved = resolvePrompt(template, context);
+
+    // Simulate navigation: encode into URL
+    const params = new URLSearchParams({ prefill: resolved });
+    const urlFragment = params.toString();
+
+    // Simulate reading on agent page: decode from URL
+    const decoded = new URLSearchParams(urlFragment).get("prefill");
+    expect(decoded).toBe(resolved);
+  });
+});

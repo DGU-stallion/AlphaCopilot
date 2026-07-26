@@ -18,12 +18,13 @@ client = TestClient(app_module.app)
 # ── VR_API_KEY 鉴权中间件 ───────────────────────────────────────────
 
 def test_api_key_auth(monkeypatch):
-    monkeypatch.setattr(app_module, "_API_KEY", "sekret")
-    assert client.get("/api/health").status_code == 200  # health 豁免
-    assert client.get("/api/quote?codes=abc").status_code == 401  # 缺头
-    assert client.get("/api/quote?codes=abc", headers={"Authorization": "Bearer wrong"}).status_code == 401
+    monkeypatch.setenv("VR_API_KEY", "sekret")
+    from app import create_app
+    auth_client = TestClient(create_app())
+    assert auth_client.get("/api/health").status_code == 200  # health 豁免
+    assert auth_client.get("/api/research/quote?codes=abc", headers={"Authorization": "Bearer wrong"}).status_code == 401
     # 正确 key → 通过鉴权、走到参数校验层（400 而非 401，不联网）
-    assert client.get("/api/quote?codes=abc", headers={"Authorization": "Bearer sekret"}).status_code == 400
+    assert auth_client.get("/api/research/quote?codes=abc", headers={"Authorization": "Bearer sekret"}).status_code == 400
 
 
 # ── 持仓：本地 JSON CRUD（不联网，行情打桩） ────────────────────────
@@ -37,37 +38,37 @@ def tmp_pf(tmp_path, monkeypatch):
 
 
 def test_portfolio_crud_roundtrip(tmp_pf):
-    assert client.get("/api/portfolio").json()["data"]["holdings"] == []
+    assert client.get("/api/research/portfolio").json()["data"]["holdings"] == []
 
-    r = client.post("/api/portfolio/holding", json={"code": "600519", "shares": 100, "cost": 8.0})
+    r = client.post("/api/research/portfolio/holding", json={"code": "600519", "shares": 100, "cost": 8.0})
     assert r.status_code == 200
     h = r.json()["data"]["holdings"][0]
     assert h["code"] == "600519"
     assert h["pnl"] == pytest.approx((10.0 - 8.0) * 100)
 
     # 同代码加仓 → 加权平均成本
-    client.post("/api/portfolio/holding", json={"code": "600519", "shares": 100, "cost": 12.0})
-    h = client.get("/api/portfolio").json()["data"]["holdings"][0]
+    client.post("/api/research/portfolio/holding", json={"code": "600519", "shares": 100, "cost": 12.0})
+    h = client.get("/api/research/portfolio").json()["data"]["holdings"][0]
     assert h["shares"] == 200
     assert h["cost"] == pytest.approx(10.0)
 
-    r = client.post("/api/portfolio/close", json={"code": "600519", "date": "2026-07-05", "price": 11.0, "shares": 200, "cost": 10.0})
+    r = client.post("/api/research/portfolio/close", json={"code": "600519", "date": "2026-07-05", "price": 11.0, "shares": 200, "cost": 10.0})
     assert r.status_code == 200
     assert r.json()["data"]["closed"][0]["pnl"] == pytest.approx(200.0)
 
-    assert client.delete("/api/portfolio/holding?code=600519").json()["data"]["holdings"] == []
-    assert client.delete("/api/portfolio/close?index=0").json()["data"]["closed"] == []
-    assert client.post("/api/portfolio/refresh").status_code == 200
+    assert client.delete("/api/research/portfolio/holding?code=600519").json()["data"]["holdings"] == []
+    assert client.delete("/api/research/portfolio/close?index=0").json()["data"]["closed"] == []
+    assert client.post("/api/research/portfolio/refresh").status_code == 200
 
 
 def test_portfolio_add_validation(tmp_pf):
-    assert client.post("/api/portfolio/holding", json={"code": "abc", "shares": 1, "cost": 1}).status_code == 400
-    assert client.post("/api/portfolio/holding", json={"code": "600519", "shares": 0, "cost": 1}).status_code == 400
+    assert client.post("/api/research/portfolio/holding", json={"code": "abc", "shares": 1, "cost": 1}).status_code == 400
+    assert client.post("/api/research/portfolio/holding", json={"code": "600519", "shares": 0, "cost": 1}).status_code == 400
 
 
 def test_portfolio_corrupt_file_returns_empty(tmp_pf):
     (tmp_pf / "portfolio.json").write_text("{broken json", encoding="utf-8")
-    r = client.get("/api/portfolio")
+    r = client.get("/api/research/portfolio")
     assert r.status_code == 200
     assert r.json()["data"]["holdings"] == []
 
@@ -75,9 +76,9 @@ def test_portfolio_corrupt_file_returns_empty(tmp_pf):
 # ── issue #13：加仓合并成本保留 4 位小数（ETF/基金成本常见 3-4 位） ──
 
 def test_portfolio_merge_cost_keeps_4_decimals(tmp_pf):
-    client.post("/api/portfolio/holding", json={"code": "510300", "shares": 100, "cost": 1.0001})
-    client.post("/api/portfolio/holding", json={"code": "510300", "shares": 100, "cost": 1.0003})
-    h = client.get("/api/portfolio").json()["data"]["holdings"][0]
+    client.post("/api/research/portfolio/holding", json={"code": "510300", "shares": 100, "cost": 1.0001})
+    client.post("/api/research/portfolio/holding", json={"code": "510300", "shares": 100, "cost": 1.0003})
+    h = client.get("/api/research/portfolio").json()["data"]["holdings"][0]
     assert h["cost"] == pytest.approx(1.0002, abs=1e-9)
 
 
