@@ -6,8 +6,9 @@ import remarkGfm from "remark-gfm";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Disclaimer } from "@/components/ui/Disclaimer";
+import { ContextualAgentEntry } from "@/components/common/ContextualAgentEntry";
 import { SaveNoteButton } from "@/components/ui/SaveNoteButton";
-import { api, ApiError, type RadarData, type Industry, type Announcement, type NewsItem } from "@/lib/api";
+import { researchPageApi as api, ApiError, type RadarData, type Industry, type Announcement, type NewsItem } from "@/lib/apiResearch";
 import { loadWatch } from "@/lib/watchlist";
 import { hasLlm, chatStream } from "@/lib/llm";
 import { cn } from "@/lib/utils";
@@ -303,7 +304,16 @@ export function Intel() {
 
   return (
     <div>
-      <PageHeader title="资讯雷达" subtitle="多来源资讯中心：AI 帮你跨源捞资讯、提炼要点" />
+      <PageHeader
+        title="资讯雷达"
+        subtitle="多来源资讯中心：AI 帮你跨源捞资讯、提炼要点"
+        actions={
+          <ContextualAgentEntry
+            prompt="帮我梳理今日资讯雷达的重点信息，分析哪些赛道值得关注"
+            label="AI 解读"
+          />
+        }
+      />
 
       <div className="mb-4 flex flex-wrap gap-2">
         {TABS.map(({ key, label, icon: Icon, integrated }) => (

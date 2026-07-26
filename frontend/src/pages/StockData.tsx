@@ -6,14 +6,14 @@ import {
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { AskAiButton } from "@/components/ui/AskAiButton";
+import { ContextualAgentEntry } from "@/components/common/ContextualAgentEntry";
 import { EarningsSnapshot } from "@/components/ui/EarningsSnapshot";
 import { Disclaimer } from "@/components/ui/Disclaimer";
-import {
-  api, ApiError, type Valuation, type Report, type NewsItem, type ValPercentile, type ValMetric,
+import { researchPageApi as api, ApiError, type Valuation, type Report, type NewsItem, type ValPercentile, type ValMetric,
   type Financials, type Announcement, type MarginRow, type BlockTradeRow, type HolderRow,
   type DividendRow, type FundFlowRow, type DragonTiger, type Lockup, type Blocks, type HotConcept, type QaRow,
   type GlobalStock,
-} from "@/lib/api";
+} from "@/lib/apiResearch";
 import { cn } from "@/lib/utils";
 
 // 金额格式化（后端资金单位：元 / 万元）
@@ -198,13 +198,20 @@ export function StockData() {
         title="个股数据"
         subtitle="行情 · 估值 · 研报 · 新闻 —— 客观数据配齐，判断交给你的 AI"
         actions={(val || gstock) && (
-          <AskAiButton
-            context={gstock ? gAiContext : aiContext}
-            label="让 AI 读这些数据"
-            suggestions={gstock
-              ? ["这家公司基本面怎么样", "盈利能力如何", "有什么风险"]
-              : ["这个估值贵不贵", "机构一致预期怎么看", "近期研报的分歧点", "有什么风险"]}
-          />
+          <div className="flex items-center gap-2">
+            <ContextualAgentEntry
+              prompt="帮我分析 {code} 的近期走势，结合成交量和资金流向给出技术面观点"
+              context={{ code: code.trim().toUpperCase() }}
+              label="AI 分析"
+            />
+            <AskAiButton
+              context={gstock ? gAiContext : aiContext}
+              label="让 AI 读这些数据"
+              suggestions={gstock
+                ? ["这家公司基本面怎么样", "盈利能力如何", "有什么风险"]
+                : ["这个估值贵不贵", "机构一致预期怎么看", "近期研报的分歧点", "有什么风险"]}
+            />
+          </div>
         )}
       />
 

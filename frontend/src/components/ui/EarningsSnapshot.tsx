@@ -6,7 +6,7 @@
 import { ClipboardList } from "lucide-react";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { cn } from "@/lib/utils";
-import type { Valuation, Financials, ValPercentile } from "@/lib/api";
+import type { Valuation, Financials, ValPercentile } from "@/lib/apiResearch";
 
 // 从含单位/符号的字符串里取数（"+15.2%" → 15.2；取不到 → null）。
 const num = (s: string | number | null | undefined): number | null => {

@@ -6,8 +6,10 @@ import remarkGfm from "remark-gfm";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { AskAiButton } from "@/components/ui/AskAiButton";
+import { ContextualAgentEntry } from "@/components/common/ContextualAgentEntry";
 import { Disclaimer } from "@/components/ui/Disclaimer";
-import { api, ApiError, type IndexQuote, type Quote, type MarketOverview, type ShortTermEmotion, type TurnoverTop, type GlobalIndex } from "@/lib/api";
+import { researchPageApi as api, ApiError, type MarketOverview, type ShortTermEmotion, type TurnoverTop, type GlobalIndex } from "@/lib/apiResearch";
+import type { IndexQuote, Quote } from "@/types/research";
 import { hasLlm, chatStream } from "@/lib/llm";
 import { SaveNoteButton } from "@/components/ui/SaveNoteButton";
 import { loadWatch, saveWatch, addCodes } from "@/lib/watchlist";
@@ -126,11 +128,17 @@ export function DailyReview() {
         title="每日复盘"
         subtitle={`${today} · 大盘 / 情绪 / 板块资金一屏看全，交给你的 AI 做复盘`}
         actions={
-          <AskAiButton
-            context={`今日大盘数据：${dataSummary}`}
-            label="问 AI"
-            suggestions={["今天大盘怎么走", "哪些指数领涨领跌", "盘面有什么值得注意"]}
-          />
+          <div className="flex items-center gap-2">
+            <ContextualAgentEntry
+              prompt="帮我分析今日 A 股市场整体表现，包括大盘走势、板块轮动和短线情绪"
+              label="AI 复盘"
+            />
+            <AskAiButton
+              context={`今日大盘数据：${dataSummary}`}
+              label="问 AI"
+              suggestions={["今天大盘怎么走", "哪些指数领涨领跌", "盘面有什么值得注意"]}
+            />
+          </div>
         }
       />
 

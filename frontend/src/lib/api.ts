@@ -1,6 +1,6 @@
 import { authHeaders, withAuthTicket } from "@/lib/apiAuth";
 
-const BASE = "";
+const QUANT_BASE = "/api/quant";
 
 export class ApiError extends Error {
   status: number;
@@ -44,7 +44,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       mergedHeaders[key] = value;
     });
   }
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${QUANT_BASE}${path}`, {
     ...rest,
     headers: mergedHeaders,
   });
@@ -75,7 +75,7 @@ export interface UploadResult {
 async function uploadFile(file: File): Promise<UploadResult> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${BASE}/upload`, { method: "POST", headers: authHeaders(), body: form });
+  const res = await fetch(`${QUANT_BASE}/upload`, { method: "POST", headers: authHeaders(), body: form });
   if (!res.ok) {
     throw await errorFromResponse(res);
   }
@@ -135,7 +135,7 @@ export const api = {
   // is minted per connect/reconnect inside useSSE (tickets are single-use, so
   // baking one into a cached URL would break reconnection).
   sseUrl: (sid: string, options?: { replay?: "active" }) => {
-    let url = `${BASE}/sessions/${sid}/events`;
+    let url = `${QUANT_BASE}/sessions/${sid}/events`;
     if (options?.replay) url = appendQueryParam(url, "replay", options.replay);
     return url;
   },
@@ -149,7 +149,7 @@ export const api = {
     }),
   listSwarmRuns: () => request<SwarmRunSummary[]>("/swarm/runs"),
   getSwarmRun: (id: string) => request<Record<string, unknown>>(`/swarm/runs/${id}`),
-  swarmSseUrl: (id: string) => withAuthTicket(`${BASE}/swarm/runs/${id}/events`),
+  swarmSseUrl: (id: string) => withAuthTicket(`${QUANT_BASE}/swarm/runs/${id}/events`),
   cancelSwarmRun: (id: string) =>
     request<{ status: string }>(`/swarm/runs/${id}/cancel`, { method: "POST" }),
   retrySwarmRun: (id: string) =>
@@ -193,14 +193,14 @@ export const api = {
       body: JSON.stringify(body),
     }),
   alphaBenchStreamUrl: (jobId: string) =>
-    withAuthTicket(`${BASE}/alpha/bench/${encodeURIComponent(jobId)}/stream`),
+    withAuthTicket(`${QUANT_BASE}/alpha/bench/${encodeURIComponent(jobId)}/stream`),
   createAlphaCompare: (body: AlphaCompareRequest) =>
     request<{ status: string; job_id: string }>("/alpha/compare", {
       method: "POST",
       body: JSON.stringify(body),
     }),
   alphaCompareStreamUrl: (jobId: string) =>
-    withAuthTicket(`${BASE}/alpha/compare/${encodeURIComponent(jobId)}/stream`),
+    withAuthTicket(`${QUANT_BASE}/alpha/compare/${encodeURIComponent(jobId)}/stream`),
 
   // Connector runtime channel — privileged surface actions (NOT agent tools).
   // commit is the ONLY action that writes a mandate; halt trips the kill switch.

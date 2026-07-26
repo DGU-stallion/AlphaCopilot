@@ -3,7 +3,7 @@ import { Upload, FileText, Trash2, Download, Loader2, FolderOpen } from "lucide-
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Disclaimer } from "@/components/ui/Disclaimer";
-import { api, ApiError, downloadReport, type MyReport } from "@/lib/api";
+import { researchPageApi as api, ApiError, downloadReport, type MyReport } from "@/lib/apiResearch";
 import { cn } from "@/lib/utils";
 
 const fmtSize = (b: number) =>

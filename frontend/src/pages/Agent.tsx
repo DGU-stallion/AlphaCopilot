@@ -783,6 +783,17 @@ export function Agent() {
     }
   }, [urlSessionId, doDisconnect, loadSessionMessages, setupSSE, forceScrollToBottom]);
 
+  /* Prefill input from URL param (e.g. /agent?prefill=...) without auto-sending */
+  useEffect(() => {
+    const prefill = searchParams.get("prefill");
+    if (prefill) {
+      setInput(prefill);
+      searchParams.delete("prefill");
+      setSearchParams(searchParams, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* Single shared poller for `GET /live/status`. RunnerStatus consumes this snapshot
    * as a prop rather than polling independently, and the global kill switch reads it
    * to stay available whenever connector runtime activity could be active out-of-band. */

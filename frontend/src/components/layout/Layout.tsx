@@ -4,7 +4,7 @@ import {
   Activity, Radar, LayoutGrid, Search, Star,
   Wallet, FileText, NotebookPen, Settings,
   Moon, Sun, ChevronsLeft, ChevronsRight, LineChart,
-  Github, UserRound, Cog, Cpu, Database, Cable,
+  Github, Cog, Cpu, Database, Cable,
   Rocket, FlaskConical, BotMessageSquare, GitCompareArrows,
   BarChart2, Beaker,
 } from "lucide-react";

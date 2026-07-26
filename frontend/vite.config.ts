@@ -18,7 +18,22 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5899,
       proxy: {
-        "/api": { target: apiTarget, changeOrigin: true },
+        "/api": {
+          target: apiTarget,
+          changeOrigin: true,
+          configure: (proxy) => {
+            proxy.on("error", (_err, _req, res) => {
+              if (res && "writeHead" in res) {
+                (res as import("http").ServerResponse).writeHead(502, {
+                  "Content-Type": "application/json",
+                });
+                (res as import("http").ServerResponse).end(
+                  JSON.stringify({ detail: "Backend unavailable" }),
+                );
+              }
+            });
+          },
+        },
       },
     },
     build: {
