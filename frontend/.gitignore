@@ -16,3 +16,4 @@ public/user-data/
 .vscode/*
 !.vscode/extensions.json
 *.log
+node_modules
