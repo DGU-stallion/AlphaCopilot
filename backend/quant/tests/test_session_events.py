@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.session.events import EventBus, SSEEvent
+from quant.session.events import EventBus, SSEEvent
 
 
 def test_first_connect_does_not_replay_completed_history_by_default() -> None:

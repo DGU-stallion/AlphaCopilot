@@ -7,13 +7,13 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
-from backtest.loaders.base import (
+from quant.backtest.loaders.base import (
     NoAvailableSourceError,
     loader_cache_get,
     loader_cache_put,
     validate_date_range,
 )
-from backtest.loaders.registry import register
+from quant.backtest.loaders.registry import register
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ class FutuLoader:
     requires_auth = True
 
     def __init__(self) -> None:
-        from src.config.accessor import get_env_config
+        from quant.config.accessor import get_env_config
 
         cfg = get_env_config().data
         self._host = cfg.futu_host
@@ -120,7 +120,7 @@ class FutuLoader:
 
     def is_available(self) -> bool:
         """Return True if FutuOpenD is reachable."""
-        from src.config.accessor import get_env_config
+        from quant.config.accessor import get_env_config
 
         cfg = get_env_config().data
         if not cfg.futu_host or not cfg.futu_port:

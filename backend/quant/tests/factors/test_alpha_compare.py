@@ -23,8 +23,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.factors import cli_handlers, compare_runner
-from src.factors.bench_runner import run_bench
+from quant.factors import cli_handlers, compare_runner
+from quant.factors.bench_runner import run_bench
 
 
 # ── run_bench(only=...) integration ─────────────────────────────────────────

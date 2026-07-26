@@ -18,11 +18,11 @@ from collections import deque
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from src.agent.tools import BaseTool, ToolRegistry
+from quant.agent.tools import BaseTool, ToolRegistry
 
 if TYPE_CHECKING:
-    from src.config.schema import AgentConfig
-    from src.memory.persistent import PersistentMemory
+    from quant.config.schema import AgentConfig
+    from quant.memory.persistent import PersistentMemory
 
 logger = logging.getLogger(__name__)
 
@@ -113,15 +113,15 @@ def build_registry(
         ToolRegistry containing all available local tools followed by any
         successfully discovered MCP tools.
     """
-    from src.tools.goal_tool import (
+    from quant.tools.goal_tool import (
         AddGoalEvidenceTool,
         GetResearchGoalTool,
         StartResearchGoalTool,
         UpdateResearchGoalStatusTool,
     )
-    from src.tools.autopilot_tool import RunResearchAutopilotTool
-    from src.tools.remember_tool import RememberTool
-    from src.tools.swarm_tool import SwarmTool
+    from quant.tools.autopilot_tool import RunResearchAutopilotTool
+    from quant.tools.remember_tool import RememberTool
+    from quant.tools.swarm_tool import SwarmTool
 
     goal_tool_classes = {
         StartResearchGoalTool,
@@ -153,7 +153,7 @@ def build_registry(
             logger.warning("Failed to register tool %s: %s", cls.name, exc)
 
     if agent_config and agent_config.mcp_servers:
-        from src.tools.mcp import build_mcp_tool_wrappers, resolve_mcp_server_tool_name_segments
+        from quant.tools.mcp import build_mcp_tool_wrappers, resolve_mcp_server_tool_name_segments
 
         if _mcp_server_tool_name_segments is None:
             local_server_names = resolve_mcp_server_tool_name_segments(
@@ -177,7 +177,7 @@ def build_registry(
                 # behind the mandate + kill switch; reads stay plain (read-only).
                 # Detection is by config key OR URL host, so a live-broker URL
                 # under an aliased key cannot bypass the gate.
-                from src.live.registry import (
+                from quant.live.registry import (
                     is_live_broker,
                     should_register_live_channel,
                     wrap_live_broker_tools,
@@ -320,8 +320,8 @@ def _prune_agent_config_for_swarm_tools(
     if not requested_mcp_tool_names:
         return None, None
 
-    from src.config.schema import AgentConfig
-    from src.tools.mcp import resolve_mcp_server_tool_name_segments
+    from quant.config.schema import AgentConfig
+    from quant.tools.mcp import resolve_mcp_server_tool_name_segments
 
     local_server_names = resolve_mcp_server_tool_name_segments(agent_config.mcp_servers.keys())
     selected_servers = {

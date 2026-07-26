@@ -16,7 +16,7 @@ import re
 
 import pandas as pd
 
-from backtest.engines.futures_base import FuturesBaseEngine
+from quant.backtest.engines.futures_base import FuturesBaseEngine
 
 
 # ── Contract multiplier lookup ──

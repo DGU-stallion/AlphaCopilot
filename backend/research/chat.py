@@ -17,9 +17,9 @@ from urllib.parse import urlparse
 
 import requests
 
-import astock
-import cli_runtime
-import gstock
+import research.astock as astock
+import research.cli_runtime as cli_runtime
+import research.gstock as gstock
 
 MAX_ROUNDS = 6  # 工具调用最大轮数，防死循环
 _TOOL_RESULT_CAP = 6000  # 单次工具结果注入上限（控 token）

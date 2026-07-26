@@ -7,14 +7,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-from src.scheduled_research.executor import (
+from quant.scheduled_research.executor import (
     ScheduledResearchExecutor,
     is_due,
     next_due,
     scheduler_enabled_from_env,
 )
-from src.scheduled_research.models import JobStatus, ScheduledResearchJob
-from src.scheduled_research.store import ScheduledResearchJobStore
+from quant.scheduled_research.models import JobStatus, ScheduledResearchJob
+from quant.scheduled_research.store import ScheduledResearchJobStore
 
 
 def _ms(year: int, month: int, day: int, hour: int, minute: int) -> int:

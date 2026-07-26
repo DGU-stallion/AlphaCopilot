@@ -50,7 +50,7 @@ from rich.table import Table
 from rich.text import Text
 
 from cli.theme import get_console
-from src.config.accessor import get_env_config, reset_env_config
+from quant.config.accessor import get_env_config, reset_env_config
 
 console = get_console()
 AGENT_DIR = Path(__file__).resolve().parents[1]
@@ -69,7 +69,7 @@ SWARM_RUN_VARS_PREVIEW_CHARS = 80
 from cli._version import __version__ as _VERSION  # noqa: E402 — single source of truth
 
 if TYPE_CHECKING:
-    from src.agent.loop import AgentLoop
+    from quant.agent.loop import AgentLoop
 
 # Agent color assignments for swarm display
 _AGENT_STYLES = ["cyan", "magenta", "green", "yellow", "blue", "bright_red", "bright_cyan", "bright_magenta"]
@@ -389,7 +389,7 @@ def _terminal_width() -> int:
 def _ensure_cli_env() -> None:
     """Load dotenv values before rendering CLI-only settings."""
     try:
-        from src.providers.llm import _ensure_dotenv
+        from quant.providers.llm import _ensure_dotenv
 
         _ensure_dotenv()
     except Exception:
@@ -940,7 +940,7 @@ def _load_full_proposal(proposal_id: str) -> Optional[Dict[str, Any]]:
         The full proposal dict, or ``None`` when not found / unreadable.
     """
     try:
-        from src.live.paths import live_root
+        from quant.live.paths import live_root
 
         for proposal_path in live_root().glob(f"*/proposals/{proposal_id}.json"):
             try:
@@ -1001,9 +1001,10 @@ def _run_agent(
             is a privileged surface action (commit), never a tool the model can
             call (SPEC.md Consent §2).
     """
-    from src.tools import build_registry
-    from src.providers.chat import ChatLLM
-    from src.agent.loop import AgentLoop
+    from quant.tools import build_registry
+    from quant.providers.chat import ChatLLM
+    from quant.agent.loop import AgentLoop
+    from quant.agent.tuning import AgentTuning
 
     # Closure-level state for the no-rich path so dots and progress lines
     # don't shoulder-bump each other (M3) and progress prints are throttled
@@ -1130,10 +1131,10 @@ def _run_agent(
             tokens = data.get("tokens_before", "?")
             console.print(f"\n  [yellow]\u27f3 context compressed[/yellow] [dim]({tokens} tokens \u2192 summary)[/dim]\n")
 
-    from src.memory.persistent import PersistentMemory
+    from quant.memory.persistent import PersistentMemory
 
     pm = PersistentMemory()
-    from src.config.loader import load_agent_config
+    from quant.config.loader import load_agent_config
 
     agent_config = load_agent_config()
 
@@ -1152,6 +1153,7 @@ def _run_agent(
             warn_callback=_mcp_warn,
         ),
         llm=ChatLLM(),
+        tuning=AgentTuning.from_env_config(),
         event_callback=on_event,
         max_iterations=max_iter,
         persistent_memory=pm,
@@ -1404,7 +1406,7 @@ def _print_result(result: dict, elapsed: float, *, no_rich: bool = False) -> Non
 def cmd_run(prompt: str, max_iter: int, *, json_mode: bool = False, no_rich: bool = False) -> int:
     """Single run."""
     if not json_mode:
-        from src.preflight import run_preflight
+        from quant.preflight import run_preflight
         results = run_preflight(console)
         if any(r.critical and r.status != "ready" for r in results):
             return EXIT_RUN_FAILED
@@ -1450,7 +1452,7 @@ def cmd_run(prompt: str, max_iter: int, *, json_mode: bool = False, no_rich: boo
 
 def _build_history_from_trace(trace_dir: Path) -> List[Dict[str, str]]:
     """Build conversation history from trace.jsonl."""
-    from src.agent.trace import TraceWriter
+    from quant.agent.trace import TraceWriter
 
     if not (trace_dir / "trace.jsonl").exists():
         return []
@@ -1477,7 +1479,7 @@ def cmd_continue(
     no_rich: bool = False,
 ) -> int:
     """Continue an existing run."""
-    from src.agent.trace import TraceWriter
+    from quant.agent.trace import TraceWriter
 
     run_dir = RUNS_DIR / run_id
     session_trace_dir = SESSIONS_DIR / run_id
@@ -1902,7 +1904,7 @@ def cmd_interactive(max_iter: int) -> None:
     """Interactive mode with welcome screen, slash commands, and agent conversation."""
     _print_welcome()
 
-    from src.preflight import run_preflight
+    from quant.preflight import run_preflight
     results = run_preflight(console)
     if any(r.critical and r.status != "ready" for r in results):
         return
@@ -2142,10 +2144,10 @@ class _SwarmDashboard:
 def cmd_swarm_run_live(preset: str, vars_json: Optional[str] = None) -> Optional[int]:
     """Run a swarm preset with Rich Live dashboard."""
     from rich.live import Live
-    from src.config import load_swarm_agent_config
-    from src.swarm.runtime import SwarmRuntime
-    from src.swarm.store import SwarmStore
-    from src.swarm.models import RunStatus
+    from quant.config import load_swarm_agent_config
+    from quant.swarm.runtime import SwarmRuntime
+    from quant.swarm.store import SwarmStore
+    from quant.swarm.models import RunStatus
 
     user_vars: Dict[str, str] = {}
     if vars_json:
@@ -2304,7 +2306,7 @@ def cmd_show(run_id: str) -> None:
         lines.append("\n[bold]Metrics:[/bold]")
         lines.extend(f"  {k}: {v}" for k, v in metrics.items())
 
-    from src.agent.trace import TraceWriter
+    from quant.agent.trace import TraceWriter
     trace_dir = TraceWriter.find_trace_dir(run_id, runs_dir=RUNS_DIR, sessions_dir=SESSIONS_DIR)
     entries = (
         TraceWriter.read(trace_dir, resolve_offloads=True, resolve_fields={"content"})
@@ -2352,7 +2354,7 @@ def cmd_pine(run_id: str) -> None:
 
 def cmd_skills() -> None:
     """List available skills."""
-    from src.agent.skills import SkillsLoader
+    from quant.agent.skills import SkillsLoader
     loader = SkillsLoader()
 
     table = Table(title="Skills", show_lines=False)
@@ -2367,7 +2369,7 @@ def cmd_skills() -> None:
 
 def cmd_trace(run_id: str) -> None:
     """Replay trace.jsonl to show full execution."""
-    from src.agent.trace import TraceWriter
+    from quant.agent.trace import TraceWriter
 
     trace_dir = TraceWriter.find_trace_dir(run_id, runs_dir=RUNS_DIR, sessions_dir=SESSIONS_DIR)
     if trace_dir is None:
@@ -2439,7 +2441,7 @@ def cmd_trace(run_id: str) -> None:
 
 def cmd_swarm_presets() -> None:
     """List available swarm presets."""
-    from src.swarm.presets import list_presets
+    from quant.swarm.presets import list_presets
 
     presets = list_presets()
     if not presets:
@@ -2477,7 +2479,7 @@ def cmd_swarm_run(preset: str, vars_json: Optional[str] = None) -> Optional[int]
 
 def cmd_swarm_inspect(preset: str) -> int:
     """Inspect a swarm preset without starting workers."""
-    from src.swarm.presets import inspect_preset
+    from quant.swarm.presets import inspect_preset
 
     try:
         report = inspect_preset(preset)
@@ -2549,7 +2551,7 @@ def cmd_swarm_inspect(preset: str) -> int:
 
 def cmd_swarm_list() -> None:
     """List swarm run history."""
-    from src.swarm.store import SwarmStore
+    from quant.swarm.store import SwarmStore
 
     store = SwarmStore(base_dir=SWARM_DIR)
     runs = store.list_runs()
@@ -2585,8 +2587,8 @@ def cmd_swarm_list() -> None:
 
 def cmd_swarm_show(run_id: str) -> None:
     """Show swarm run details."""
-    from src.swarm.store import SwarmStore
-    from src.swarm.models import TaskStatus
+    from quant.swarm.store import SwarmStore
+    from quant.swarm.models import TaskStatus
 
     store = SwarmStore(base_dir=SWARM_DIR)
     run = store.load_run(run_id)
@@ -2636,8 +2638,8 @@ def cmd_swarm_show(run_id: str) -> None:
 
 def cmd_swarm_cancel(run_id: str) -> None:
     """Cancel a swarm run."""
-    from src.swarm.runtime import SwarmRuntime
-    from src.swarm.store import SwarmStore
+    from quant.swarm.runtime import SwarmRuntime
+    from quant.swarm.store import SwarmStore
 
     store = SwarmStore(base_dir=SWARM_DIR)
     runtime = SwarmRuntime(store=store)
@@ -2654,7 +2656,7 @@ def cmd_swarm_cancel(run_id: str) -> None:
 
 def cmd_sessions() -> None:
     """List chat sessions."""
-    from src.session.store import SessionStore
+    from quant.session.store import SessionStore
 
     store = SessionStore(base_dir=SESSIONS_DIR)
     sessions = store.list_sessions()
@@ -2686,7 +2688,7 @@ def cmd_sessions() -> None:
 
 def cmd_session_chat(session_id: str, max_iter: int) -> None:
     """Continue a session chat."""
-    from src.session.store import SessionStore
+    from quant.session.store import SessionStore
 
     store = SessionStore(base_dir=SESSIONS_DIR)
     session = store.get_session(session_id)
@@ -2785,7 +2787,7 @@ def cmd_provider_login(provider: str) -> int:
         console.print("[red]Unknown OAuth provider.[/red] Supported: openai-codex")
         return EXIT_USAGE_ERROR
     try:
-        from src.providers.openai_codex import login_openai_codex
+        from quant.providers.openai_codex import login_openai_codex
 
         console.print("[cyan]Starting OpenAI Codex OAuth login...[/cyan]\n")
         token = login_openai_codex(
@@ -2906,8 +2908,8 @@ def _channels_api_call(method: str, path: str, *, body: Optional[Dict[str, Any]]
 
 def _channels_local_status() -> Dict[str, Any]:
     """Build local channel config/import status without starting adapters."""
-    from src.channels.config import load_channels_config
-    from src.channels.registry import inspect_channels
+    from quant.channels.config import load_channels_config
+    from quant.channels.registry import inspect_channels
 
     config = load_channels_config()
     return {
@@ -3000,7 +3002,7 @@ def cmd_channels_stop(*, json_mode: bool = False) -> int:
 
 def cmd_channels_pairing(channel: str, command: str) -> int:
     """Run a pairing command against the shared local pairing store."""
-    from src.channels.pairing import handle_pairing_command
+    from quant.channels.pairing import handle_pairing_command
 
     console.print(handle_pairing_command(channel, command))
     return EXIT_SUCCESS
@@ -3010,9 +3012,9 @@ def cmd_channels_login(channel_name: str, *, force: bool = False) -> int:
     """Run a channel adapter's interactive login hook when available."""
     import asyncio
 
-    from src.channels.config import load_channels_config
-    from src.channels.manager import ChannelManager
-    from src.channels.bus.queue import MessageBus
+    from quant.channels.config import load_channels_config
+    from quant.channels.manager import ChannelManager
+    from quant.channels.bus.queue import MessageBus
 
     config = load_channels_config()
     section = dict(config.get(channel_name, {})) if isinstance(config.get(channel_name), dict) else {}
@@ -3059,7 +3061,7 @@ def _dispatch_channels(args: argparse.Namespace) -> int:
 # QVERIS-INTEGRATION
 def _print_qveris_config(config) -> None:  # QVERIS-INTEGRATION
     """Render local QVeris config."""  # QVERIS-INTEGRATION
-    from src.tools.qveris_tool import SIGNUP_URL, INVITE_CODE, has_qveris_credentials, is_qveris_configured, mask_api_key, normalize_qveris_mode  # QVERIS-INTEGRATION
+    from quant.tools.qveris_tool import SIGNUP_URL, INVITE_CODE, has_qveris_credentials, is_qveris_configured, mask_api_key, normalize_qveris_mode  # QVERIS-INTEGRATION
     table = Table(title="Data Routing", box=box.SIMPLE)  # QVERIS-INTEGRATION
     table.add_column("Field")  # QVERIS-INTEGRATION
     table.add_column("Value")  # QVERIS-INTEGRATION
@@ -3077,7 +3079,7 @@ def _print_qveris_config(config) -> None:  # QVERIS-INTEGRATION
 # QVERIS-INTEGRATION
 def cmd_qveris_status() -> int:  # QVERIS-INTEGRATION
     """Show QVeris local config and live status when configured."""  # QVERIS-INTEGRATION
-    from src.tools.qveris_tool import QVerisClient, is_qveris_configured, load_qveris_config  # QVERIS-INTEGRATION
+    from quant.tools.qveris_tool import QVerisClient, is_qveris_configured, load_qveris_config  # QVERIS-INTEGRATION
     config = load_qveris_config()  # QVERIS-INTEGRATION
     _print_qveris_config(config)  # QVERIS-INTEGRATION
     if not is_qveris_configured(config):  # QVERIS-INTEGRATION
@@ -3092,7 +3094,7 @@ def cmd_qveris_status() -> int:  # QVERIS-INTEGRATION
 # QVERIS-INTEGRATION
 def cmd_qveris_enable(*, key: str | None = None, url: str | None = None) -> int:  # QVERIS-INTEGRATION
     """Enable QVeris if an API key is present or supplied."""  # QVERIS-INTEGRATION
-    from src.tools.qveris_tool import SIGNUP_URL, INVITE_CODE, QVerisConfig, _read_config_file, save_qveris_config  # QVERIS-INTEGRATION
+    from quant.tools.qveris_tool import SIGNUP_URL, INVITE_CODE, QVerisConfig, _read_config_file, save_qveris_config  # QVERIS-INTEGRATION
     existing = _read_config_file()  # QVERIS-INTEGRATION
     api_key = (key or existing.api_key or "").strip()  # QVERIS-INTEGRATION
     if not api_key:  # QVERIS-INTEGRATION
@@ -3116,7 +3118,7 @@ def cmd_qveris_mode(
     url: str | None = None,
 ) -> int:  # QVERIS-INTEGRATION
     """Switch QVeris between free and paid modes."""  # QVERIS-INTEGRATION
-    from src.tools.qveris_tool import QVerisConfig, _read_config_file, normalize_qveris_mode, save_qveris_config  # QVERIS-INTEGRATION
+    from quant.tools.qveris_tool import QVerisConfig, _read_config_file, normalize_qveris_mode, save_qveris_config  # QVERIS-INTEGRATION
     existing = _read_config_file()  # QVERIS-INTEGRATION
     next_mode = normalize_qveris_mode(mode)  # QVERIS-INTEGRATION
     next_budget = existing.budget_credits_per_session if budget is None else max(float(budget), 0.0)  # QVERIS-INTEGRATION
@@ -3132,7 +3134,7 @@ def cmd_qveris_mode(
 # QVERIS-INTEGRATION
 def cmd_qveris_disable() -> int:  # QVERIS-INTEGRATION
     """Disable QVeris without deleting the stored key."""  # QVERIS-INTEGRATION
-    from src.tools.qveris_tool import QVerisConfig, _read_config_file, save_qveris_config  # QVERIS-INTEGRATION
+    from quant.tools.qveris_tool import QVerisConfig, _read_config_file, save_qveris_config  # QVERIS-INTEGRATION
     existing = _read_config_file()  # QVERIS-INTEGRATION
     save_qveris_config(QVerisConfig(False, existing.base_url, existing.api_key, "free", existing.budget_credits_per_session))  # QVERIS-INTEGRATION
     console.print("[green]QVeris disabled.[/green]")  # QVERIS-INTEGRATION
@@ -3140,7 +3142,7 @@ def cmd_qveris_disable() -> int:  # QVERIS-INTEGRATION
 # QVERIS-INTEGRATION
 def cmd_qveris_usage() -> int:  # QVERIS-INTEGRATION
     """Show recent QVeris usage events."""  # QVERIS-INTEGRATION
-    from src.tools.qveris_tool import QVerisClient, is_qveris_configured, load_qveris_config  # QVERIS-INTEGRATION
+    from quant.tools.qveris_tool import QVerisClient, is_qveris_configured, load_qveris_config  # QVERIS-INTEGRATION
     config = load_qveris_config()  # QVERIS-INTEGRATION
     if not is_qveris_configured(config):  # QVERIS-INTEGRATION
         console.print("[yellow]QVeris is not configured.[/yellow]")  # QVERIS-INTEGRATION
@@ -3177,7 +3179,7 @@ def _live_server_config(broker: str):
         The :class:`MCPServerConfig` for ``broker``, or ``None`` when the broker
         has no entry in the protected config.
     """
-    from src.config.loader import load_agent_config
+    from quant.config.loader import load_agent_config
 
     agent_config = load_agent_config()
     servers = getattr(agent_config, "mcp_servers", {}) or {}
@@ -3186,9 +3188,9 @@ def _live_server_config(broker: str):
 
 def _raw_live_server_config_entry(broker: str) -> dict[str, Any] | None:
     """Best-effort raw lookup used only to explain invalid live config."""
-    from src.config.loader import _read_config_file
-    from src.config.paths import get_config_path
-    from src.config.schema import live_broker_key_for_url
+    from quant.config.loader import _read_config_file
+    from quant.config.paths import get_config_path
+    from quant.config.schema import live_broker_key_for_url
 
     try:
         path = get_config_path()
@@ -3231,7 +3233,7 @@ def _raw_server_entry_uses_wildcard(entry: dict[str, Any] | None) -> bool:
 def _print_missing_live_channel_config(key: str) -> None:
     """Print actionable guidance when a live broker config cannot be loaded."""
     if key == "robinhood":
-        from src.config.schema import format_robinhood_mcp_config_guidance
+        from quant.config.schema import format_robinhood_mcp_config_guidance
 
         reason = "wildcard" if _raw_server_entry_uses_wildcard(_raw_live_server_config_entry(key)) else "missing"
         console.print("[red]Robinhood live channel is not configured safely.[/red]")
@@ -3276,7 +3278,7 @@ def cmd_live_authorize(broker: str) -> int:
         "once the broker redirects back.[/dim]"
     )
     try:
-        from src.tools.mcp import build_mcp_tool_wrappers
+        from quant.tools.mcp import build_mcp_tool_wrappers
 
         # The OAuth flow is driven lazily by the first request to the server —
         # the `list_tools` discovery handshake — which is bounded by the
@@ -3325,7 +3327,7 @@ def cmd_live_authorize(broker: str) -> int:
 
 def cmd_provider_doctor() -> int:
     """Print redacted provider diagnostics."""
-    from src.providers.llm import provider_diagnostics
+    from quant.providers.llm import provider_diagnostics
 
     console.print_json(data=provider_diagnostics())
     return EXIT_SUCCESS
@@ -3378,7 +3380,7 @@ def _add_runner_liveness_rows(table: Table, broker: str) -> None:
     """
     runner_id = _runner_id_for(broker)
     try:
-        from src.live.runtime.liveness import is_runner_alive, last_tick
+        from quant.live.runtime.liveness import is_runner_alive, last_tick
     except Exception:  # noqa: BLE001 — liveness lands concurrently; degrade cleanly
         table.add_row("Runner", "[dim]unknown (runtime not available)[/dim]")
         return
@@ -3447,9 +3449,9 @@ def cmd_live_status(broker: Optional[str] = None) -> int:
     Returns:
         Process exit code.
     """
-    from src.live.halt import halt_flag_set, read_halt
-    from src.live.mandate.model import MANDATE_SCHEMA_VERSION
-    from src.live.mandate.store import load_mandate
+    from quant.live.halt import halt_flag_set, read_halt
+    from quant.live.mandate.model import MANDATE_SCHEMA_VERSION
+    from quant.live.mandate.store import load_mandate
 
     key = (broker or _DEFAULT_LIVE_BROKER).strip().lower()
 
@@ -3510,7 +3512,7 @@ def cmd_live_mandate(broker: Optional[str] = None) -> int:
     """
     from dataclasses import asdict
 
-    from src.live.mandate.store import load_mandate
+    from quant.live.mandate.store import load_mandate
 
     key = (broker or _DEFAULT_LIVE_BROKER).strip().lower()
     mandate = load_mandate(key)
@@ -3543,7 +3545,7 @@ def cmd_live_halt(broker: Optional[str] = None) -> int:
     Returns:
         Process exit code.
     """
-    from src.live.halt import trip_halt
+    from quant.live.halt import trip_halt
 
     target = broker.strip().lower() if broker else None
     path = trip_halt(by="cli", reason="cli live halt", broker=target)
@@ -3564,7 +3566,7 @@ def cmd_live_resume(broker: Optional[str] = None) -> int:
     Returns:
         Process exit code.
     """
-    from src.live.halt import clear_halt
+    from quant.live.halt import clear_halt
 
     target = broker.strip().lower() if broker else None
     cleared = clear_halt(broker=target)
@@ -3588,7 +3590,7 @@ def cmd_live_revoke(broker: str) -> int:
     Returns:
         Process exit code.
     """
-    from src.live.paths import broker_dir
+    from quant.live.paths import broker_dir
 
     key = broker.strip().lower()
     try:
@@ -3722,7 +3724,7 @@ def cmd_live_run(broker: Optional[str] = None) -> int:
     )
 
     try:
-        from src.live.runtime.liveness import is_runner_alive, last_tick
+        from quant.live.runtime.liveness import is_runner_alive, last_tick
     except Exception:  # noqa: BLE001 — runtime lands concurrently; fall back to a wait
         is_runner_alive = None  # type: ignore[assignment]
         last_tick = None  # type: ignore[assignment]
@@ -3772,14 +3774,14 @@ def _profile_id(value: Optional[str]) -> Optional[str]:
 
 def _selected_profile_or(value: Optional[str]):
     """Resolve the selected or explicit trading profile."""
-    from src.trading.profiles import profile_by_id
+    from quant.trading.profiles import profile_by_id
 
     return profile_by_id(_profile_id(value))
 
 
 def cmd_connector_list() -> int:
     """List selectable trading connector profiles."""
-    from src.trading.profiles import list_profiles, load_selected_profile_id
+    from quant.trading.profiles import list_profiles, load_selected_profile_id
 
     selected = load_selected_profile_id()
     table = Table(title="Trading Connectors", box=box.SIMPLE_HEAVY, show_lines=False)
@@ -3805,7 +3807,7 @@ def cmd_connector_list() -> int:
 
 def cmd_connector_use(profile_id: str) -> int:
     """Select the default trading connector profile."""
-    from src.trading.profiles import profile_by_id, save_selected_profile_id
+    from quant.trading.profiles import profile_by_id, save_selected_profile_id
 
     try:
         profile = profile_by_id(profile_id)
@@ -3829,7 +3831,7 @@ def cmd_connector_configure(
     yes: bool = False,
 ) -> int:
     """Configure a local connector profile."""
-    from src.trading.connectors.ibkr.local import IBKRLocalConfig, config_path, save_config
+    from quant.trading.connectors.ibkr.local import IBKRLocalConfig, config_path, save_config
 
     try:
         profile = _selected_profile_or(profile_id)
@@ -3876,7 +3878,7 @@ def cmd_connector_check(
     account: str | None = None,
 ) -> int:
     """Check selected or explicit trading connector profile."""
-    from src.trading.service import check_connection
+    from quant.trading.service import check_connection
 
     try:
         profile = _selected_profile_or(profile_id)
@@ -4078,7 +4080,7 @@ def cmd_connector_account(
     account: str | None = None,
 ) -> int:
     """Print account summary from a connector profile."""
-    from src.trading.service import get_account
+    from quant.trading.service import get_account
 
     try:
         result = get_account(_profile_id(profile_id), host=host, port=port, client_id=client_id, account=account)
@@ -4100,7 +4102,7 @@ def cmd_connector_positions(
     account: str | None = None,
 ) -> int:
     """Print positions from a connector profile."""
-    from src.trading.service import get_positions
+    from quant.trading.service import get_positions
 
     try:
         result = get_positions(_profile_id(profile_id), host=host, port=port, client_id=client_id, account=account)
@@ -4182,7 +4184,7 @@ def cmd_connector_orders(
     include_executions: bool = False,
 ) -> int:
     """Print open orders from a connector profile."""
-    from src.trading.service import get_open_orders
+    from quant.trading.service import get_open_orders
 
     try:
         result = get_open_orders(
@@ -4241,7 +4243,7 @@ def cmd_connector_quote(
     sec_type: str = "STK",
 ) -> int:
     """Print a quote from a connector profile."""
-    from src.trading.service import get_quote
+    from quant.trading.service import get_quote
 
     try:
         result = get_quote(
@@ -4298,7 +4300,7 @@ def cmd_connector_history(
     limit: int = 90,
 ) -> int:
     """Print historical bars from a connector profile."""
-    from src.trading.service import get_history
+    from quant.trading.service import get_history
 
     try:
         result = get_history(
@@ -4363,7 +4365,7 @@ def _live_profile_connector(
         console.print(f"[red]{profile.id} is not a live remote MCP connector profile.[/red]")
         return EXIT_USAGE_ERROR, None
     if require_runner:
-        from src.trading.service import profile_supports_live_runner
+        from quant.trading.service import profile_supports_live_runner
 
         if not profile_supports_live_runner(profile):
             console.print(f"[red]{profile.id} does not support live runner management.[/red]")
@@ -4772,11 +4774,11 @@ def _build_parser() -> argparse.ArgumentParser:
         _add_connector_profile_arg(p)
 
     # Alpha Zoo subcommands (registered via cli_handlers.add_subparser)
-    from src.factors.cli_handlers import add_subparser as _add_alpha_subparser
+    from quant.factors.cli_handlers import add_subparser as _add_alpha_subparser
     _add_alpha_subparser(subparsers)
 
     # Hypothesis Registry subcommands
-    from src.hypotheses.cli_handlers import add_subparser as _add_hypothesis_subparser
+    from quant.hypotheses.cli_handlers import add_subparser as _add_hypothesis_subparser
     _add_hypothesis_subparser(subparsers)
 
     return parser
@@ -5049,7 +5051,7 @@ def _render_env_content(config: dict[str, str]) -> str:
     return "\n".join(lines) + "\n"
 
 
-from src.memory.persistent import MEMORY_TYPES  # noqa: E402  source-of-truth for choices/invariants
+from quant.memory.persistent import MEMORY_TYPES  # noqa: E402  source-of-truth for choices/invariants
 
 _MEMORY_TYPE_STYLES = {
     "user": "cyan",
@@ -5069,7 +5071,7 @@ assert set(_MEMORY_TYPE_STYLES) == set(MEMORY_TYPES), (
 
 def cmd_memory_list(memory_type: Optional[str] = None, *, memory_dir: Optional[Path] = None) -> int:
     """List persisted memory entries."""
-    from src.memory.persistent import PersistentMemory
+    from quant.memory.persistent import PersistentMemory
 
     pm = PersistentMemory(memory_dir=memory_dir)
     entries = pm.list_entries()
@@ -5105,7 +5107,7 @@ def cmd_memory_list(memory_type: Optional[str] = None, *, memory_dir: Optional[P
 
 def cmd_memory_show(name: str, *, memory_dir: Optional[Path] = None) -> int:
     """Show full content of a single memory entry."""
-    from src.memory.persistent import PersistentMemory
+    from quant.memory.persistent import PersistentMemory
 
     pm = PersistentMemory(memory_dir=memory_dir)
     entry = pm.find(name)
@@ -5127,7 +5129,7 @@ def cmd_memory_show(name: str, *, memory_dir: Optional[Path] = None) -> int:
 
 def cmd_memory_search(query: str, max_results: int = 5, *, memory_dir: Optional[Path] = None) -> int:
     """Run keyword recall and display the top matches."""
-    from src.memory.persistent import PersistentMemory
+    from quant.memory.persistent import PersistentMemory
 
     pm = PersistentMemory(memory_dir=memory_dir)
     results = pm.find_relevant(query, max_results=max_results)
@@ -5156,7 +5158,7 @@ def cmd_memory_search(query: str, max_results: int = 5, *, memory_dir: Optional[
 
 def cmd_memory_forget(name: str, *, yes: bool = False, memory_dir: Optional[Path] = None) -> int:
     """Remove a memory entry by name."""
-    from src.memory.persistent import PersistentMemory
+    from quant.memory.persistent import PersistentMemory
 
     pm = PersistentMemory(memory_dir=memory_dir)
     entry = pm.find(name)
@@ -5649,10 +5651,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "chat":
         return _coerce_exit_code(cmd_interactive(args.chat_max_iter))
     if args.command == "alpha":
-        from src.factors.cli_handlers import dispatch as _alpha_dispatch
+        from quant.factors.cli_handlers import dispatch as _alpha_dispatch
         return _coerce_exit_code(_alpha_dispatch(args))
     if args.command == "hypothesis":
-        from src.hypotheses.cli_handlers import dispatch as _hyp_dispatch
+        from quant.hypotheses.cli_handlers import dispatch as _hyp_dispatch
         return _coerce_exit_code(_hyp_dispatch(args))
     if args.command == "connector":
         return _coerce_exit_code(_dispatch_connector(args))

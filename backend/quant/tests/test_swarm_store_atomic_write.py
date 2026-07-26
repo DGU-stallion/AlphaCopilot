@@ -19,9 +19,9 @@ import os
 
 import pytest
 
-import src.swarm.store as store_mod
-from src.swarm.models import SwarmRun
-from src.swarm.store import SwarmStore
+import quant.swarm.store as store_mod
+from quant.swarm.models import SwarmRun
+from quant.swarm.store import SwarmStore
 
 
 def _winerr(code: int) -> PermissionError:
@@ -126,7 +126,7 @@ def test_load_run_missing_is_fast_none(tmp_path, monkeypatch):
 def test_posix_oserror_is_not_treated_transient():
     """POSIX no-op guard: a plain OSError (no winerror) is never transient,
     so off-Windows the retry loop runs exactly once — no behavior change."""
-    from src.swarm.store import _is_transient_windows_error
+    from quant.swarm.store import _is_transient_windows_error
 
     assert _is_transient_windows_error(OSError("posix")) is False
     assert _is_transient_windows_error(_winerr(13)) is False

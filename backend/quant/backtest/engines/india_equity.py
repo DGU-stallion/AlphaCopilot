@@ -31,8 +31,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from backtest.engines.base import BaseEngine
-from backtest.engines.china_a import _calc_pct_change
+from quant.backtest.engines.base import BaseEngine
+from quant.backtest.engines.china_a import _calc_pct_change
 
 
 class IndiaEquityEngine(BaseEngine):

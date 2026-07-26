@@ -64,8 +64,8 @@ except Exception:  # pragma: no cover — rich is a project dep, fallback only
     TextColumn = None  # type: ignore[assignment]
     TimeElapsedColumn = None  # type: ignore[assignment]
 
-from src.factors.compare_runner import SORT_KEYS as _COMPARE_SORT_KEYS, compare_alphas
-from src.factors.registry import Registry, RegistryError
+from quant.factors.compare_runner import SORT_KEYS as _COMPARE_SORT_KEYS, compare_alphas
+from quant.factors.registry import Registry, RegistryError
 
 
 # Resolve repo root once: this file lives at
@@ -511,7 +511,7 @@ def cmd_alpha_bench(args: argparse.Namespace) -> int:
     """
     try:
         try:
-            from src.factors.bench_runner import run_bench
+            from quant.factors.bench_runner import run_bench
         except ImportError as exc:
             _err(f"alpha bench failed: bench_runner unavailable ({exc})")
             return 1
@@ -641,7 +641,7 @@ def cmd_alpha_bench(args: argparse.Namespace) -> int:
 
         report_path: Path | None = None
         try:
-            from src.tools.alpha_bench_tool import (  # type: ignore[import-not-found]
+            from quant.tools.alpha_bench_tool import (  # type: ignore[import-not-found]
                 _CSP,
                 _REPORT_CSS,
                 _default_output_dir,

@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from src.tools import symbol_search_tool as ss
+from quant.tools import symbol_search_tool as ss
 
 
 def _eastmoney_payload() -> dict:

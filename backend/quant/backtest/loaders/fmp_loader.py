@@ -23,9 +23,9 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from backtest.loaders._http import resolve_min_interval, throttled_get_json
-from backtest.loaders.base import cached_loader_fetch, validate_date_range
-from backtest.loaders.registry import register
+from quant.backtest.loaders._http import resolve_min_interval, throttled_get_json
+from quant.backtest.loaders.base import cached_loader_fetch, validate_date_range
+from quant.backtest.loaders.registry import register
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ _OHLCV_FIELDS = ("open", "high", "low", "close", "volume")
 
 def _api_key() -> str:
     """Return the FMP API key from the environment, stripped (``""`` if unset)."""
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
 
     return get_env_config().data.fmp_api_key.strip()
 

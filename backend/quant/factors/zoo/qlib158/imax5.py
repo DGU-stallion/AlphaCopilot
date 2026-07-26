@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import pandas as pd
-from src.factors.base import ts_argmax
+from quant.factors.base import ts_argmax
 
 __alpha_meta__ = {
     'id': 'qlib158_imax5',

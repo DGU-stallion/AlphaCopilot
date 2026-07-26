@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.tools.image_vision_tool import AnalyzeImageTool
+from quant.tools.image_vision_tool import AnalyzeImageTool
 
 # 1x1 transparent PNG
 _PNG_BYTES = bytes.fromhex(

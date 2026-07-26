@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from src.tools import block_trades_tool as bt
+from quant.tools import block_trades_tool as bt
 
 
 def _sample_payload() -> dict:

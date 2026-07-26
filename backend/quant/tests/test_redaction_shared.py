@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.tools.redaction import is_sensitive_arg, redact_payload
+from quant.tools.redaction import is_sensitive_arg, redact_payload
 
 
 @pytest.mark.parametrize(

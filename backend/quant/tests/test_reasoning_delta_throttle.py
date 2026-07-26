@@ -58,14 +58,16 @@ def _build_agent(llm: Any, events: list, tmp_run_dir: Path):
     Returns:
         Configured AgentLoop instance.
     """
-    from src.agent.loop import AgentLoop
-    from src.memory.persistent import PersistentMemory
-    from src.tools import build_registry
+    from quant.agent.loop import AgentLoop
+    from quant.memory.persistent import PersistentMemory
+    from quant.tools import build_registry
+    from conftest import make_test_tuning
 
     pm = PersistentMemory()
     agent = AgentLoop(
         registry=build_registry(persistent_memory=pm, include_shell_tools=False),
         llm=llm,
+        tuning=make_test_tuning(),
         event_callback=lambda event_type, data: events.append((event_type, data)),
         max_iterations=3,
         persistent_memory=pm,

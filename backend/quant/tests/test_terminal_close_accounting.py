@@ -5,10 +5,10 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from backtest.engines.base import BaseEngine
-from backtest.engines.china_futures import ChinaFuturesEngine
-from backtest.engines.composite import CompositeEngine
-from backtest.engines.global_futures import GlobalFuturesEngine
+from quant.backtest.engines.base import BaseEngine
+from quant.backtest.engines.china_futures import ChinaFuturesEngine
+from quant.backtest.engines.composite import CompositeEngine
+from quant.backtest.engines.global_futures import GlobalFuturesEngine
 
 
 class _TerminalCostEngine(BaseEngine):

@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-import src.live.paths as paths
-from src.live.mandate.commit import CommitError, commit_mandate, save_proposal
+import quant.live.paths as paths
+from quant.live.mandate.commit import CommitError, commit_mandate, save_proposal
 
 pytestmark = pytest.mark.unit
 
@@ -85,7 +85,7 @@ def test_commit_mandate_rejects_proposal_id_traversal_to_external_json(live_runt
     escape that directory and load an attacker-controlled JSON file, then write
     a live mandate from it.
     """
-    from src.live.paths import broker_dir
+    from quant.live.paths import broker_dir
 
     proposals_dir = broker_dir("robinhood") / "proposals"
     proposals_dir.mkdir(parents=True)

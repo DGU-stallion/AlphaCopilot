@@ -20,7 +20,7 @@ import threading
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.config.env_schema import EnvConfig
+    from quant.config.env_schema import EnvConfig
 
 __all__ = ["get_env_config", "reset_env_config", "_parse_bool", "get_env_or"]
 
@@ -64,7 +64,7 @@ def get_env_config() -> EnvConfig:
         # Import here to avoid a circular import at module-load time and
         # to keep the heavy Pydantic model out of the import path for
         # callers that only need ``_parse_bool`` or ``get_env_or``.
-        from src.config.env_schema import EnvConfig as _EnvConfig
+        from quant.config.env_schema import EnvConfig as _EnvConfig
 
         _instance = _EnvConfig()
     return _instance

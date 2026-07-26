@@ -6,10 +6,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from src.agent.loop import AgentLoop
-from src.agent.tools import BaseTool, ToolRegistry
-from src.memory.persistent import PersistentMemory
-from src.providers.chat import ChatLLM
+from quant.agent.loop import AgentLoop
+from quant.agent.tools import BaseTool, ToolRegistry
+from quant.memory.persistent import PersistentMemory
+from quant.providers.chat import ChatLLM
+
+from conftest import make_test_tuning
 
 
 class _Chunk:
@@ -79,6 +81,7 @@ def test_agent_loop_executes_dsml_textual_tool_call(tmp_path: Path) -> None:
     agent = AgentLoop(
         registry=registry,
         llm=_chat_llm(_ScriptedStreamingLLM([dsml, "final answer"])),
+        tuning=make_test_tuning(),
         event_callback=lambda event_type, payload: events.append((event_type, payload)),
         max_iterations=2,
         persistent_memory=memory,

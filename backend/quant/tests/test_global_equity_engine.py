@@ -12,7 +12,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from backtest.engines.global_equity import GlobalEquityEngine
+from quant.backtest.engines.global_equity import GlobalEquityEngine
 
 
 # ---------------------------------------------------------------------------

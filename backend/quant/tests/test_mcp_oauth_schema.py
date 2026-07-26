@@ -22,7 +22,7 @@ from fastmcp.client.transports.sse import SSETransport
 from fastmcp.client.transports.stdio import StdioTransport
 from pydantic import ValidationError
 
-from src.config.schema import (
+from quant.config.schema import (
     IBKR_MCP_SERVER_SEED,
     LIVE_BROKER_SERVER_KEYS,
     ROBINHOOD_MCP_SERVER_SEED,
@@ -31,7 +31,7 @@ from src.config.schema import (
     MCPServerConfig,
     MCPServerConfigOverride,
 )
-from src.tools.mcp import MCPServerAdapter
+from quant.tools.mcp import MCPServerAdapter
 
 pytestmark = pytest.mark.unit
 

@@ -27,8 +27,8 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from backtest.loaders.base import validate_date_range
-from backtest.loaders.registry import register
+from quant.backtest.loaders.base import validate_date_range
+from quant.backtest.loaders.registry import register
 
 logger = logging.getLogger(__name__)
 
@@ -46,14 +46,14 @@ def _resolve_broker():
     crash in the loader registry.
     """
     try:
-        from src.trading.connectors.shoonya import sdk as shoonya_sdk
+        from quant.trading.connectors.shoonya import sdk as shoonya_sdk
 
         if shoonya_sdk.shoonya_available():
             return "shoonya", shoonya_sdk
     except Exception as exc:  # noqa: BLE001 — optional dependency / config
         logger.debug("shoonya bridge unavailable: %s", exc)
     try:
-        from src.trading.connectors.dhan import sdk as dhan_sdk
+        from quant.trading.connectors.dhan import sdk as dhan_sdk
 
         if dhan_sdk.dhan_available():
             return "dhan", dhan_sdk

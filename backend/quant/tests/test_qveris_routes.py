@@ -6,8 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 import api_server
-from src.api import qveris_routes
-from src.tools import qveris_tool as qt
+from quant.api import qveris_routes
+from quant.tools import qveris_tool as qt
 
 
 @pytest.fixture

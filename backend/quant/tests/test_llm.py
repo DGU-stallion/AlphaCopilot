@@ -8,12 +8,12 @@ from unittest.mock import patch
 
 import pytest
 
-from src.providers.capabilities import (
+from quant.providers.capabilities import (
     get_llm_credentials,
     get_provider_capabilities,
     provider_env_names,
 )
-from src.providers.llm import _sync_provider_env, build_llm
+from quant.providers.llm import _sync_provider_env, build_llm
 
 
 class TestProviderCapabilityAliases:
@@ -130,7 +130,7 @@ class TestSyncProviderEnv:
     def _run_sync(self, env: dict[str, str]) -> dict[str, str]:
         """Run _sync_provider_env with a clean env and return relevant keys."""
         # Reset the dotenv guard so it doesn't skip
-        import src.providers.llm as llm_mod
+        import quant.providers.llm as llm_mod
 
         llm_mod._dotenv_loaded = True  # pretend already loaded
 
@@ -332,7 +332,7 @@ class TestSyncProviderEnv:
 
 
 def test_build_anthropic_uses_messages_api_proxy() -> None:
-    import src.providers.llm as llm_mod
+    import quant.providers.llm as llm_mod
 
     llm_mod._dotenv_loaded = True
     captured: dict[str, object] = {}
@@ -378,7 +378,7 @@ class TestMinimaxTemperature:
 
     def test_minimax_temperature_clamped_from_zero(self) -> None:
         """When LANGCHAIN_TEMPERATURE=0.0 and provider=minimax, temperature must be clamped to 0.01."""
-        import src.providers.llm as llm_mod
+        import quant.providers.llm as llm_mod
 
         llm_mod._dotenv_loaded = True
 
@@ -404,7 +404,7 @@ class TestMinimaxTemperature:
 
     def test_minimax_positive_temperature_preserved(self) -> None:
         """When an explicit positive temperature is set, it should be preserved."""
-        import src.providers.llm as llm_mod
+        import quant.providers.llm as llm_mod
 
         llm_mod._dotenv_loaded = True
 
@@ -436,7 +436,7 @@ class TestKimiTemperature:
     """Kimi reasoning models reject any temperature other than 1."""
 
     def _capture_temperature(self, model: str, configured_temp: str) -> float:
-        import src.providers.llm as llm_mod
+        import quant.providers.llm as llm_mod
         llm_mod._dotenv_loaded = True
 
         captured: dict[str, float] = {}
@@ -480,7 +480,7 @@ class TestReasoningEffortPassthrough:
     relays that require opt-in to enable thinking."""
 
     def _capture(self, env: dict[str, str]) -> dict:
-        import src.providers.llm as llm_mod
+        import quant.providers.llm as llm_mod
 
         llm_mod._dotenv_loaded = True
 
@@ -545,7 +545,7 @@ class TestKimiCodingProvider:
         )
 
     def test_env_mapping_to_openai_vars(self) -> None:
-        import src.providers.llm as llm_mod
+        import quant.providers.llm as llm_mod
 
         llm_mod._dotenv_loaded = True
 
@@ -568,7 +568,7 @@ class TestKimiCodingProvider:
             assert os.environ.get("OPENAI_API_BASE") == "https://api.kimi.com/coding/v1"
 
     def _build_and_capture(self, temperature: str) -> dict:
-        import src.providers.llm as llm_mod
+        import quant.providers.llm as llm_mod
 
         llm_mod._dotenv_loaded = True
 

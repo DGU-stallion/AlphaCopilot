@@ -12,8 +12,8 @@ from typing import Any
 
 import pytest
 
-from src.tools import build_registry
-from src.tools.alpha_compare_tool import AlphaCompareTool, _coerce_ids
+from quant.tools import build_registry
+from quant.tools.alpha_compare_tool import AlphaCompareTool, _coerce_ids
 
 
 # ── _coerce_ids ─────────────────────────────────────────────────────────────

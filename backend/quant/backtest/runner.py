@@ -27,20 +27,20 @@ try:
 except ImportError:
     pass
 
-from backtest.loaders.registry import (
+from quant.backtest.loaders.registry import (
     FALLBACK_CHAINS,
     LOADER_REGISTRY,
     VALID_SOURCES,
     get_loader_cls_with_fallback,
     resolve_loader,
 )
-from backtest.loaders.base import NoAvailableSourceError, validate_ohlc
+from quant.backtest.loaders.base import NoAvailableSourceError, validate_ohlc
 # Symbol classification lives in ``_market_hooks`` so runner.py and
 # composite.py share a single source of truth (audit-2026-05-18 B1+C1+C2).
 # ``_detect_market`` is also re-exported here for back-compat with
 # ``agent/src/swarm/grounding.py`` and existing tests that import it
 # from ``backtest.runner``.
-from backtest.engines._market_hooks import (  # noqa: F401  (re-exported)
+from quant.backtest.engines._market_hooks import (  # noqa: F401  (re-exported)
     _detect_market,
     _detect_submarket,
     _is_china_futures,
@@ -685,7 +685,7 @@ def _selected_factor_specs(config: dict) -> list[Any]:
             alpha_ids.extend(str(item) for item in raw)
 
     if alpha_ids:
-        from src.factors.registry import get_default_registry
+        from quant.factors.registry import get_default_registry
 
         registry = get_default_registry()
         for alpha_id in alpha_ids:
@@ -785,7 +785,7 @@ def _inject_fundamental_panel(
         price_index = close.index if close is not None else pd.DatetimeIndex([])
 
     try:
-        from backtest.loaders.fundamentals_loader import load_fundamental_panel
+        from quant.backtest.loaders.fundamentals_loader import load_fundamental_panel
 
         loaded = load_fundamental_panel(
             symbols=symbols,
@@ -884,7 +884,7 @@ def main(run_dir: Path) -> None:
     # import ``signal_engine.py`` from anywhere on disk; the AST scrubber
     # below blocks executable top-level statements but a method body still
     # runs on instantiation. See ``safe_run_dir`` for the policy.
-    from src.tools.path_utils import safe_run_dir
+    from quant.tools.path_utils import safe_run_dir
     try:
         run_dir = safe_run_dir(str(run_dir))
     except ValueError as exc:
@@ -955,7 +955,7 @@ def main(run_dir: Path) -> None:
 
     # Annualization bars
     effective_source = _detect_primary_source(codes, source)
-    from backtest.metrics import calc_bars_per_year
+    from quant.backtest.metrics import calc_bars_per_year
     # Cross-market: use calendar-day annualization (bars_per_year=None)
     market_types = {_detect_market(c) for c in codes}
     if len(market_types) > 1:
@@ -969,7 +969,7 @@ def main(run_dir: Path) -> None:
     loader = _AutoLoader(data_map)
 
     if engine_type == "options":
-        from backtest.engines.options_portfolio import run_options_backtest
+        from quant.backtest.engines.options_portfolio import run_options_backtest
         run_options_backtest(config, loader, signal_engine, run_dir, bars_per_year=bars_per_year)
     else:
         market_engine = _create_market_engine(effective_source, config, codes)
@@ -996,43 +996,43 @@ def _create_market_engine(source: str, config: dict, codes: List[str]):
 
     # Cross-market -> CompositeEngine
     if len(markets) > 1:
-        from backtest.engines.composite import CompositeEngine
+        from quant.backtest.engines.composite import CompositeEngine
         return CompositeEngine(config, codes)
 
     # Futures routing (Wave 2)
     if "futures" in markets:
         # Distinguish China vs global futures by exchange suffix
         if any(_is_china_futures(c) for c in codes):
-            from backtest.engines.china_futures import ChinaFuturesEngine
+            from quant.backtest.engines.china_futures import ChinaFuturesEngine
             return ChinaFuturesEngine(config)
-        from backtest.engines.global_futures import GlobalFuturesEngine
+        from quant.backtest.engines.global_futures import GlobalFuturesEngine
         return GlobalFuturesEngine(config)
 
     # Forex routing (Wave 2)
     if "forex" in markets:
-        from backtest.engines.forex import ForexEngine
+        from quant.backtest.engines.forex import ForexEngine
         return ForexEngine(config)
 
     # India equity routing — must precede source-based routing because India's
     # effective source is ``yahoo``, which has no Wave-1 branch and would
     # otherwise fall through to the crypto default.
     if "india_equity" in markets:
-        from backtest.engines.india_equity import IndiaEquityEngine
+        from quant.backtest.engines.india_equity import IndiaEquityEngine
         return IndiaEquityEngine(config)
 
     # Original routing (Wave 1)
     if source in ("okx", "ccxt"):
-        from backtest.engines.crypto import CryptoEngine
+        from quant.backtest.engines.crypto import CryptoEngine
         return CryptoEngine(config)
     elif source in ("tushare", "akshare"):
         if markets & {"us_equity", "hk_equity"}:
-            from backtest.engines.global_equity import GlobalEquityEngine
+            from quant.backtest.engines.global_equity import GlobalEquityEngine
             market = _detect_submarket(codes)
             return GlobalEquityEngine(config, market=market)
-        from backtest.engines.china_a import ChinaAEngine
+        from quant.backtest.engines.china_a import ChinaAEngine
         return ChinaAEngine(config)
     elif source == "yfinance":
-        from backtest.engines.global_equity import GlobalEquityEngine
+        from quant.backtest.engines.global_equity import GlobalEquityEngine
         market = _detect_submarket(codes)
         return GlobalEquityEngine(config, market=market)
     else:
@@ -1040,10 +1040,10 @@ def _create_market_engine(source: str, config: dict, codes: List[str]):
         # instrument market rather than the loader name, so e.g. a local
         # AAPL.US dataset gets US-equity execution rules instead of crypto.
         if markets & {"us_equity", "hk_equity"}:
-            from backtest.engines.global_equity import GlobalEquityEngine
+            from quant.backtest.engines.global_equity import GlobalEquityEngine
             market = _detect_submarket(codes)
             return GlobalEquityEngine(config, market=market)
-        from backtest.engines.crypto import CryptoEngine
+        from quant.backtest.engines.crypto import CryptoEngine
         return CryptoEngine(config)
 
 

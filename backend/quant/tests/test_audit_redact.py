@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from src.live import audit
-from src.live import paths
-from src.live.audit import LiveActionEvent, write_live_action
+from quant.live import audit
+from quant.live import paths
+from quant.live.audit import LiveActionEvent, write_live_action
 
 
 @pytest.fixture

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import os
 
-from src.config.accessor import get_env_config
+from quant.config.accessor import get_env_config
 
 CONTENT_FILTER_WARNING_THRESHOLD_ENV = "CONTENT_FILTER_WARNING_THRESHOLD"
 DEFAULT_CONTENT_FILTER_THRESHOLD = 0.05

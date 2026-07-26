@@ -23,7 +23,7 @@ import pytest
 
 import importlib
 
-import src.live.paths as live_paths
+import quant.live.paths as live_paths
 
 # ``cli/__init__.py`` re-exports the ``main`` *function* as ``cli.main``, which
 # shadows the submodule for attribute access. Import the module object directly
@@ -150,7 +150,7 @@ class TestConnectorLiveDispatch:
 class TestLiveHaltResume:
     def test_halt_trips_global_sentinel(self, live_root: Path) -> None:
         from cli._legacy import cmd_live_halt
-        from src.live.halt import halt_flag_set
+        from quant.live.halt import halt_flag_set
 
         assert cmd_live_halt(None) == 0
         assert (live_root / "live" / "HALT").exists()
@@ -158,7 +158,7 @@ class TestLiveHaltResume:
 
     def test_halt_broker_scoped(self, live_root: Path) -> None:
         from cli._legacy import cmd_live_halt
-        from src.live.halt import halt_flag_set
+        from quant.live.halt import halt_flag_set
 
         cmd_live_halt("robinhood")
         assert (live_root / "live" / "robinhood" / "HALT").exists()
@@ -167,7 +167,7 @@ class TestLiveHaltResume:
 
     def test_resume_clears_halt(self, live_root: Path) -> None:
         from cli._legacy import cmd_live_halt, cmd_live_resume
-        from src.live.halt import halt_flag_set
+        from quant.live.halt import halt_flag_set
 
         cmd_live_halt(None)
         assert cmd_live_resume(None) == 0
@@ -184,7 +184,7 @@ class TestConnectorHaltResume:
         self, live_root: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from cli._legacy import EXIT_USAGE_ERROR, cmd_connector_halt
-        from src.trading import profiles
+        from quant.trading import profiles
 
         monkeypatch.setattr(profiles, "get_runtime_root", lambda: live_root)
 
@@ -195,8 +195,8 @@ class TestConnectorHaltResume:
         self, live_root: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
     ) -> None:
         from cli._legacy import cmd_connector_halt
-        from src.live.halt import halt_flag_set
-        from src.trading import profiles
+        from quant.live.halt import halt_flag_set
+        from quant.trading import profiles
 
         monkeypatch.setattr(profiles, "get_runtime_root", lambda: live_root)
         profiles.save_selected_profile_id("robinhood-live-mcp")
@@ -214,8 +214,8 @@ class TestConnectorHaltResume:
         self, live_root: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from cli._legacy import cmd_connector_halt, cmd_connector_resume
-        from src.live.halt import halt_flag_set
-        from src.trading import profiles
+        from quant.live.halt import halt_flag_set
+        from quant.trading import profiles
 
         monkeypatch.setattr(profiles, "get_runtime_root", lambda: live_root)
         profiles.save_selected_profile_id("robinhood-live-mcp")
@@ -352,7 +352,7 @@ class TestLiveAuthorize:
         must reach the 300 s authorize deadline.
         """
         from cli._legacy import cmd_live_authorize
-        from src.config.schema import MCPServerConfig
+        from quant.config.schema import MCPServerConfig
 
         cfg = MCPServerConfig.model_validate(
             {
@@ -377,7 +377,7 @@ class TestLiveAuthorize:
     def test_authorize_preserves_larger_configured_tool_timeout(self) -> None:
         """Raise-only: an already-larger configured timeout is not lowered."""
         from cli._legacy import cmd_live_authorize
-        from src.config.schema import MCPServerConfig
+        from quant.config.schema import MCPServerConfig
 
         cfg = MCPServerConfig.model_validate(
             {
@@ -403,7 +403,7 @@ class TestLiveAuthorize:
     ) -> None:
         """VIBE_LIVE_AUTHORIZE_TIMEOUT_SECONDS overrides the 300 s default."""
         from cli._legacy import cmd_live_authorize
-        from src.config.schema import MCPServerConfig
+        from quant.config.schema import MCPServerConfig
 
         monkeypatch.setenv("VIBE_LIVE_AUTHORIZE_TIMEOUT_SECONDS", "900")
         cfg = MCPServerConfig.model_validate(
@@ -777,7 +777,7 @@ class TestProposalArmingRelay:
 
 class TestHaltIntercept:
     def test_repl_halt_trips_flag(self, live_root: Path) -> None:
-        from src.live.halt import halt_flag_set
+        from quant.live.halt import halt_flag_set
 
         console = main.get_console()
         main._trip_halt_from_repl(console, reason="repl turn: 停")
@@ -791,7 +791,7 @@ class TestHaltIntercept:
         Mirrors the ``_interactive_loop`` guard: a halt turn is consumed before
         ``_run_one_turn`` (the only path into ``_run_agent``) is ever called.
         """
-        from src.live.halt import halt_flag_set
+        from quant.live.halt import halt_flag_set
 
         text = "停"
         ctx = InteractiveContext()

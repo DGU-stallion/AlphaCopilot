@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.tools.path_utils import safe_document_path, safe_path, safe_run_dir, safe_run_id, safe_user_path
+from quant.tools.path_utils import safe_document_path, safe_path, safe_run_dir, safe_run_id, safe_user_path
 
 
 # ---------------------------------------------------------------------------

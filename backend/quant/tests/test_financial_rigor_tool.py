@@ -14,8 +14,8 @@ from typing import Any
 
 import pytest
 
-from src.tools import build_registry
-from src.tools.financial_rigor_tool import (
+from quant.tools import build_registry
+from quant.tools.financial_rigor_tool import (
     FinancialRigorTool,
     _exact,
     _fmt,

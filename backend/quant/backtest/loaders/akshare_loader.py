@@ -11,9 +11,9 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
-from backtest.loaders._symbol_utils import _is_etf_listed
-from backtest.loaders.base import cached_loader_fetch, validate_date_range
-from backtest.loaders.registry import register
+from quant.backtest.loaders._symbol_utils import _is_etf_listed
+from quant.backtest.loaders.base import cached_loader_fetch, validate_date_range
+from quant.backtest.loaders.registry import register
 
 logger = logging.getLogger(__name__)
 

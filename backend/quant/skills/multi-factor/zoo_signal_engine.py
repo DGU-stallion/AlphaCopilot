@@ -313,7 +313,7 @@ def _default_registry():
     """
     global _DEFAULT_REGISTRY
     if _DEFAULT_REGISTRY is None:
-        from src.factors.registry import Registry  # local import (see module docstring)
+        from quant.factors.registry import Registry  # local import (see module docstring)
 
         _DEFAULT_REGISTRY = Registry()
     return _DEFAULT_REGISTRY

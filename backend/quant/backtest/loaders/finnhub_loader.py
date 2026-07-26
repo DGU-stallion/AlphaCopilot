@@ -26,9 +26,9 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from backtest.loaders._http import resolve_min_interval, throttled_get_json
-from backtest.loaders.base import cached_loader_fetch, validate_date_range
-from backtest.loaders.registry import register
+from quant.backtest.loaders._http import resolve_min_interval, throttled_get_json
+from quant.backtest.loaders.base import cached_loader_fetch, validate_date_range
+from quant.backtest.loaders.registry import register
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +160,7 @@ class DataLoader:
 
     def is_available(self) -> bool:
         """Return whether a Finnhub API key is present in the environment."""
-        from src.config.accessor import get_env_config
+        from quant.config.accessor import get_env_config
 
         return bool(get_env_config().data.finnhub_api_key)
 
@@ -197,7 +197,7 @@ class DataLoader:
         del fields
         validate_date_range(start_date, end_date)
 
-        from src.config.accessor import get_env_config
+        from quant.config.accessor import get_env_config
 
         api_key = get_env_config().data.finnhub_api_key
         if not api_key:

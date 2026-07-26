@@ -10,8 +10,8 @@ import time
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 
-import astock
-import gstock
+import research.astock as astock
+import research.gstock as gstock
 
 BEIJING = timezone(timedelta(hours=8))
 _CACHE: dict = {}

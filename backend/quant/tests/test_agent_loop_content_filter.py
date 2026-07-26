@@ -11,7 +11,7 @@ from typing import Any, Callable
 
 import pytest
 
-from src.providers.chat import LLMResponse, ToolCallRequest
+from quant.providers.chat import LLMResponse, ToolCallRequest
 
 
 class _ContentFilterLoopLLM:
@@ -78,14 +78,16 @@ def _run(
     llm: Any,
     max_iterations: int = 5,
 ) -> dict[str, Any]:
-    from src.agent.loop import AgentLoop
-    from src.memory.persistent import PersistentMemory
-    from src.tools import build_registry
+    from quant.agent.loop import AgentLoop
+    from quant.memory.persistent import PersistentMemory
+    from quant.tools import build_registry
+    from conftest import make_test_tuning
 
     pm = PersistentMemory()
     agent = AgentLoop(
         registry=build_registry(persistent_memory=pm, include_shell_tools=False),
         llm=llm,
+        tuning=make_test_tuning(),
         max_iterations=max_iterations,
         persistent_memory=pm,
     )
@@ -96,7 +98,7 @@ def _run(
 
 
 def _read_trace(run_dir: str) -> list[dict[str, Any]]:
-    from src.agent.trace import TraceWriter
+    from quant.agent.trace import TraceWriter
 
     return TraceWriter.read(Path(run_dir))
 

@@ -9,9 +9,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 import api_server
-import src.api.swarm_routes as swarm_routes
-from src.swarm.models import RunStatus, SwarmEvent, SwarmRun, SwarmTask
-from src.swarm.store import SwarmStore
+import quant.api.swarm_routes as swarm_routes
+from quant.swarm.models import RunStatus, SwarmEvent, SwarmRun, SwarmTask
+from quant.swarm.store import SwarmStore
 
 
 @pytest.fixture

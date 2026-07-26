@@ -7,11 +7,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from backtest.engines.base import BaseEngine
-from backtest.engines.china_a import ChinaAEngine
-from backtest.engines.composite import CompositeEngine
-from backtest.engines.global_futures import GlobalFuturesEngine
-from backtest.metrics import calc_metrics, calc_trade_turnover_series
+from quant.backtest.engines.base import BaseEngine
+from quant.backtest.engines.china_a import ChinaAEngine
+from quant.backtest.engines.composite import CompositeEngine
+from quant.backtest.engines.global_futures import GlobalFuturesEngine
+from quant.backtest.metrics import calc_metrics, calc_trade_turnover_series
 
 
 class _RoundedEngine(BaseEngine):

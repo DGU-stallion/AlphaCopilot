@@ -22,7 +22,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import api_server
-from src.api import alpha_routes
+from quant.api import alpha_routes
 
 
 def _client() -> TestClient:

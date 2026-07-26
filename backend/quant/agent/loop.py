@@ -18,34 +18,35 @@ import copy
 import json
 import logging
 import queue
-import sys
 import threading
 import time as _time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from src.agent.context import ContextBuilder
-from src.agent.memory import WorkspaceMemory
-from src.agent.progress import HeartbeatTimer, ProgressEvent, _set_emitter
-from src.agent.tools import ToolRegistry
-from src.agent.trace import TraceWriter
-from src.core.state import RunStateStore
-from src.goal.context import (
+from quant.agent.context import ContextBuilder
+from quant.agent.memory import WorkspaceMemory
+from quant.agent.progress import HeartbeatTimer, ProgressEvent, _set_emitter
+from quant.agent.tools import ToolRegistry
+from quant.agent.trace import TraceWriter
+from quant.core.state import RunStateStore
+from quant.goal.context import (
     format_goal_continuation_prompt,
     get_current_goal_context,
     goal_needs_continuation,
     goal_progress_tuple,
 )
-from src.providers.chat import ChatLLM, ProviderStreamError
-from src.providers.content_filter import (
+from quant.providers.chat import ChatLLM, ProviderStreamError
+from quant.providers.content_filter import (
     CONTENT_FILTER_SKIP_MESSAGE,
     MAX_CONSECUTIVE_CONTENT_FILTER_SKIPS,
     compute_content_filter_warnings,
 )
-from src.config.accessor import get_env_config
-from src.tools.background_tools import get_background_manager
-from src.tools.redaction import redact_payload
+from quant.config.accessor import get_env_config
+from quant.tools.background_tools import get_background_manager
+from quant.tools.redaction import redact_payload
+
+from quant.agent.tuning import AgentTuning
 
 RUNS_DIR = Path(__file__).resolve().parents[2] / "runs"
 SESSIONS_DIR = Path(__file__).resolve().parents[2] / "sessions"
@@ -61,60 +62,7 @@ COLLAPSE_TAIL = 500
 TAIL_TOKEN_BUDGET = 20_000
 
 
-def _override(name: str):
-    """Return a monkeypatched module-level override if present."""
-    mod = sys.modules.get(__name__)
-    if mod is not None and name in mod.__dict__:
-        return mod.__dict__[name]
-    return None
 
-
-def _token_threshold() -> int:
-    ov = _override("TOKEN_THRESHOLD")
-    if ov is not None:
-        return ov
-    from src.config.accessor import get_env_config
-    return get_env_config().agent_tuning.token_threshold
-
-
-def _heartbeat_interval_s() -> float:
-    ov = _override("HEARTBEAT_INTERVAL_S")
-    if ov is not None:
-        return ov
-    from src.config.accessor import get_env_config
-    return get_env_config().agent_tuning.vt_heartbeat_interval_s
-
-
-def _reasoning_delta_min_interval_s() -> float:
-    ov = _override("REASONING_DELTA_MIN_INTERVAL_S")
-    if ov is not None:
-        return ov
-    from src.config.accessor import get_env_config
-    return get_env_config().agent_tuning.vt_reasoning_delta_min_interval_s
-
-
-def _stream_retry_delay_s() -> float:
-    ov = _override("STREAM_RETRY_DELAY_S")
-    if ov is not None:
-        return ov
-    from src.config.accessor import get_env_config
-    return get_env_config().agent_tuning.vt_stream_retry_delay_s
-
-
-def _tool_timeout_seconds() -> float:
-    ov = _override("TOOL_TIMEOUT_SECONDS")
-    if ov is not None:
-        return ov
-    from src.config.accessor import get_env_config
-    return get_env_config().agent_tuning.vibe_trading_tool_timeout_seconds
-
-
-def _goal_max_continuations() -> int:
-    ov = _override("GOAL_MAX_CONTINUATIONS")
-    if ov is not None:
-        return ov
-    from src.config.accessor import get_env_config
-    return get_env_config().agent_tuning.vibe_trading_goal_max_continuations
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +101,6 @@ def _normalize_llm_usage(usage: Any) -> dict[str, int] | None:
 
 def _new_llm_usage_summary(llm: Any) -> dict[str, Any]:
     """Create the run-scoped provider usage accumulator."""
-    from src.config.accessor import get_env_config
     cfg = get_env_config()
     provider = cfg.llm.langchain_provider.strip() or "openai"
     model = getattr(llm, "model_name", None) or cfg.llm.langchain_model_name.strip()
@@ -525,6 +472,7 @@ class AgentLoop:
         self,
         registry: ToolRegistry,
         llm: ChatLLM,
+        tuning: AgentTuning,
         memory: Optional[WorkspaceMemory] = None,
         event_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         max_iterations: int = 50,
@@ -535,6 +483,7 @@ class AgentLoop:
         Args:
             registry: Tool registry.
             llm: ChatLLM client.
+            tuning: Immutable tuning parameters for the loop.
             memory: Workspace memory (created fresh if not provided).
             event_callback: Event callback (event_type, data).
             max_iterations: Maximum number of loop iterations.
@@ -542,6 +491,7 @@ class AgentLoop:
         """
         self.registry = registry
         self.llm = llm
+        self._tuning = tuning
         self.memory = memory or WorkspaceMemory()
         self._event_callback = event_callback
         self.max_iterations = max_iterations
@@ -665,17 +615,17 @@ class AgentLoop:
                 # memory pressure, so short, low-pressure runs keep their full
                 # tool history available for the model to reference instead of
                 # having every result past the most recent few cleared.
-                if tokens > int(_token_threshold() * 0.5):
+                if tokens > int(self._tuning.token_threshold * 0.5):
                     _microcompact(messages)
                     tokens = estimate_tokens(messages)
 
                 # Layer 2: context collapse (fold long text, zero API cost)
-                if tokens > int(_token_threshold() * 0.7):
+                if tokens > int(self._tuning.token_threshold * 0.7):
                     _context_collapse(messages)
                     tokens = estimate_tokens(messages)
 
                 # Layer 3: auto_compact (token threshold exceeded)
-                _tok_threshold = _token_threshold()
+                _tok_threshold = self._tuning.token_threshold
                 if tokens > _tok_threshold:
                     logger.info(f"Auto compact triggered: {tokens} tokens > {_tok_threshold}")
                     self._auto_compact(messages, run_dir, trace, iteration=current_iter)
@@ -719,7 +669,7 @@ class AgentLoop:
                     now = _time.monotonic()
                     if (
                         last_reasoning_emit is not None
-                        and now - last_reasoning_emit < _reasoning_delta_min_interval_s()
+                        and now - last_reasoning_emit < self._tuning.reasoning_delta_min_interval_s
                     ):
                         return
                     last_reasoning_emit = now
@@ -767,7 +717,7 @@ class AgentLoop:
                     thinking_chunks.clear()
                     reasoning_chars = 0
                     last_reasoning_emit = None
-                    _time.sleep(_stream_retry_delay_s())
+                    _time.sleep(self._tuning.stream_retry_delay_s)
                     response = self.llm.stream_chat(
                         messages,
                         tools=tool_defs,
@@ -802,7 +752,7 @@ class AgentLoop:
                     if token_delta or turn_delta:
                         try:
                             if goal_store is None:
-                                from src.goal import GoalStore
+                                from quant.goal import GoalStore
 
                                 goal_store = GoalStore()
                             goal_store.account_usage(
@@ -873,11 +823,11 @@ class AgentLoop:
                         break
                     should_continue_goal = False
                     continuation_snapshot = None
-                    _max_cont = _goal_max_continuations()
+                    _max_cont = self._tuning.goal_max_continuations
                     if active_goal_id and session_id and _max_cont > 0:
                         try:
                             if goal_store is None:
-                                from src.goal import GoalStore
+                                from quant.goal import GoalStore
 
                                 goal_store = GoalStore()
                             continuation_snapshot = goal_store.get_goal_snapshot(active_goal_id)
@@ -1262,7 +1212,7 @@ class AgentLoop:
 
         Installs a thread-local progress emitter so the tool may call
         ``emit_progress()`` without taking a callback parameter, and runs a
-        background heartbeat timer that ticks every ``_heartbeat_interval_s()``
+        background heartbeat timer that ticks every ``self._tuning.heartbeat_interval_s``
         seconds. Both event streams are forwarded through ``self._emit`` and
         therefore land in the same SSE bus and CLI dashboard as normal
         tool events.
@@ -1290,7 +1240,7 @@ class AgentLoop:
             self._emit("tool_heartbeat", payload)
 
         t0 = _time.perf_counter()
-        _tool_timeout = _tool_timeout_seconds()
+        _tool_timeout = self._tuning.tool_timeout_seconds
         timeout = _tool_timeout if _tool_timeout > 0 else None
         timeout_label = _format_timeout(timeout) if timeout is not None else ""
 
@@ -1310,7 +1260,7 @@ class AgentLoop:
             """
             return HeartbeatTimer(
                 tool_name=tool_name,
-                interval=_heartbeat_interval_s(),
+                interval=self._tuning.heartbeat_interval_s,
                 emit=_on_heartbeat,
             )
 
@@ -1595,19 +1545,3 @@ class AgentLoop:
         self.memory.increment(tool_name)
 
 
-_LEGACY_LAZY = {
-    "TOKEN_THRESHOLD": _token_threshold,
-    "MICROCOMPACT_THRESHOLD": lambda: int(_token_threshold() * 0.5),
-    "COLLAPSE_THRESHOLD": lambda: int(_token_threshold() * 0.7),
-    "HEARTBEAT_INTERVAL_S": _heartbeat_interval_s,
-    "REASONING_DELTA_MIN_INTERVAL_S": _reasoning_delta_min_interval_s,
-    "STREAM_RETRY_DELAY_S": _stream_retry_delay_s,
-    "TOOL_TIMEOUT_SECONDS": _tool_timeout_seconds,
-    "GOAL_MAX_CONTINUATIONS": _goal_max_continuations,
-}
-
-
-def __getattr__(name: str):
-    if name in _LEGACY_LAZY:
-        return _LEGACY_LAZY[name]()
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -27,11 +27,11 @@ import pytest
 from fastmcp.client.client import CallToolResult
 from mcp import types as mcp_types
 
-from src.live.classification import ToolClass, classify_tool
-from src.live.order_guard import LiveOrderGuardTool
-from src.live.registry import wrap_live_broker_tools
-from src.trading.connectors.robinhood.classification import ROBINHOOD_TOOL_CLASS
-from src.tools.mcp import MCPRemoteTool, build_mcp_tool_wrappers
+from quant.live.classification import ToolClass, classify_tool
+from quant.live.order_guard import LiveOrderGuardTool
+from quant.live.registry import wrap_live_broker_tools
+from quant.trading.connectors.robinhood.classification import ROBINHOOD_TOOL_CLASS
+from quant.tools.mcp import MCPRemoteTool, build_mcp_tool_wrappers
 
 pytestmark = pytest.mark.unit
 
@@ -102,7 +102,7 @@ def _factory() -> _MockMCPServer:
 
 
 def _make_config():
-    from src.config.schema import MCPServerConfig
+    from quant.config.schema import MCPServerConfig
 
     return MCPServerConfig.model_validate(
         {

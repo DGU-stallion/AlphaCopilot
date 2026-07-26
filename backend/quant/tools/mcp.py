@@ -30,8 +30,8 @@ from fastmcp.exceptions import McpError, ToolError
 from key_value.aio.stores.filetree import FileTreeStore, FileTreeV1KeySanitizationStrategy
 from mcp import types as mcp_types
 
-from src.agent.tools import BaseTool
-from src.config.schema import (
+from quant.agent.tools import BaseTool
+from quant.config.schema import (
     ROBINHOOD_AGENT_CONFIG_PATH,
     MCPServerConfig,
     live_broker_key_for_entry,

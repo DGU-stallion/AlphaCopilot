@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.factors.base import (
+from quant.factors.base import (
     decay_linear,
     delta,
     rank,

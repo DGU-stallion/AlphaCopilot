@@ -13,10 +13,10 @@ import pytest
 from fastmcp.client.client import CallToolResult
 from mcp import types as mcp_types
 
-from src.config.schema import AgentConfig, IBKR_MCP_SERVER_SEED
-from src.live.order_guard import LiveOrderGuardTool
-from src.live.registry import is_live_broker, wrap_live_broker_tools
-from src.tools.mcp import MCPRemoteTool, build_mcp_tool_wrappers
+from quant.config.schema import AgentConfig, IBKR_MCP_SERVER_SEED
+from quant.live.order_guard import LiveOrderGuardTool
+from quant.live.registry import is_live_broker, wrap_live_broker_tools
+from quant.tools.mcp import MCPRemoteTool, build_mcp_tool_wrappers
 
 pytestmark = pytest.mark.unit
 

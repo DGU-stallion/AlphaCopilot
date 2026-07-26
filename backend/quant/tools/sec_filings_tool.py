@@ -22,12 +22,12 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from backtest.loaders.sec_edgar_client import (
+from quant.backtest.loaders.sec_edgar_client import (
     cik_for,
     get_company_facts,
     get_submissions,
 )
-from src.agent.tools import BaseTool
+from quant.agent.tools import BaseTool
 
 # Hard caps so a long filing history or metric series cannot bloat the payload.
 _MAX_LIMIT = 40

@@ -8,14 +8,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.agent.context import ContextBuilder
-from src.agent.loop import AgentLoop
-from src.agent.tools import ToolRegistry
-from src.agent.trace import TraceWriter
-from src.tools.get_fundamentals_tool import GetFundamentalsTool
-from src.tools.market_data_tool import MarketDataTool
-from src.tools.market_screener_tool import MarketScreenerTool
-from src.tools.symbol_search_tool import SymbolSearchTool
+from quant.agent.context import ContextBuilder
+from quant.agent.loop import AgentLoop
+from quant.agent.tools import ToolRegistry
+from quant.agent.trace import TraceWriter
+from quant.tools.get_fundamentals_tool import GetFundamentalsTool
+
+from conftest import make_test_tuning
+from quant.tools.market_data_tool import MarketDataTool
+from quant.tools.market_screener_tool import MarketScreenerTool
+from quant.tools.symbol_search_tool import SymbolSearchTool
 
 
 @pytest.mark.parametrize(
@@ -79,7 +81,7 @@ def test_repeatable_query_executes_again_with_different_arguments(
     monkeypatch.setattr(tool, "execute", _execute)
     registry = ToolRegistry()
     registry.register(tool)
-    agent = AgentLoop(registry=registry, llm=SimpleNamespace(), max_iterations=2)
+    agent = AgentLoop(registry=registry, llm=SimpleNamespace(), tuning=make_test_tuning(), max_iterations=2)
 
     run_dir = tmp_path / "run"
     run_dir.mkdir()

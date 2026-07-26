@@ -30,9 +30,9 @@ import logging
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from src.config.schema import AgentConfig
-from src.tools import build_swarm_registry
-from src.tools.mcp import MCPRemoteTool, resolve_mcp_server_tool_name_segments
+from quant.config.schema import AgentConfig
+from quant.tools import build_swarm_registry
+from quant.tools.mcp import MCPRemoteTool, resolve_mcp_server_tool_name_segments
 
 
 def _make_agent_config(servers: dict[str, dict[str, Any]]) -> AgentConfig:

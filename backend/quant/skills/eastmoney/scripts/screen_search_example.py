@@ -8,8 +8,8 @@
 
 import json
 
-from src.tools.market_screener_tool import MarketScreenerTool
-from src.tools.symbol_search_tool import SymbolSearchTool
+from quant.tools.market_screener_tool import MarketScreenerTool
+from quant.tools.symbol_search_tool import SymbolSearchTool
 
 
 def resolve_symbol(query: str, limit: int = 5) -> str | None:

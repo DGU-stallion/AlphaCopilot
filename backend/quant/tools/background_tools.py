@@ -11,7 +11,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from src.agent.tools import BaseTool
+from quant.agent.tools import BaseTool
 
 WORKDIR = Path(__file__).resolve().parents[2]
 _COMMAND_TIMEOUT_SECONDS = 300.0

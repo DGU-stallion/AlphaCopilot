@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from backtest.engines.global_equity import GlobalEquityEngine
-from backtest.engines.india_equity import IndiaEquityEngine
+from quant.backtest.engines.global_equity import GlobalEquityEngine
+from quant.backtest.engines.india_equity import IndiaEquityEngine
 
 
 def _nse_bars() -> pd.DataFrame:

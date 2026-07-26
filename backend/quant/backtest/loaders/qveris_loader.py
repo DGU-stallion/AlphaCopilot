@@ -25,12 +25,12 @@ from typing import Any, Dict, Iterable, List, Optional
 import pandas as pd
 import requests
 
-from backtest.loaders.base import (
+from quant.backtest.loaders.base import (
     cached_loader_fetch,
     validate_date_range,
     validate_ohlc,
 )
-from backtest.loaders.registry import register
+from quant.backtest.loaders.registry import register
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def _load_config() -> QVerisConfig:
     except Exception as exc:  # noqa: BLE001 - config read failures mean unavailable
         logger.warning("qveris config ignored: %s", exc)
 
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
 
     api_key = (get_env_config().data.qveris_api_key or str(raw.get("api_key") or "")).strip()
     base_url = (get_env_config().data.qveris_base_url or str(raw.get("base_url") or _DEFAULT_BASE_URL)).strip()

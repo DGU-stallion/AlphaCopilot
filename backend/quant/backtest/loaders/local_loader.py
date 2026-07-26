@@ -38,8 +38,8 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 import yaml
 
-from backtest.loaders.base import cached_loader_fetch, validate_date_range, validate_ohlc
-from backtest.loaders.registry import register
+from quant.backtest.loaders.base import cached_loader_fetch, validate_date_range, validate_ohlc
+from quant.backtest.loaders.registry import register
 
 logger = logging.getLogger(__name__)
 

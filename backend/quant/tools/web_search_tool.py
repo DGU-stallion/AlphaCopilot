@@ -17,9 +17,9 @@ import os
 import time
 from typing import Any
 
-from src.agent.tools import BaseTool
-from src.config.accessor import _parse_bool, get_env_config
-from src.security.scanner import with_security_warnings
+from quant.agent.tools import BaseTool
+from quant.config.accessor import _parse_bool, get_env_config
+from quant.security.scanner import with_security_warnings
 
 logger = logging.getLogger(__name__)
 

@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from backtest.engines._market_hooks import _is_china_futures
-from backtest.runner import (
+from quant.backtest.engines._market_hooks import _is_china_futures
+from quant.backtest.runner import (
     _detect_market,
     _detect_source,
     _group_codes_by_market,

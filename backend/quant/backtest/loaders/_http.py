@@ -26,7 +26,7 @@ from typing import Any
 
 import requests
 
-from backtest.loaders.base import positive_env_float
+from quant.backtest.loaders.base import positive_env_float
 
 logger = logging.getLogger(__name__)
 

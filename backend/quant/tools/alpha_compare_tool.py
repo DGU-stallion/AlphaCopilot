@@ -14,8 +14,8 @@ import json
 import re
 from typing import Any
 
-from src.agent.tools import BaseTool
-from src.factors.compare_runner import SORT_KEYS, compare_alphas
+from quant.agent.tools import BaseTool
+from quant.factors.compare_runner import SORT_KEYS, compare_alphas
 
 
 def _coerce_ids(raw: Any) -> list[str]:

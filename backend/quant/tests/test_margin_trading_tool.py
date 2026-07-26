@@ -11,8 +11,8 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from backtest.loaders import eastmoney_client
-from src.tools.margin_trading_tool import MarginTradingTool
+from quant.backtest.loaders import eastmoney_client
+from quant.tools.margin_trading_tool import MarginTradingTool
 
 
 def _datacenter_payload() -> dict:

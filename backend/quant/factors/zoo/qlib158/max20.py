@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import pandas as pd
-from src.factors.base import safe_div, ts_max
+from quant.factors.base import safe_div, ts_max
 
 __alpha_meta__ = {
     'id': 'qlib158_max20',

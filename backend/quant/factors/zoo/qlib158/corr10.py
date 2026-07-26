@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from src.factors.base import ts_corr
+from quant.factors.base import ts_corr
 
 __alpha_meta__ = {
     'id': 'qlib158_corr10',

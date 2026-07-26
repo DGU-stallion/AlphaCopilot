@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from src.goal import GoalStore
+from quant.goal import GoalStore
 
 
 def test_goal_command_is_registered() -> None:

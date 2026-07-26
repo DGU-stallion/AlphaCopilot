@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-from src.agent.loop import AgentLoop
-from src.goal import GoalStore
+from quant.agent.loop import AgentLoop
+from quant.goal import GoalStore
 
 
 class _AnswerResponse:
@@ -43,13 +43,15 @@ class _CapturingLLM:
 
 
 def _agent(llm: _CapturingLLM, run_dir: Path) -> AgentLoop:
-    from src.memory.persistent import PersistentMemory
-    from src.tools import build_registry
+    from quant.memory.persistent import PersistentMemory
+    from quant.tools import build_registry
+    from conftest import make_test_tuning
 
     pm = PersistentMemory()
     agent = AgentLoop(
         registry=build_registry(persistent_memory=pm, include_shell_tools=False),
         llm=llm,
+        tuning=make_test_tuning(),
         max_iterations=2,
         persistent_memory=pm,
     )
@@ -133,7 +135,7 @@ def test_agent_loop_continues_active_incomplete_goal(tmp_path: Path, monkeypatch
 
 def test_agent_loop_continues_active_covered_goal_to_force_audit(tmp_path: Path, monkeypatch) -> None:
     """Covered criteria still need a terminal status audit before the loop stops."""
-    from src.goal import EvidenceInput
+    from quant.goal import EvidenceInput
 
     monkeypatch.setattr("src.agent.loop.GOAL_MAX_CONTINUATIONS", 1)
     monkeypatch.setenv("VIBE_TRADING_GOAL_DB_PATH", str(tmp_path / "goals.db"))

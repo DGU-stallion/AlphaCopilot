@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from src.tools import northbound_tool as nb
+from quant.tools import northbound_tool as nb
 
 
 def _realtime_payload() -> dict:

@@ -13,7 +13,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from backtest.loaders.sina_loader import (
+from quant.backtest.loaders.sina_loader import (
     DataLoader,
     _bars_to_frame,
     _is_us_equity,
@@ -217,7 +217,7 @@ def test_is_available_always_true() -> None:
 
 
 def test_register_decorator_added_sina_to_registry() -> None:
-    from backtest.loaders.registry import LOADER_REGISTRY
+    from quant.backtest.loaders.registry import LOADER_REGISTRY
 
     assert LOADER_REGISTRY.get("sina") is DataLoader
     assert DataLoader.markets == {"us_equity"}

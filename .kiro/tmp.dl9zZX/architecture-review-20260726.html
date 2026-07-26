@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlphaCopilot Architecture Review</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        warm: { 50: '#fff7ed', 100: '#ffedd5', 200: '#fed7aa', 500: '#f97316', 600: '#ea580c', 700: '#c2410c' },
+        depth: { light: '#dbeafe', dark: '#1e40af' },
+        shallow: { light: '#fee2e2', dark: '#991b1b' }
+      }
+    }
+  }
+}
+</script>
+<style>
+.badge-strong { background: #dcfce7; color: #166534; border: 1px solid #86efac; padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+.badge-exploring { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+.badge-speculative { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+.card { background: white; border-radius: 1rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border: 1px solid #f3f4f6; padding: 1.5rem; margin-bottom: 2rem; }
+.before-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 0.75rem; padding: 1rem; }
+.after-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 0.75rem; padding: 1rem; }
+.file-tag { background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-family: monospace; }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+
+<div class="max-w-5xl mx-auto px-6 py-12">
+
+<!-- Header -->
+<header class="mb-12">
+  <h1 class="text-3xl font-bold text-gray-900 mb-2">AlphaCopilot 架构深化分析</h1>
+  <p class="text-gray-500 text-sm">Generated 2026-07-26 · 基于 codebase-design 深模块方法论</p>
+  <div class="mt-4 p-4 bg-warm-50 border border-warm-200 rounded-xl text-sm text-gray-700">
+    <strong>分析范围：</strong>聚焦最近 commit 热点（统一后端架构 + 测试基础设施），识别阻碍可测试性与 AI 可导航性的浅模块与泄漏接缝。
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<!-- CANDIDATE 1: Dual Entry Point -->
+<!-- ============================================================ -->
+<div class="card">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-bold text-gray-900">候选 1：三重入口点（三具 FastAPI 尸体）</h2>
+    <span class="badge-strong">Strong</span>
+  </div>
+
+  <div class="mb-3">
+    <span class="file-tag">backend/app.py</span>
+    <span class="file-tag">backend/research/app.py</span>
+    <span class="file-tag">backend/quant/api_server.py</span>
+    <span class="file-tag">backend/quant/router.py</span>
+  </div>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">问题</h3>
+  <p class="text-gray-700 text-sm leading-relaxed">
+    系统存在<strong>三个</strong>可独立启动的 FastAPI 应用：统一入口 <code>app.py</code>、Research 独立入口 <code>research/app.py</code>、Quant 独立入口 <code>quant/api_server.py</code>。三者各自实现 CORS 配置、auth 中间件、生命周期钩子。统一入口又通过 <code>quant/router.py</code> 适配层选择性地导入 Quant 路由，形成第四层间接——每层都有自己的 try/except 降级逻辑。
+  </p>
+  <p class="text-gray-700 text-sm leading-relaxed mt-2">
+    这三个入口的<strong>接口</strong>几乎一样大（CORS + auth + route mounting + lifecycle），但各自的<strong>实现</strong>差异极小——它们是典型的<strong>浅模块</strong>。修改认证策略需要同步改三处。测试时搞不清该启动哪个 app。
+  </p>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">方案</h3>
+  <p class="text-gray-700 text-sm leading-relaxed">
+    删除 <code>research/app.py</code> 和 <code>quant/api_server.py</code> 作为可执行入口（保留 router 适配）。将中间件、auth、CORS 集中到 <code>app.py</code> 一处。Research 和 Quant 各自只暴露一个 <code>create_router() -> APIRouter</code>——纯路由，无应用级副作用。
+  </p>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">收益</h3>
+  <ul class="text-sm text-gray-700 list-disc ml-5 space-y-1">
+    <li><strong>Locality：</strong>auth/CORS/lifecycle 集中一处，改一次生效全局</li>
+    <li><strong>Leverage：</strong>测试只需一个 TestClient(app)，无歧义</li>
+    <li><strong>测试改善：</strong>集成测试针对统一 app 写，不再有"研究端口 vs 量化端口"的混淆</li>
+  </ul>
+
+  <!-- Before/After Diagram -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+    <div class="before-box">
+      <p class="text-xs font-bold text-red-700 mb-2 uppercase">Before — 三个浅入口</p>
+      <div class="mermaid">
+graph TD
+  A[research/app.py<br/>CORS + Auth + Router] -->|独立启动| R[Research 路由]
+  B[quant/api_server.py<br/>CORS + Auth + Router] -->|独立启动| Q[Quant 全路由]
+  C[app.py<br/>CORS + Auth + Router] --> R
+  C -->|通过 router.py| Q2[Quant 子集路由]
+  style A fill:#fee2e2,stroke:#f87171
+  style B fill:#fee2e2,stroke:#f87171
+  style C fill:#fef3c7,stroke:#f59e0b
+      </div>
+    </div>
+    <div class="after-box">
+      <p class="text-xs font-bold text-green-700 mb-2 uppercase">After — 单一深入口</p>
+      <div class="mermaid">
+graph TD
+  C[app.py<br/>CORS + Auth + Lifecycle] --> R[research.create_router]
+  C --> Q[quant.create_router]
+  style C fill:#dcfce7,stroke:#22c55e
+  style R fill:#f0fdf4,stroke:#86efac
+  style Q fill:#f0fdf4,stroke:#86efac
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- CANDIDATE 2: sys.path + import aliasing -->
+<!-- ============================================================ -->
+<div class="card">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-bold text-gray-900">候选 2：Quant 模块的 sys.path 黑魔法与幽灵 <code>src.</code> 前缀</h2>
+    <span class="badge-strong">Strong</span>
+  </div>
+
+  <div class="mb-3">
+    <span class="file-tag">backend/quant/router.py</span>
+    <span class="file-tag">backend/quant/agent/__init__.py</span>
+    <span class="file-tag">backend/quant/agent/loop.py</span>
+    <span class="file-tag">backend/quant/tests/conftest.py</span>
+  </div>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">问题</h3>
+  <p class="text-gray-700 text-sm leading-relaxed">
+    Quant 模块从上游 Vibe-Trading 继承了一套 <code>from src.agent.*</code>、<code>from src.tools.*</code>、<code>from backtest.*</code> 的 import 约定——但实际目录名是 <code>agent/</code>、<code>tools/</code>、<code>backtest/</code>，根本没有 <code>src/</code> 目录。它靠 <code>sys.path.insert(0, quant_dir)</code> 在运行时 hack 路径解析，且多处重复这个 hack（router.py、conftest.py、mcp_server.py）。
+  </p>
+  <p class="text-gray-700 text-sm leading-relaxed mt-2">
+    这违反了<strong>locality</strong>：理解 <code>from src.agent.loop import AgentLoop</code> 需要知道一个不可见的运行时条件（sys.path 被修改过）。IDE 类型检查和 AI 代码导航全部失效。接缝泄漏严重——一个不相关目录下的 <code>src/__init__.py</code> 可能被意外解析到（实际已发生：毕业论文目录下的 src 包被命中）。
+  </p>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">方案</h3>
+  <p class="text-gray-700 text-sm leading-relaxed">
+    将 Quant 模块重组为标准 Python 包结构。两个选项：(a) 在 <code>quant/</code> 下真正创建 <code>src/</code> 目录作为命名空间包，或 (b) 全局替换 <code>from src.X</code> 为相对导入 <code>from quant.X</code>，配合 pyproject.toml 声明 <code>packages = ["quant"]</code>。删除所有 <code>sys.path.insert</code> hack。
+  </p>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">收益</h3>
+  <ul class="text-sm text-gray-700 list-disc ml-5 space-y-1">
+    <li><strong>Locality：</strong>import 语句自解释，无需运行时上下文</li>
+    <li><strong>Leverage：</strong>IDE 类型检查恢复；mypy/pyright 能静态分析跨模块依赖</li>
+    <li><strong>测试改善：</strong>conftest 不再需要 path hack，pytest 自然发现测试</li>
+  </ul>
+
+  <!-- Before/After Diagram -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+    <div class="before-box">
+      <p class="text-xs font-bold text-red-700 mb-2 uppercase">Before — 幽灵路径</p>
+      <div style="font-family: monospace; font-size: 0.7rem; line-height: 1.6; color: #991b1b;">
+        <div>quant/</div>
+        <div>&nbsp;&nbsp;agent/loop.py → <code>from src.agent.tools import ...</code></div>
+        <div>&nbsp;&nbsp;router.py → <code>sys.path.insert(0, quant_dir)</code></div>
+        <div>&nbsp;&nbsp;tests/conftest.py → <code>sys.path.insert(0, AGENT_DIR)</code></div>
+        <div style="color:#dc2626; font-weight:bold;">&nbsp;&nbsp;❌ No src/ directory exists!</div>
+        <div style="color:#dc2626;">&nbsp;&nbsp;❌ Resolves to ~/毕业论文/src/ on this machine</div>
+      </div>
+    </div>
+    <div class="after-box">
+      <p class="text-xs font-bold text-green-700 mb-2 uppercase">After — 标准包结构</p>
+      <div style="font-family: monospace; font-size: 0.7rem; line-height: 1.6; color: #166534;">
+        <div>backend/</div>
+        <div>&nbsp;&nbsp;pyproject.toml → packages = ["quant", "research"]</div>
+        <div>&nbsp;&nbsp;quant/</div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;agent/loop.py → <code>from quant.agent.tools import ...</code></div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;backtest/... → <code>from quant.backtest.loaders import ...</code></div>
+        <div style="color:#16a34a; font-weight:bold;">&nbsp;&nbsp;✅ IDE resolution works</div>
+        <div style="color:#16a34a;">&nbsp;&nbsp;✅ No sys.path hacks</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- CANDIDATE 3: Research Router God Function -->
+<!-- ============================================================ -->
+<div class="card">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-bold text-gray-900">候选 3：投研 Router 单文件巨函数</h2>
+    <span class="badge-exploring">Worth exploring</span>
+  </div>
+
+  <div class="mb-3">
+    <span class="file-tag">backend/research/router.py</span>
+  </div>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">问题</h3>
+  <p class="text-gray-700 text-sm leading-relaxed">
+    <code>create_research_router()</code> 是一个将所有路由端点（聊天、持仓、行情、资讯、个股数据、自选股、研报）定义在<strong>同一个函数内</strong>的巨型闭包。所有端点共享模块级缓存（<code>_PCT_CACHE</code>、<code>_ANN_CACHE</code>）、工具函数（<code>_validate</code>、<code>_cached</code>）、Pydantic model。
+  </p>
+  <p class="text-gray-700 text-sm leading-relaxed mt-2">
+    这个模块的<strong>接口</strong>是好的（一个函数返回 APIRouter），但其<strong>实现</strong>缺乏内部接缝——不同业务域（持仓管理、市场数据、聊天）混在同一个作用域。要单独测试「持仓 API」必须导入整个研究模块。缓存是模块级副作用，无法在测试间隔离。
+  </p>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">方案</h3>
+  <p class="text-gray-700 text-sm leading-relaxed">
+    将 <code>create_research_router()</code> 拆为 3-4 个内部子模块，每个负责一个业务域（chat、portfolio、market_data、reports），各自暴露 <code>register_xxx_routes(router)</code>。模块级缓存替换为传入的缓存对象（测试时注入 fake）。外部接口不变——<code>create_research_router()</code> 仍然是唯一的对外接缝。
+  </p>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">收益</h3>
+  <ul class="text-sm text-gray-700 list-disc ml-5 space-y-1">
+    <li><strong>Locality：</strong>持仓 bug 只需看 portfolio 子模块，不需扫全文件</li>
+    <li><strong>Leverage：</strong>外部接口不变（deletion test 通过），内部获得可测试的接缝</li>
+    <li><strong>测试改善：</strong>可单独测试持仓逻辑，注入 mock 缓存，无网络副作用</li>
+  </ul>
+
+  <!-- Before/After Diagram -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+    <div class="before-box">
+      <p class="text-xs font-bold text-red-700 mb-2 uppercase">Before — 巨型闭包</p>
+      <div class="mermaid">
+graph TD
+  F["create_research_router()"] --> C[Chat 端点]
+  F --> P[Portfolio 端点]
+  F --> M[Market 端点]
+  F --> R[Reports 端点]
+  F --> N[News 端点]
+  CACHE["模块级 _DC_CACHE"] -.->|全局共享| F
+  style F fill:#fee2e2,stroke:#f87171
+  style CACHE fill:#fef3c7,stroke:#f59e0b
+      </div>
+    </div>
+    <div class="after-box">
+      <p class="text-xs font-bold text-green-700 mb-2 uppercase">After — 内部接缝</p>
+      <div class="mermaid">
+graph TD
+  F["create_research_router()"] --> C["register_chat_routes()"]
+  F --> P["register_portfolio_routes()"]
+  F --> M["register_market_routes(cache)"]
+  F --> N["register_news_routes(cache)"]
+  style F fill:#dcfce7,stroke:#22c55e
+  style C fill:#f0fdf4,stroke:#86efac
+  style P fill:#f0fdf4,stroke:#86efac
+  style M fill:#f0fdf4,stroke:#86efac
+  style N fill:#f0fdf4,stroke:#86efac
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- CANDIDATE 4: Quant Router Graceful Degradation -->
+<!-- ============================================================ -->
+<div class="card">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-bold text-gray-900">候选 4：Quant Router 的"优雅降级"——实际是接缝泄漏</h2>
+    <span class="badge-exploring">Worth exploring</span>
+  </div>
+
+  <div class="mb-3">
+    <span class="file-tag">backend/quant/router.py</span>
+    <span class="file-tag">backend/app.py</span>
+  </div>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">问题</h3>
+  <p class="text-gray-700 text-sm leading-relaxed">
+    <code>create_quant_router()</code> 为每个路由组（sessions、runs、swarm、alpha、settings、auth、system）分别 try/except，把失败的依赖收集到 <code>_missing_deps</code> 列表，最后注册一个 catch-all 503 fallback。这意味着：
+  </p>
+  <ul class="text-sm text-gray-700 list-disc ml-5 space-y-1 mt-2">
+    <li>接缝在运行时才确定形状——同一个 router 对象在不同机器上注册不同数量的路由</li>
+    <li>测试无法预测 router 的行为（取决于哪些 import 成功）</li>
+    <li>503 catch-all fallback 掩盖真正的配置问题——用户看到"部分不可用"但不知道为什么</li>
+    <li><code>app.py</code> 自己也有一层 try/except 包裹整个 quant router，形成<strong>双重降级</strong></li>
+  </ul>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">方案</h3>
+  <p class="text-gray-700 text-sm leading-relaxed">
+    Fail fast at startup：将依赖检查提前到应用启动阶段（preflight check），如果核心依赖缺失则启动失败并报明确错误。对真正可选的路由组（如 alpha 因子分析），使用显式 feature flag（环境变量）控制是否注册，而非靠 import 是否成功。删除 catch-all fallback。
+  </p>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">收益</h3>
+  <ul class="text-sm text-gray-700 list-disc ml-5 space-y-1">
+    <li><strong>Locality：</strong>router 形状在启动时确定且不可变，行为可预测</li>
+    <li><strong>Leverage：</strong>测试可断言"这些路由一定存在"，无需处理 503 分支</li>
+    <li><strong>测试改善：</strong>集成测试不会因为缺少 optional dep 而静默跳过路由覆盖</li>
+  </ul>
+
+  <!-- Before/After Diagram -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+    <div class="before-box">
+      <p class="text-xs font-bold text-red-700 mb-2 uppercase">Before — 运行时形状不确定</p>
+      <div class="mermaid">
+graph TD
+  R[create_quant_router] -->|try| S[sessions ✓?]
+  R -->|try| U[runs ✓?]
+  R -->|try| W[swarm ✓?]
+  R -->|try| A[alpha ✓?]
+  R -->|fallback| F["catch-all 503"]
+  style R fill:#fee2e2,stroke:#f87171
+  style F fill:#fef3c7,stroke:#f59e0b
+      </div>
+    </div>
+    <div class="after-box">
+      <p class="text-xs font-bold text-green-700 mb-2 uppercase">After — 确定形状 + Feature Flag</p>
+      <div class="mermaid">
+graph TD
+  PF[preflight_check] -->|fail fast| STOP[启动失败 + 明确错误]
+  PF -->|pass| R[create_quant_router]
+  R --> S[sessions ✓]
+  R --> U[runs ✓]
+  R --> W[swarm ✓]
+  R -->|ENABLE_ALPHA=1| A[alpha ✓]
+  style PF fill:#dbeafe,stroke:#3b82f6
+  style R fill:#dcfce7,stroke:#22c55e
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- CANDIDATE 5: Agent Loop Depth -->
+<!-- ============================================================ -->
+<div class="card">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-bold text-gray-900">候选 5：Agent Loop 配置耦合——深度被配置分散稀释</h2>
+    <span class="badge-speculative">Speculative</span>
+  </div>
+
+  <div class="mb-3">
+    <span class="file-tag">backend/quant/agent/loop.py</span>
+    <span class="file-tag">backend/quant/config/</span>
+  </div>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">问题</h3>
+  <p class="text-gray-700 text-sm leading-relaxed">
+    <code>AgentLoop</code> 本身是一个<strong>深模块</strong>（大量 context management、streaming、batching 逻辑藏在 <code>run()</code> 方法后面），但它的深度被一系列 <code>get_env_config()</code> 调用稀释了。Loop 的每个可调参数（token_threshold、heartbeat_interval、stream_retry_delay、tool_timeout、goal_max_continuations）都通过 lazy <code>from src.config.accessor import get_env_config</code> 在函数级别获取。
+  </p>
+  <p class="text-gray-700 text-sm leading-relaxed mt-2">
+    这导致：(1) 测试要 monkeypatch 5 个不同的模块级函数；(2) 配置变更的影响面不可见——改一个 yaml 字段可能影响 AgentLoop 的 5 个行为维度；(3) <code>_override()</code> 机制用 <code>sys.modules[__name__].__dict__</code> 做猴子补丁，进一步降低可读性。
+  </p>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">方案</h3>
+  <p class="text-gray-700 text-sm leading-relaxed">
+    引入一个 <code>AgentTuning</code> dataclass（frozen），在 AgentLoop 构造时一次性传入。测试直接构造 <code>AgentTuning(token_threshold=100, ...)</code>，不需要 monkeypatch。Loop 内部不再访问全局配置。
+  </p>
+
+  <h3 class="font-semibold text-gray-800 mt-4 mb-2">收益</h3>
+  <ul class="text-sm text-gray-700 list-disc ml-5 space-y-1">
+    <li><strong>Locality：</strong>所有调参集中在一个 dataclass 定义中，而非散布在函数间</li>
+    <li><strong>Leverage：</strong>AgentLoop 接口更小——构造参数替代隐式全局状态</li>
+    <li><strong>测试改善：</strong>无需 monkeypatch；直接传不同 tuning 实例测试边界行为</li>
+  </ul>
+
+  <!-- Before/After Diagram -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+    <div class="before-box">
+      <p class="text-xs font-bold text-red-700 mb-2 uppercase">Before — 散布配置访问</p>
+      <div style="font-family: monospace; font-size: 0.7rem; line-height: 1.8; color: #991b1b;">
+        <div>class AgentLoop:</div>
+        <div>&nbsp;&nbsp;def run(...):</div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;threshold = _token_threshold()&nbsp;&nbsp;# → get_env_config()</div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;interval = _heartbeat_interval_s()&nbsp;&nbsp;# → get_env_config()</div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;retry = _stream_retry_delay_s()&nbsp;&nbsp;# → get_env_config()</div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;timeout = _tool_timeout_seconds()&nbsp;&nbsp;# → get_env_config()</div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;max_cont = _goal_max_continuations()&nbsp;&nbsp;# → get_env_config()</div>
+        <div style="color:#dc2626; font-weight:bold;">&nbsp;&nbsp;&nbsp;&nbsp;# 5个隐式全局依赖，测试需 5 个 monkeypatch</div>
+      </div>
+    </div>
+    <div class="after-box">
+      <p class="text-xs font-bold text-green-700 mb-2 uppercase">After — 显式注入</p>
+      <div style="font-family: monospace; font-size: 0.7rem; line-height: 1.8; color: #166534;">
+        <div>@dataclass(frozen=True)</div>
+        <div>class AgentTuning:</div>
+        <div>&nbsp;&nbsp;token_threshold: int = 128_000</div>
+        <div>&nbsp;&nbsp;heartbeat_interval_s: float = 30.0</div>
+        <div>&nbsp;&nbsp;stream_retry_delay_s: float = 1.0</div>
+        <div>&nbsp;&nbsp;tool_timeout_s: float = 120.0</div>
+        <div>&nbsp;&nbsp;goal_max_continuations: int = 5</div>
+        <div><br/></div>
+        <div>class AgentLoop:</div>
+        <div>&nbsp;&nbsp;def __init__(self, ..., tuning: AgentTuning): ...</div>
+        <div style="color:#16a34a; font-weight:bold;">&nbsp;&nbsp;# 测试: AgentLoop(tuning=AgentTuning(token_threshold=100))</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TOP RECOMMENDATION -->
+<!-- ============================================================ -->
+<div class="card" style="border-left: 4px solid #f97316;">
+  <h2 class="text-xl font-bold text-warm-700 mb-4">🎯 首选推荐</h2>
+
+  <p class="text-gray-700 text-sm leading-relaxed">
+    <strong>候选 2（sys.path 幽灵导入）</strong>是我建议首先解决的。原因：
+  </p>
+  <ol class="text-sm text-gray-700 list-decimal ml-5 space-y-2 mt-3">
+    <li>
+      <strong>它是其他所有改进的前提。</strong>在 import 路径不稳定的情况下，任何重构（拆分 router、统一入口、提取 AgentTuning）都会触发大量不可预测的 import 失败。先修正包结构，后续变更才有稳定的基础。
+    </li>
+    <li>
+      <strong>风险最低。</strong>这是纯 rename + 正则替换——行为不变，只改 import 路径。配合一次性 sed 脚本和 pytest 全量跑通即可验证。
+    </li>
+    <li>
+      <strong>即刻收益最大。</strong>修正后 IDE 类型检查恢复、AI 代码导航恢复、测试发现恢复。这三项对日常开发摩擦的消除是立竿见影的。
+    </li>
+  </ol>
+
+  <p class="text-gray-700 text-sm leading-relaxed mt-4">
+    修正 import 后，<strong>候选 1（统一入口）</strong> 自然成为第二步——因为 <code>research/app.py</code> 和 <code>quant/api_server.py</code> 可以简化为开发时的 convenience script（不含任何中间件逻辑）而非独立应用。
+  </p>
+</div>
+
+</div><!-- end max-w-5xl container -->
+
+<script>
+mermaid.initialize({ startOnLoad: true, theme: 'neutral', flowchart: { useMaxWidth: true } });
+</script>
+</body>
+</html>

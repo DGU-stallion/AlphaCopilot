@@ -6,11 +6,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from src.agent.tools import BaseTool
-from src.tools.path_utils import safe_path as _safe_path
-from src.tools.path_utils import safe_run_dir as _safe_run_dir
-from src.tools.path_utils import allowed_file_roots
-from src.tools.redaction import redact_internal_paths
+from quant.agent.tools import BaseTool
+from quant.tools.path_utils import safe_path as _safe_path
+from quant.tools.path_utils import safe_run_dir as _safe_run_dir
+from quant.tools.path_utils import allowed_file_roots
+from quant.tools.redaction import redact_internal_paths
 
 _OUTPUT_LIMIT = 50_000
 

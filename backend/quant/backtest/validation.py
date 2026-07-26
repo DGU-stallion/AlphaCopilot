@@ -20,7 +20,7 @@ from typing import Any, Dict, List
 import numpy as np
 import pandas as pd
 
-from backtest.models import TradeRecord
+from quant.backtest.models import TradeRecord
 
 
 # ─── Monte Carlo Permutation Test ───

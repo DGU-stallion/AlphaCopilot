@@ -15,17 +15,17 @@ from dataclasses import asdict
 from datetime import date, timedelta
 from typing import Any
 
-from src.agent.tools import BaseTool
-from src.tools.path_utils import safe_user_path
-from src.shadow_account import (
+from quant.agent.tools import BaseTool
+from quant.tools.path_utils import safe_user_path
+from quant.shadow_account import (
     extract_shadow_profile,
     load_profile,
     render_shadow_report,
     run_shadow_backtest,
     save_profile,
 )
-from src.shadow_account.backtester import load_cached_result
-from src.shadow_account.scanner import scan_today_signals
+from quant.shadow_account.backtester import load_cached_result
+from quant.shadow_account.scanner import scan_today_signals
 
 logger = logging.getLogger(__name__)
 
@@ -262,7 +262,7 @@ class RenderShadowReportTool(BaseTool):
                 )
             except Exception as exc:  # pragma: no cover — defensive
                 logger.warning("backtest failed during report render: %s", exc)
-                from src.shadow_account.models import AttributionBreakdown, ShadowBacktestResult
+                from quant.shadow_account.models import AttributionBreakdown, ShadowBacktestResult
                 result = ShadowBacktestResult(
                     shadow_id=profile.shadow_id,
                     per_market={}, combined={"error": str(exc)}, equity_curves={},

@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from src.tools.fund_flow_tool import FundFlowTool
+from quant.tools.fund_flow_tool import FundFlowTool
 
 _DAILY_PAYLOAD = {
     "data": {

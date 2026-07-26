@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from src.config.accessor import get_env_config
+from quant.config.accessor import get_env_config
 
 _ALLOWED_FILE_ROOTS_ENV = "VIBE_TRADING_ALLOWED_FILE_ROOTS"
 _ALLOWED_RUN_ROOTS_ENV = "VIBE_TRADING_ALLOWED_RUN_ROOTS"
@@ -98,7 +98,7 @@ def _default_file_roots() -> list[Path]:
 
 def _default_run_roots() -> list[Path]:
     """Return default roots for generated backtest/tool run directories."""
-    from src.swarm.store import swarm_runs_root
+    from quant.swarm.store import swarm_runs_root
 
     cwd = Path.cwd().resolve()
     home = Path.home().resolve()

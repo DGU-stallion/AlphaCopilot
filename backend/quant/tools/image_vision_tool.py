@@ -15,8 +15,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from src.agent.tools import BaseTool
-from src.tools.path_utils import allowed_file_roots, resolve_safe_path
+from quant.agent.tools import BaseTool
+from quant.tools.path_utils import allowed_file_roots, resolve_safe_path
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +129,7 @@ class AnalyzeImageTool(BaseTool):
         ]
 
         try:
-            from src.providers.chat import ChatLLM
+            from quant.providers.chat import ChatLLM
 
             response = ChatLLM().chat(messages, timeout=_VISION_TIMEOUT_S)
             answer = (response.content or "").strip()

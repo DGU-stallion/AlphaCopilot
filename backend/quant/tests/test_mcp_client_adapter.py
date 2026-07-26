@@ -11,8 +11,8 @@ from fastmcp.client.client import CallToolResult
 from fastmcp.exceptions import McpError, ToolError
 from mcp import types as mcp_types
 
-from src.config.schema import MCPServerConfig
-from src.tools.mcp import (
+from quant.config.schema import MCPServerConfig
+from quant.tools.mcp import (
     MCPServerAdapter,
     build_mcp_tool_wrappers,
     format_mcp_server_name_collision_warning,

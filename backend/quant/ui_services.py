@@ -457,7 +457,7 @@ def reconstruct_price_series(run_dir: Path) -> List[Dict[str, Any]]:
         return []
 
     try:
-        from src.providers.llm import _ensure_dotenv
+        from quant.providers.llm import _ensure_dotenv
 
         _ensure_dotenv()
     except Exception:
@@ -466,7 +466,7 @@ def reconstruct_price_series(run_dir: Path) -> List[Dict[str, Any]]:
 
     try:
         config_data = load_json_file(run_dir / "config.json") or {}
-        from backtest.runner import fetch_data_map
+        from quant.backtest.runner import fetch_data_map
 
         fetch_config = dict(config_data)
         fetch_config.update(

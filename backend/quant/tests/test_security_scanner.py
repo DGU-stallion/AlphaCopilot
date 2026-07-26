@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 
-from src.security.scanner import scan_prompt_injection, with_security_warnings
-from src.tools.doc_reader_tool import read_document
-from src.tools import web_reader_tool, web_search_tool
+from quant.security.scanner import scan_prompt_injection, with_security_warnings
+from quant.tools.doc_reader_tool import read_document
+from quant.tools import web_reader_tool, web_search_tool
 
 
 def test_scan_prompt_injection_detects_instruction_override() -> None:

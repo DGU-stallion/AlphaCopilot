@@ -15,8 +15,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.hypotheses import HypothesisRegistry
-from src.tools.autopilot_tool import (
+from quant.hypotheses import HypothesisRegistry
+from quant.tools.autopilot_tool import (
     LinkAutopilotBacktestTool,
     ScaffoldSignalEngineTool,
     _get_hypothesis,

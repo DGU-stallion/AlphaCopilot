@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-import src.core.state as state_mod
-from src.core.state import RunStateStore
+import quant.core.state as state_mod
+from quant.core.state import RunStateStore
 
 
 def test_write_json_calls_fsync(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

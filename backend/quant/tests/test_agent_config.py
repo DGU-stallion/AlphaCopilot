@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from src.channels.config import load_channels_config
-from src.config import (
+from quant.channels.config import load_channels_config
+from quant.config import (
     AgentConfig,
     MCPServerConfig,
     get_config_path,
@@ -20,7 +20,7 @@ from src.config import (
     load_runtime_agent_config,
     sanitize_session_overrides,
 )
-from src.config.schema import (
+from quant.config.schema import (
     ROBINHOOD_AGENT_CONFIG_PATH,
     ROBINHOOD_MCP_SERVER_SEED,
     format_robinhood_mcp_server_seed_json,

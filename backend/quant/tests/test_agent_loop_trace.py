@@ -9,11 +9,13 @@ from typing import Any, Callable
 
 import pytest
 
-import src.agent.loop as loop_mod
-import src.agent.trace as trace_mod
-from src.agent.context import ContextBuilder
-from src.agent.loop import AgentLoop
-from src.agent.trace import TraceWriter
+import quant.agent.loop as loop_mod
+import quant.agent.trace as trace_mod
+from quant.agent.context import ContextBuilder
+from quant.agent.loop import AgentLoop
+from quant.agent.trace import TraceWriter
+
+from conftest import make_test_tuning
 
 
 class _Tool:
@@ -46,6 +48,7 @@ def test_tool_call_trace_redacts_args_and_structured_results(tmp_path: Path) -> 
     agent = AgentLoop(
         registry=_SecretRegistry(),  # type: ignore[arg-type]
         llm=SimpleNamespace(),
+        tuning=make_test_tuning(),
         max_iterations=1,
     )
     run_dir = tmp_path / "run"
@@ -119,6 +122,7 @@ def test_session_trace_uses_session_dir_and_round_trips_long_answer(
     agent = AgentLoop(
         registry=_SecretRegistry(),  # type: ignore[arg-type]
         llm=_LongAnswerLLM(),
+        tuning=make_test_tuning(),
         max_iterations=1,
     )
     run_dir = tmp_path / "run"

@@ -37,7 +37,7 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from src.factors.base import Alpha
+from quant.factors.base import Alpha
 
 logger = logging.getLogger(__name__)
 

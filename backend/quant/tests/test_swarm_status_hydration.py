@@ -23,10 +23,10 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 import mcp_server
-import src.swarm.runtime as rt
-import src.swarm.store as store_mod
-import src.swarm.worker as worker_mod
-from src.swarm.models import (
+import quant.swarm.runtime as rt
+import quant.swarm.store as store_mod
+import quant.swarm.worker as worker_mod
+from quant.swarm.models import (
     RunStatus,
     SwarmAgentSpec,
     SwarmEvent,
@@ -34,8 +34,8 @@ from src.swarm.models import (
     SwarmTask,
     TaskStatus,
 )
-from src.swarm.store import SwarmStore
-from src.swarm.task_store import TaskStore
+from quant.swarm.store import SwarmStore
+from quant.swarm.task_store import TaskStore
 
 
 def _iso(dt: datetime) -> str:
@@ -314,7 +314,7 @@ def test_runtime_layer_boundary_sync_writes_run_json(tmp_path, monkeypatch):
     store.create_run(run)
 
     def fake_worker(*args, **kwargs):
-        from src.swarm.models import WorkerResult
+        from quant.swarm.models import WorkerResult
         return WorkerResult(status="completed", summary="ok")
 
     import threading
@@ -342,7 +342,7 @@ def test_worker_emits_task_heartbeat_during_tool_call():
     """
     import time
 
-    from src.agent.progress import HeartbeatTimer
+    from quant.agent.progress import HeartbeatTimer
 
     captured: list[dict] = []
     with HeartbeatTimer(tool_name="slow_tool", interval=0.5, emit=captured.append):
@@ -356,7 +356,7 @@ def test_swarm_tool_format_result_preserves_running_status_on_budget_out():
     """_format_result(timed_out=True) must surface the real run status, not
     overwrite it with "timeout". Agents need to know "still running" so they
     can re-invoke with the run_id; the historical "timeout" mask hid that."""
-    import src.tools.swarm_tool as swarm_tool
+    import quant.tools.swarm_tool as swarm_tool
 
     run = _base_run("r-budget")
     run.status = RunStatus.running
@@ -373,7 +373,7 @@ def test_swarm_tool_no_longer_cancels_on_budget_out():
     """Source-level guard: the SwarmTool wait loop must not call cancel_run
     when its budget elapses — that used to throw away in-flight LLM work."""
     import inspect
-    import src.tools.swarm_tool as swarm_tool
+    import quant.tools.swarm_tool as swarm_tool
 
     source = inspect.getsource(swarm_tool.SwarmTool.execute)
     assert "cancel_run" not in source, (
@@ -602,7 +602,7 @@ def test_heartbeat_interval_env_var_is_robust_to_garbage(monkeypatch):
 
     # Force re-evaluation by calling the resolver directly.
     import importlib
-    import src.swarm.worker as w
+    import quant.swarm.worker as w
     importlib.reload(w)
 
     assert w._HEARTBEAT_INTERVAL_S == 3.0
@@ -627,7 +627,7 @@ def test_worker_source_wires_heartbeat_around_tool_execute():
 
 def test_swarm_tool_forwards_started_and_live_events(monkeypatch):
     """Web chat sessions should receive a status card seed plus live swarm events."""
-    import src.tools.swarm_tool as swarm_tool
+    import quant.tools.swarm_tool as swarm_tool
 
     run = _base_run("r-web-chat")
     run.status = RunStatus.running
@@ -681,7 +681,7 @@ def test_swarm_tool_forwards_started_and_live_events(monkeypatch):
 
 def test_swarm_tool_without_session_callback_preserves_plain_runtime(monkeypatch):
     """No session bridge means no live callback is installed."""
-    import src.tools.swarm_tool as swarm_tool
+    import quant.tools.swarm_tool as swarm_tool
 
     run = _base_run("r-no-session")
     run.status = RunStatus.running

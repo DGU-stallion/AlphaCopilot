@@ -9,7 +9,7 @@ from typing import Any
 
 import pandas as pd
 
-from src.agent.tools import BaseTool
+from quant.agent.tools import BaseTool
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +168,7 @@ class GetFundamentalsTool(BaseTool):
             return _error("index must be a list of date strings or a DatetimeIndex")
 
         try:
-            from backtest.loaders.fundamentals_loader import load_fundamental_panel
+            from quant.backtest.loaders.fundamentals_loader import load_fundamental_panel
 
             panel = load_fundamental_panel(
                 symbols=symbols,

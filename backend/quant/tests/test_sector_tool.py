@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from src.tools.sector_tool import SectorInfoTool
+from quant.tools.sector_tool import SectorInfoTool
 
 _MEMBERSHIP_PAYLOAD = {
     "data": {

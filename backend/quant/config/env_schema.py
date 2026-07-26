@@ -10,7 +10,7 @@ a validated, typed, centrally-managed configuration layer.
 
 Usage::
 
-    from src.config.env_schema import EnvConfig
+    from quant.config.env_schema import EnvConfig
 
     cfg = EnvConfig()          # reads os.environ, applies defaults
     cfg.llm.timeout_seconds    # 120

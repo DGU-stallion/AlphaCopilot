@@ -20,8 +20,8 @@ import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-from backtest.loaders import eastmoney_client
-from src.agent.tools import BaseTool
+from quant.backtest.loaders import eastmoney_client
+from quant.agent.tools import BaseTool
 
 logger = logging.getLogger(__name__)
 

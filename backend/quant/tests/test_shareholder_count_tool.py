@@ -9,8 +9,8 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from src.tools import shareholder_count_tool as sct
-from src.tools.shareholder_count_tool import ShareholderCountTool
+from quant.tools import shareholder_count_tool as sct
+from quant.tools.shareholder_count_tool import ShareholderCountTool
 
 _SAMPLE_PAYLOAD = {
     "result": {

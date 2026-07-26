@@ -9,9 +9,9 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
-from backtest.loaders import longbridge as loader_mod
-from backtest.loaders.base import NoAvailableSourceError
-from src.trading.connectors.longbridge import credentials as lb_credentials
+from quant.backtest.loaders import longbridge as loader_mod
+from quant.backtest.loaders.base import NoAvailableSourceError
+from quant.trading.connectors.longbridge import credentials as lb_credentials
 
 
 def test_wide_date_range_never_truncates_silently() -> None:

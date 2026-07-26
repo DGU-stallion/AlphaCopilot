@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from src.live import paths
-from src.live.runtime import liveness
-from src.live.runtime.liveness import (
+from quant.live import paths
+from quant.live.runtime import liveness
+from quant.live.runtime.liveness import (
     DEFAULT_STALENESS_MS,
     heartbeats_dir,
     is_runner_alive,

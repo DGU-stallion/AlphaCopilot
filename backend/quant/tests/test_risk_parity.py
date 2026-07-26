@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backtest.optimizers.risk_parity import RiskParityOptimizer
+from quant.backtest.optimizers.risk_parity import RiskParityOptimizer
 
 
 class TestRiskParityCalcWeights:

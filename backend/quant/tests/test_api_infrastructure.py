@@ -6,7 +6,7 @@ import os
 import pytest
 
 import api_server
-from src.api import _compat, security, models, helpers, state
+from quant.api import _compat, security, models, helpers, state
 
 
 # ============================================================================
@@ -320,7 +320,7 @@ def test_read_write_env_quoted_hash_roundtrip(tmp_path):
 def test_session_service_writeback_to_host(monkeypatch):
     """_get_session_service should write back to api_server for monkeypatch compat."""
     monkeypatch.setenv("ENABLE_SESSION_RUNTIME", "false")
-    import src.api.state as state_mod
+    import quant.api.state as state_mod
     state_mod._session_service = None
     _compat.set_host_attr("_session_service", None)
 

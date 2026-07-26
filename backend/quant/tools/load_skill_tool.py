@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from src.agent.skills import SkillsLoader
-from src.agent.tools import BaseTool
+from quant.agent.skills import SkillsLoader
+from quant.agent.tools import BaseTool
 
 
 class LoadSkillTool(BaseTool):

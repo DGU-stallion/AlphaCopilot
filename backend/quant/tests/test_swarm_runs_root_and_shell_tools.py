@@ -17,10 +17,10 @@ from __future__ import annotations
 import logging
 import threading
 
-from src.swarm.models import SwarmAgentSpec, SwarmRun, SwarmTask, WorkerResult
-from src.swarm.store import SwarmStore, swarm_runs_root
-from src.tools import build_filtered_registry, path_utils
-import src.swarm.runtime as rt
+from quant.swarm.models import SwarmAgentSpec, SwarmRun, SwarmTask, WorkerResult
+from quant.swarm.store import SwarmStore, swarm_runs_root
+from quant.tools import build_filtered_registry, path_utils
+import quant.swarm.runtime as rt
 
 
 # ---- P03-A: single source of truth -----------------------------------------

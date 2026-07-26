@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from backtest.loaders.yfinance_loader import DataLoader, _to_yfinance_symbol
+from quant.backtest.loaders.yfinance_loader import DataLoader, _to_yfinance_symbol
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ def _download_frame() -> pd.DataFrame:
 
 
 def test_fetch_passes_inclusive_end_date_to_yfinance_as_exclusive_end(monkeypatch: pytest.MonkeyPatch) -> None:
-    import backtest.loaders.yfinance_loader as yfl
+    import quant.backtest.loaders.yfinance_loader as yfl
 
     monkeypatch.delenv("VIBE_TRADING_DATA_CACHE", raising=False)
     calls = []
@@ -95,7 +95,7 @@ def test_fetch_passes_inclusive_end_date_to_yfinance_as_exclusive_end(monkeypatc
 
 
 def test_fallback_single_symbol_download_uses_inclusive_end_date(monkeypatch: pytest.MonkeyPatch) -> None:
-    import backtest.loaders.yfinance_loader as yfl
+    import quant.backtest.loaders.yfinance_loader as yfl
 
     monkeypatch.delenv("VIBE_TRADING_DATA_CACHE", raising=False)
     calls = []
@@ -118,7 +118,7 @@ def test_fallback_single_symbol_download_uses_inclusive_end_date(monkeypatch: py
 
 
 def test_yfinance_cache_lookup_keeps_requested_end_date(monkeypatch: pytest.MonkeyPatch) -> None:
-    import backtest.loaders.yfinance_loader as yfl
+    import quant.backtest.loaders.yfinance_loader as yfl
 
     cache_calls = []
 

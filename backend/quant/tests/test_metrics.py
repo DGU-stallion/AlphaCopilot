@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backtest.metrics import (
+from quant.backtest.metrics import (
     by_exit_reason_stats,
     by_symbol_stats,
     calc_bars_per_year,
@@ -23,7 +23,7 @@ from backtest.metrics import (
     calc_turnover_series,
     win_rate_and_stats,
 )
-from backtest.models import TradeRecord
+from quant.backtest.models import TradeRecord
 
 
 # ---------------------------------------------------------------------------

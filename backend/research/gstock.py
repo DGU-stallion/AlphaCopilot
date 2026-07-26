@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-import astock
+import research.astock as astock
 
 _UA_H = {"User-Agent": astock.UA}
 _GS_HOSTS = ("push2.eastmoney.com", "push2delay.eastmoney.com")

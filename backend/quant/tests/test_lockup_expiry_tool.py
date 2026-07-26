@@ -12,9 +12,9 @@ import json
 from datetime import date
 from unittest.mock import patch
 
-from backtest.loaders import eastmoney_client
-from src.tools import lockup_expiry_tool
-from src.tools.lockup_expiry_tool import LockupExpiryTool
+from quant.backtest.loaders import eastmoney_client
+from quant.tools import lockup_expiry_tool
+from quant.tools.lockup_expiry_tool import LockupExpiryTool
 
 
 def _payload(rows: list[dict]) -> dict:

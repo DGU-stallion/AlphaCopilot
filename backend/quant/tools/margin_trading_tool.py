@@ -18,9 +18,9 @@ import json
 import logging
 from typing import Any
 
-from backtest.loaders import eastmoney_client
-from src.agent.tools import BaseTool
-from src.tools import tushare_fallbacks
+from quant.backtest.loaders import eastmoney_client
+from quant.agent.tools import BaseTool
+from quant.tools import tushare_fallbacks
 
 logger = logging.getLogger(__name__)
 

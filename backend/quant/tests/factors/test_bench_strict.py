@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.factors.bench_runner_strict import (
+from quant.factors.bench_runner_strict import (
     StrictThresholds,
     _shuffle_within_rows,
     alpha_series_paired,

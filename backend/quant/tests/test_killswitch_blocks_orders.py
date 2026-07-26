@@ -14,9 +14,9 @@ from typing import Any
 
 import pytest
 
-import src.live.paths as paths
-from src.live.halt import trip_halt
-from src.live.mandate.model import (
+import quant.live.paths as paths
+from quant.live.halt import trip_halt
+from quant.live.mandate.model import (
     MANDATE_SCHEMA_VERSION,
     AssetClass,
     ConsentMeta,
@@ -25,8 +25,8 @@ from src.live.mandate.model import (
     Mandate,
     UniverseConstraint,
 )
-from src.live.order_guard import LiveOrderGuardTool
-from src.tools.mcp import MCPRemoteTool, MCPRemoteToolSpec
+from quant.live.order_guard import LiveOrderGuardTool
+from quant.tools.mcp import MCPRemoteTool, MCPRemoteToolSpec
 
 
 @pytest.fixture

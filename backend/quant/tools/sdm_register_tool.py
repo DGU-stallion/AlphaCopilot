@@ -6,13 +6,13 @@ import json
 from dataclasses import asdict
 from typing import Any
 
-from src.agent.tools import BaseTool
-from src.strategy_store.models import (
+from quant.agent.tools import BaseTool
+from quant.strategy_store.models import (
     Artifact,
     ArtifactStatus,
     ArtifactType,
 )
-from src.strategy_store._shared import get_store as _get_store
+from quant.strategy_store._shared import get_store as _get_store
 
 
 def _ok(payload: dict[str, Any]) -> str:

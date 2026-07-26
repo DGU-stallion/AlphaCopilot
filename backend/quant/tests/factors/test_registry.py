@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.factors.registry import (
+from quant.factors.registry import (
     AlphaMeta,
     Registry,
     RegistryError,

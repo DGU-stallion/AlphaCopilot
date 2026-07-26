@@ -13,8 +13,8 @@ from unittest.mock import patch
 
 import pytest
 
-from backtest.loaders import eastmoney_client
-from src.tools.dragon_tiger_tool import DragonTigerTool, _bare_code, _compact_date
+from quant.backtest.loaders import eastmoney_client
+from quant.tools.dragon_tiger_tool import DragonTigerTool, _bare_code, _compact_date
 
 
 def _appearance_payload() -> dict[str, Any]:

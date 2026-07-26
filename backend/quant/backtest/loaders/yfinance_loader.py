@@ -11,13 +11,13 @@ import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
-from backtest.loaders.base import (
+from quant.backtest.loaders.base import (
     loader_cache_get,
     loader_cache_put,
     validate_date_range,
     validate_ohlc,
 )
-from backtest.loaders.registry import register
+from quant.backtest.loaders.registry import register
 
 _OHLCV_COLUMNS = ["open", "high", "low", "close", "volume"]
 _COLUMN_RENAMES = {

@@ -15,7 +15,7 @@ import json
 
 import pytest
 
-from src.trading.connectors.alpaca import sdk as al
+from quant.trading.connectors.alpaca import sdk as al
 
 pytestmark = pytest.mark.unit
 
@@ -367,7 +367,7 @@ def test_denied_cancel_is_blocked(monkeypatch) -> None:
 # These run the REAL alpaca connector module through the REAL gate.
 # --------------------------------------------------------------------------- #
 
-from src.live import sdk_order_gate as gate  # noqa: E402
+from quant.live import sdk_order_gate as gate  # noqa: E402
 from tests.test_sdk_order_gate import _intent, _mandate, _patch_gate  # noqa: E402
 
 

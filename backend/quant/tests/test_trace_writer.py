@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-import src.agent.trace as trace_mod
-from src.agent.trace import TraceWriter
+import quant.agent.trace as trace_mod
+from quant.agent.trace import TraceWriter
 
 
 def _raw_entries(trace_dir: Path) -> list[dict]:

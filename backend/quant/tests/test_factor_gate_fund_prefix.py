@@ -9,8 +9,8 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from backtest import runner
-from src.factors.registry import AlphaMeta
+from quant.backtest import runner
+from quant.factors.registry import AlphaMeta
 
 
 def _meta(**overrides: Any) -> dict[str, Any]:

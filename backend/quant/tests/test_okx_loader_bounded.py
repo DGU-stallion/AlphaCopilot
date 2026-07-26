@@ -15,9 +15,9 @@ import pandas as pd
 import pytest
 import requests
 
-import backtest.loaders.okx as okx
-from backtest.loaders.base import DEFAULT_MAX_RETRIES
-from backtest.loaders.okx import DataLoader
+import quant.backtest.loaders.okx as okx
+from quant.backtest.loaders.base import DEFAULT_MAX_RETRIES
+from quant.backtest.loaders.okx import DataLoader
 
 S = int(pd.Timestamp("2026-05-01").timestamp() * 1000)
 E = int((pd.Timestamp("2026-05-05") + pd.Timedelta(days=1)).timestamp() * 1000)

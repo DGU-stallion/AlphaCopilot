@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.tools.trade_journal_parsers import (
+from quant.tools.trade_journal_parsers import (
     TradeRecord,
     _infer_market_from_symbol,
     _normalize_side,
@@ -27,7 +27,7 @@ from src.tools.trade_journal_parsers import (
     parse_file,
     records_to_dataframe,
 )
-from src.tools.trade_journal_tool import (
+from quant.tools.trade_journal_tool import (
     _apply_filter,
     _compute_behavior,
     _compute_profile,

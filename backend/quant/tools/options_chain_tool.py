@@ -12,8 +12,8 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from backtest.loaders import yahoo_client
-from src.agent.tools import BaseTool
+from quant.backtest.loaders import yahoo_client
+from quant.agent.tools import BaseTool
 
 # Upper bound on contracts emitted per side so a deep chain cannot blow up the
 # tool payload handed back to the model.

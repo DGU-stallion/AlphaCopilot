@@ -18,16 +18,16 @@ from pathlib import Path
 
 import pytest
 
-import src.live.paths as paths
-import src.live.mandate.commit as mandate_commit
-from src.live.mandate.commit import (
+import quant.live.paths as paths
+import quant.live.mandate.commit as mandate_commit
+from quant.live.mandate.commit import (
     CommitError,
     DEFAULT_MANDATE_LIFETIME_DAYS,
     commit_mandate,
     save_proposal,
 )
-from src.live.mandate.store import load_mandate
-from src.tools.propose_mandate_tool import ProposeMandateProfilesTool
+from quant.live.mandate.store import load_mandate
+from quant.tools.propose_mandate_tool import ProposeMandateProfilesTool
 
 pytestmark = pytest.mark.unit
 
@@ -509,8 +509,8 @@ def test_commit_explicit_flatten_param_overrides_profile(live_runtime: Path) -> 
 
 def test_propose_tool_is_a_basetool_but_commit_is_not() -> None:
     """The proposer is a registerable tool; the committer is a plain function."""
-    from src.agent.tools import BaseTool
-    import src.live.mandate.commit as commit_mod
+    from quant.agent.tools import BaseTool
+    import quant.live.mandate.commit as commit_mod
 
     assert issubclass(ProposeMandateProfilesTool, BaseTool)
     # No BaseTool subclass lives in the commit module — it can never be
@@ -553,7 +553,7 @@ def test_no_registered_tool_references_commit_mandate() -> None:
 
 def test_registry_has_propose_tool_but_no_mandate_writer() -> None:
     """The assembled registry exposes propose_mandate_profiles, no commit tool."""
-    from src.tools import build_registry
+    from quant.tools import build_registry
 
     registry = build_registry()
     names = set(registry.tool_names)

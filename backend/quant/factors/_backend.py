@@ -44,7 +44,7 @@ def _ensure_bottleneck() -> None:
     if _bn_initialised:
         return
     _bn_initialised = True
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
 
     if get_env_config().agent_tuning.vibe_trading_disable_bottleneck:
         return

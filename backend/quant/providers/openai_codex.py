@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Optional
 from urllib.parse import urlparse
 
-from src.config.accessor import get_env_config
+from quant.config.accessor import get_env_config
 
 try:
     import httpx

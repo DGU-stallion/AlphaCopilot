@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 import yaml
 
-import backtest.loaders.local_loader as local_loader
+import quant.backtest.loaders.local_loader as local_loader
 
 
 def _configure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, sources: list[dict]) -> None:

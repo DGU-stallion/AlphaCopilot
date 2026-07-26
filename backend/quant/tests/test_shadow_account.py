@@ -15,7 +15,7 @@ pytestmark = pytest.mark.filterwarnings(
     "ignore:Number of distinct clusters.*:UserWarning",
 )
 
-from src.shadow_account import (
+from quant.shadow_account import (
     AttributionBreakdown,
     ShadowBacktestResult,
     ShadowProfile,
@@ -32,8 +32,8 @@ from src.shadow_account import (
     validate_generated,
     write_run_dir,
 )
-from src.shadow_account.models import AttributionBreakdown as _AttrCls
-from src.shadow_account.extractor import MIN_PROFITABLE_ROUNDTRIPS
+from quant.shadow_account.models import AttributionBreakdown as _AttrCls
+from quant.shadow_account.extractor import MIN_PROFITABLE_ROUNDTRIPS
 
 
 # ---------------- Helpers ----------------
@@ -49,7 +49,7 @@ def _offline_prices(monkeypatch: pytest.MonkeyPatch) -> None:
     extraction degrades to NaN price features exactly as in production offline.
     Tests that exercise the price path override this with a fixture loader.
     """
-    from backtest.loaders.base import NoAvailableSourceError
+    from quant.backtest.loaders.base import NoAvailableSourceError
 
     def _no_source(market: str):
         raise NoAvailableSourceError(f"offline test: no source for {market}")
@@ -148,7 +148,7 @@ def test_extract_profile_happy_path(profitable_journal: Path) -> None:
 
 @pytest.mark.unit
 def test_extract_profile_yields_rules(profitable_journal: Path) -> None:
-    from src.shadow_account.extractor import RULE_TEXT_MAX
+    from quant.shadow_account.extractor import RULE_TEXT_MAX
 
     profile = extract_shadow_profile(profitable_journal, min_support=2, max_rules=5)
     assert 1 <= len(profile.rules) <= 5
@@ -503,7 +503,7 @@ def test_render_shadow_report_handles_empty_equity(
 
 @pytest.mark.unit
 def test_shadow_tools_are_auto_discovered() -> None:
-    from src.tools import build_registry
+    from quant.tools import build_registry
 
     registry = build_registry()
     for expected in (
@@ -519,7 +519,7 @@ def test_shadow_tools_are_auto_discovered() -> None:
 def test_extract_shadow_strategy_tool(
     profitable_journal: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.tools.shadow_account_tool import ExtractShadowStrategyTool
+    from quant.tools.shadow_account_tool import ExtractShadowStrategyTool
 
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
@@ -529,7 +529,7 @@ def test_extract_shadow_strategy_tool(
     assert out["status"] == "ok"
     assert out["shadow_id"].startswith("shadow_")
     assert len(out["rules"]) >= 1
-    from src.shadow_account.extractor import RULE_TEXT_MAX
+    from quant.shadow_account.extractor import RULE_TEXT_MAX
     assert 1 <= len(out["rules"][0]["human_text"]) <= RULE_TEXT_MAX
 
     # Persistence happened — we can load it back.
@@ -539,7 +539,7 @@ def test_extract_shadow_strategy_tool(
 
 @pytest.mark.unit
 def test_extract_shadow_strategy_tool_reports_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.tools.shadow_account_tool import ExtractShadowStrategyTool
+    from quant.tools.shadow_account_tool import ExtractShadowStrategyTool
 
     monkeypatch.setenv("VIBE_TRADING_ALLOWED_FILE_ROOTS", str(tmp_path))
     tool = ExtractShadowStrategyTool()
@@ -552,7 +552,7 @@ def test_extract_shadow_strategy_tool_reports_errors(tmp_path: Path, monkeypatch
 def test_scan_shadow_signals_tool(
     profitable_journal: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.tools.shadow_account_tool import ScanShadowSignalsTool
+    from quant.tools.shadow_account_tool import ScanShadowSignalsTool
 
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("USERPROFILE", str(tmp_path))
@@ -567,7 +567,7 @@ def test_scan_shadow_signals_tool(
 
 @pytest.mark.unit
 def test_run_shadow_backtest_tool_handles_missing_id() -> None:
-    from src.tools.shadow_account_tool import RunShadowBacktestTool
+    from quant.tools.shadow_account_tool import RunShadowBacktestTool
 
     out = json.loads(RunShadowBacktestTool().execute(shadow_id="shadow_unknown"))
     assert out["status"] == "error"
@@ -584,7 +584,7 @@ def test_shadow_account_skill_shipped() -> None:
 
 @pytest.mark.unit
 def test_context_prompt_references_shadow_account() -> None:
-    from src.agent.context import _SYSTEM_PROMPT  # noqa: SLF001 — intentional peek
+    from quant.agent.context import _SYSTEM_PROMPT  # noqa: SLF001 — intentional peek
 
     assert "Shadow Account" in _SYSTEM_PROMPT
     assert "extract_shadow_strategy" in _SYSTEM_PROMPT
@@ -622,7 +622,7 @@ def test_attribution_is_zero_without_journal(
 
 # ---------------- Price-context features (as-of buy_dt) ----------------
 
-from src.shadow_account.extractor import (  # noqa: E402
+from quant.shadow_account.extractor import (  # noqa: E402
     _MARKET_KEY_MAP,
     _attach_price_features,
     _compute_rsi,
@@ -772,7 +772,7 @@ def test_extract_with_price_features_promotes_into_clustering(
 
     # Capture what `_compute_features` produced and which numeric features the
     # clusterer was actually handed — a rule count alone can't prove promotion.
-    import src.shadow_account.extractor as extractor
+    import quant.shadow_account.extractor as extractor
 
     captured: dict[str, object] = {}
     orig_features = extractor._compute_features
@@ -812,7 +812,7 @@ def test_sparse_price_features_fall_back_to_journal_only(
     profitable_journal: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """With prices offline (autouse), promotion is skipped and rules still form."""
-    import src.shadow_account.extractor as extractor
+    import quant.shadow_account.extractor as extractor
 
     captured: dict[str, object] = {}
     orig_cluster = extractor._auto_cluster
@@ -856,7 +856,7 @@ def test_single_cluster_fallback_carries_price_bounds() -> None:
     journals (len < min_support) silently produced behavior-only rules even
     when price data was present.
     """
-    from src.shadow_account.extractor import _extract_rules
+    from quant.shadow_account.extractor import _extract_rules
 
     df = pd.DataFrame({
         "market": ["us", "us", "us"],
@@ -885,8 +885,8 @@ def test_codegen_and_extractor_share_price_feature_names() -> None:
     Both now source ``PRICE_FEATURES`` from ``models`` instead of repeating a
     literal tuple, so a single edit cannot leave one side stale.
     """
-    from src.shadow_account import codegen, extractor
-    from src.shadow_account.models import PRICE_FEATURES
+    from quant.shadow_account import codegen, extractor
+    from quant.shadow_account.models import PRICE_FEATURES
 
     assert extractor._PRICE_FEATURES is PRICE_FEATURES
     # codegen flattens exactly these features' bounds — guard against drift.
@@ -917,7 +917,7 @@ def test_price_bounds_keep_four_decimal_precision() -> None:
     bounds (e.g. 0.0123 → 0.01); the extractor now rounds price-feature bounds
     to 4 decimals.
     """
-    from src.shadow_account.extractor import _extract_rules
+    from quant.shadow_account.extractor import _extract_rules
 
     df = pd.DataFrame({
         "market": ["us"] * 4,
@@ -940,7 +940,7 @@ def test_price_bounds_keep_four_decimal_precision() -> None:
 
 # ---- Degradation branches in the price-fetch / attach path ----
 
-from src.shadow_account.extractor import (  # noqa: E402
+from quant.shadow_account.extractor import (  # noqa: E402
     _auto_cluster,
     _fetch_price_history,
 )
@@ -1112,7 +1112,7 @@ def test_extracted_rules_no_price_conditions_when_sparse(
 @pytest.mark.unit
 def test_price_condition_bounds_are_p10_p90() -> None:
     """The p10/p90 values are the actual quantiles of the cluster."""
-    from src.shadow_account.extractor import _cluster_to_rule
+    from quant.shadow_account.extractor import _cluster_to_rule
 
     cluster_df = pd.DataFrame({
         "symbol": ["A"] * 4,
@@ -1145,7 +1145,7 @@ def test_price_condition_bounds_are_p10_p90() -> None:
 @pytest.mark.unit
 def test_price_condition_nan_rows_excluded_from_bounds() -> None:
     """NaN rows in the cluster do not shift p10/p90 quantiles."""
-    from src.shadow_account.extractor import _cluster_to_rule
+    from quant.shadow_account.extractor import _cluster_to_rule
 
     cluster_df = pd.DataFrame({
         "symbol": ["A"] * 4,
@@ -1174,7 +1174,7 @@ def test_price_condition_nan_rows_excluded_from_bounds() -> None:
 # ---- M5: Codegen with price conditions ----
 
 
-from src.shadow_account.codegen import _rule_to_context  # noqa: E402
+from quant.shadow_account.codegen import _rule_to_context  # noqa: E402
 
 
 @pytest.mark.unit
@@ -1664,7 +1664,7 @@ def test_conditional_entry_only_prior_return_condition() -> None:
 @pytest.mark.unit
 def test_cluster_to_rule_skips_all_nan_price_feature() -> None:
     """When a promoted price feature is all-NaN in the cluster, it is skipped."""
-    from src.shadow_account.extractor import _cluster_to_rule
+    from quant.shadow_account.extractor import _cluster_to_rule
 
     cluster_df = pd.DataFrame({
         "symbol": ["A"] * 4,

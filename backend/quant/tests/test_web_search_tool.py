@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.tools.web_search_tool import WebSearchTool
+from quant.tools.web_search_tool import WebSearchTool
 
 
 def _make_ddgs_module(text_impl):

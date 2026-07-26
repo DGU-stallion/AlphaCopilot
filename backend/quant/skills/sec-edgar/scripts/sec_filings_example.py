@@ -15,7 +15,7 @@ Run from the ``agent/`` directory so that ``backtest`` resolves on the path::
 
 from typing import Any, Dict, List, Optional
 
-from backtest.loaders.sec_edgar_client import (
+from quant.backtest.loaders.sec_edgar_client import (
     cik_for,
     get_company_facts,
     get_submissions,

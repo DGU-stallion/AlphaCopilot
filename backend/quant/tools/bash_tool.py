@@ -6,7 +6,7 @@ import json
 import subprocess
 from typing import Any
 
-from src.agent.tools import BaseTool
+from quant.agent.tools import BaseTool
 
 _OUTPUT_LIMIT = 50_000
 _DEFAULT_TIMEOUT = 120

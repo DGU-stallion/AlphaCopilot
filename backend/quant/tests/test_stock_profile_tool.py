@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from src.tools import stock_profile_tool as sp
+from quant.tools import stock_profile_tool as sp
 
 
 def _sample_summary() -> dict:

@@ -17,8 +17,8 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from src.agent.skills import USER_SKILLS_DIR
-from src.agent.tools import BaseTool
+from quant.agent.skills import USER_SKILLS_DIR
+from quant.agent.tools import BaseTool
 
 _ALLOWED_SUBDIRS = {"references", "templates", "examples", "assets"}
 

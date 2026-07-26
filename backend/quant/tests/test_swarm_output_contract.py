@@ -21,9 +21,9 @@ from pathlib import Path
 
 import pytest
 
-from src.agent.tools import BaseTool, ToolRegistry
-from src.providers.chat import LLMResponse, ToolCallRequest
-from src.swarm.models import (
+from quant.agent.tools import BaseTool, ToolRegistry
+from quant.providers.chat import LLMResponse, ToolCallRequest
+from quant.swarm.models import (
     RunStatus,
     SwarmAgentSpec,
     SwarmEvent,
@@ -31,8 +31,8 @@ from src.swarm.models import (
     SwarmTask,
     WorkerResult,
 )
-from src.swarm.store import SwarmStore
-from src.swarm.worker import (
+from quant.swarm.store import SwarmStore
+from quant.swarm.worker import (
     _classify_deliverable,
     _collect_artifacts,
     _is_data_agent,
@@ -40,8 +40,8 @@ from src.swarm.worker import (
     _report_written,
     run_worker,
 )
-import src.swarm.runtime as rt
-import src.swarm.worker as worker_mod
+import quant.swarm.runtime as rt
+import quant.swarm.worker as worker_mod
 
 PLAN_STUB = (
     "### Phase 1 — Plan\n"

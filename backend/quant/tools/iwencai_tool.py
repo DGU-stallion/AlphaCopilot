@@ -21,9 +21,9 @@ import logging
 import os
 from typing import Any
 
-from backtest.loaders._http import resolve_min_interval, throttled_get_json
-from src.agent.tools import BaseTool
-from src.config.accessor import get_env_config
+from quant.backtest.loaders._http import resolve_min_interval, throttled_get_json
+from quant.agent.tools import BaseTool
+from quant.config.accessor import get_env_config
 
 logger = logging.getLogger(__name__)
 

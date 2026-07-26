@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from src.agent.tools import BaseTool
-from src.tools.path_utils import allowed_write_roots
-from src.tools.path_utils import resolve_safe_path
-from src.tools.redaction import redact_internal_paths
+from quant.agent.tools import BaseTool
+from quant.tools.path_utils import allowed_write_roots
+from quant.tools.path_utils import resolve_safe_path
+from quant.tools.redaction import redact_internal_paths
 
 
 class EditFileTool(BaseTool):

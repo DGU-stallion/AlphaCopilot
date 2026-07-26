@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.market_data import (
+from quant.market_data import (
     DEFAULT_MAX_ROWS,
     _json_safe,
     cap_rows,
@@ -66,7 +66,7 @@ def test_detect_source(code: str, expected: str) -> None:
 
 def test_yahoo_loader_accepts_futures_and_forex_suffixes() -> None:
     """The yahoo direct loader must accept =F/=X, not just equity suffixes (#718)."""
-    from backtest.loaders.yahoo_loader import _is_supported
+    from quant.backtest.loaders.yahoo_loader import _is_supported
 
     assert _is_supported("GC=F") is True
     assert _is_supported("EURUSD=X") is True

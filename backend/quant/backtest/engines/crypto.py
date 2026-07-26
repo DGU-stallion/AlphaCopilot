@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from backtest.engines.base import BaseEngine
-from backtest.engines._market_hooks import (
+from quant.backtest.engines.base import BaseEngine
+from quant.backtest.engines._market_hooks import (
     calc_crypto_funding_fee,
     check_crypto_liquidation,
 )

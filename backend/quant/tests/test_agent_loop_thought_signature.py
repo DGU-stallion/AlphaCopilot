@@ -6,9 +6,9 @@ import json
 
 from langchain_core.messages import AIMessage, convert_to_messages
 
-from src.agent.context import ContextBuilder
-from src.agent.loop import _attach_tool_call_thought_signatures
-from src.providers.chat import ChatLLM, ToolCallRequest
+from quant.agent.context import ContextBuilder
+from quant.agent.loop import _attach_tool_call_thought_signatures
+from quant.providers.chat import ChatLLM, ToolCallRequest
 
 
 def _raw_tool_call(

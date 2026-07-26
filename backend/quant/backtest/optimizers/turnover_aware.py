@@ -32,7 +32,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-from backtest.optimizers.base import BaseOptimizer
+from quant.backtest.optimizers.base import BaseOptimizer
 
 
 class TurnoverAwareOptimizer(BaseOptimizer):

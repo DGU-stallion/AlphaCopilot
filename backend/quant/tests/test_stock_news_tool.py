@@ -14,8 +14,8 @@ from unittest.mock import patch
 
 import pytest
 
-from backtest.loaders import eastmoney_client, yahoo_client
-from src.tools.stock_news_tool import (
+from quant.backtest.loaders import eastmoney_client, yahoo_client
+from quant.tools.stock_news_tool import (
     StockNewsTool,
     _bare_query,
     _clamp_limit,

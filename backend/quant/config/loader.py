@@ -10,8 +10,8 @@ from typing import Any, Mapping
 
 from pydantic import ValidationError
 
-from src.config.paths import get_config_path, get_runtime_root
-from src.config.schema import AgentConfig, AgentConfigOverride, MCPServerConfig
+from quant.config.paths import get_config_path, get_runtime_root
+from quant.config.schema import AgentConfig, AgentConfigOverride, MCPServerConfig
 
 logger = logging.getLogger(__name__)
 

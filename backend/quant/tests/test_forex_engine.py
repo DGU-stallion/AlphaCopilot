@@ -15,15 +15,15 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from backtest.engines.forex import (
+from quant.backtest.engines.forex import (
     ForexEngine,
     _normalize_symbol,
     _pip_value,
     _SPREAD_PIPS,
     STANDARD_LOT,
 )
-from backtest.engines._market_hooks import _SWAP_LONG
-from backtest.models import Position
+from quant.backtest.engines._market_hooks import _SWAP_LONG
+from quant.backtest.models import Position
 
 
 # ---------------------------------------------------------------------------

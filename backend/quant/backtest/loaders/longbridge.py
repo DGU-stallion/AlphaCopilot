@@ -29,14 +29,14 @@ from typing import Any, List, Optional
 
 import pandas as pd
 
-from backtest.loaders.base import (
+from quant.backtest.loaders.base import (
     NoAvailableSourceError,
     loader_cache_get,
     loader_cache_put,
     validate_date_range,
 )
-from backtest.loaders.registry import register
-from src.trading.connectors.longbridge.credentials import (
+from quant.backtest.loaders.registry import register
+from quant.trading.connectors.longbridge.credentials import (
     LongbridgeCredentialError,
     resolve_longbridge_credentials,
 )

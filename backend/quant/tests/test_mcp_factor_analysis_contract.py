@@ -16,7 +16,7 @@ import json
 import pandas as pd
 
 import mcp_server
-from src.tools.factor_analysis_tool import FactorAnalysisTool
+from quant.tools.factor_analysis_tool import FactorAnalysisTool
 
 # fastmcp wraps the tool; reach the raw callable.
 _fa = getattr(mcp_server.factor_analysis, "fn", None) or getattr(

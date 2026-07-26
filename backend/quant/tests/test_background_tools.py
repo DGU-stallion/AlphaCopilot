@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from src.tools import background_tools
-from src.tools.background_tools import BackgroundManager
+from quant.tools import background_tools
+from quant.tools.background_tools import BackgroundManager
 
 
 def _execute(manager: BackgroundManager, task_id: str, command: str) -> dict:

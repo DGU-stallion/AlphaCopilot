@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from src.live import halt
-from src.live import paths
+from quant.live import halt
+from quant.live import paths
 
 
 @pytest.fixture

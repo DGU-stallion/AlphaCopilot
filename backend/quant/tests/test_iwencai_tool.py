@@ -13,8 +13,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.tools import iwencai_tool
-from src.tools.iwencai_tool import IWenCaiSearchTool, _coerce_limit, _extract_rows
+from quant.tools import iwencai_tool
+from quant.tools.iwencai_tool import IWenCaiSearchTool, _coerce_limit, _extract_rows
 
 _KEY_ENV = "VIBE_TRADING_IWENCAI_KEY"
 

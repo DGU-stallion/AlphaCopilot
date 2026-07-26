@@ -13,7 +13,7 @@ from rich.table import Table
 from rich.text import Text
 
 from cli.theme import get_console
-from src.goal.context import default_goal_criteria
+from quant.goal.context import default_goal_criteria
 
 _goal_store = None
 
@@ -27,7 +27,7 @@ def _get_goal_store():
     """Return the shared goal store, lazily initialized."""
     global _goal_store
     if _goal_store is None:
-        from src.goal import GoalStore
+        from quant.goal import GoalStore
 
         _goal_store = GoalStore()
     return _goal_store
@@ -51,9 +51,9 @@ def _create_cli_session(ctx: Any, title: str) -> str | None:
     """Create a normal CLI session when /goal is used before the first turn."""
     try:
         from cli._legacy import SESSIONS_DIR
-        from src.session.models import Session, SessionStatus
-        from src.session.search import get_shared_index
-        from src.session.store import SessionStore
+        from quant.session.models import Session, SessionStatus
+        from quant.session.search import get_shared_index
+        from quant.session.store import SessionStore
 
         session = Session(
             title=(title[:60] or "Goal research"),
@@ -73,7 +73,7 @@ def _session_id(ctx: Any, *, title: str = "Goal research", create: bool) -> str 
     existing = getattr(ctx, "session_id", None)
     if existing:
         return str(existing)
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
 
     env_session_id = get_env_config().paths.vibe_goal_session_id
     if env_session_id:
@@ -239,7 +239,7 @@ def cmd_evidence(ctx: Any = None, *args: str) -> int:
 
     try:
         criterion_id = _resolve_criterion_id(snapshot, criterion_token)
-        from src.goal import EvidenceInput
+        from quant.goal import EvidenceInput
 
         _get_goal_store().append_evidence(
             session_id=session_id,
@@ -275,7 +275,7 @@ def cmd_cancel(ctx: Any = None, *args: str) -> int:
 
     recap = " ".join(args).strip() or "Cancelled from CLI."
     try:
-        from src.goal import GoalStatus
+        from quant.goal import GoalStatus
 
         updated = _get_goal_store().update_status(
             session_id=session_id,
@@ -322,7 +322,7 @@ def cmd_complete(ctx: Any = None, *args: str) -> int:  # noqa: ARG001
                 )
             )
             return 1
-        from src.goal import AuditRow
+        from quant.goal import AuditRow
 
         audit_rows.append(
             AuditRow(
@@ -334,7 +334,7 @@ def cmd_complete(ctx: Any = None, *args: str) -> int:  # noqa: ARG001
         )
 
     try:
-        from src.goal import GoalStatus
+        from quant.goal import GoalStatus
 
         updated = _get_goal_store().update_status(
             session_id=session_id,

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from src.agent.loop import (
+from quant.agent.loop import (
     KEEP_RECENT,
     COLLAPSE_PRESERVE_RECENT,
     COLLAPSE_TEXT_MIN,

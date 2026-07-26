@@ -19,8 +19,8 @@ from typing import Any
 
 import pandas as pd
 
-from backtest.loaders import sec_edgar_client
-from backtest.loaders.base import cached_loader_fetch, validate_date_range
+from quant.backtest.loaders import sec_edgar_client
+from quant.backtest.loaders.base import cached_loader_fetch, validate_date_range
 
 logger = logging.getLogger(__name__)
 

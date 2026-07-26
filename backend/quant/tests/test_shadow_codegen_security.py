@@ -6,8 +6,8 @@ import ast
 
 import pytest
 
-from src.shadow_account.codegen import render_signal_engine, validate_generated
-from src.shadow_account.models import ShadowProfile, ShadowRule
+from quant.shadow_account.codegen import render_signal_engine, validate_generated
+from quant.shadow_account.models import ShadowProfile, ShadowRule
 
 
 def _malicious_profile() -> ShadowProfile:

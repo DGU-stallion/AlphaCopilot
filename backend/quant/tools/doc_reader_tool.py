@@ -19,10 +19,10 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
-from src.agent.progress import emit_progress
-from src.agent.tools import BaseTool
-from src.security.scanner import with_security_warnings
-from src.tools.path_utils import safe_document_path
+from quant.agent.progress import emit_progress
+from quant.agent.tools import BaseTool
+from quant.security.scanner import with_security_warnings
+from quant.tools.path_utils import safe_document_path
 
 _MAX_CHARS = 15000
 _MIN_TEXT_PER_PAGE = 50
@@ -44,7 +44,7 @@ _TEXT_EXTS = {
     ".dockerfile", ".makefile", ".cmake",
 }
 
-from src.tools.ocr import get_ocr_engine, get_ocr_install_hint
+from quant.tools.ocr import get_ocr_engine, get_ocr_install_hint
 
 _cached_ocr_engine = None
 _cached_ocr_checked = False

@@ -33,7 +33,7 @@ import pandas as pd
 from defusedxml import ElementTree as ET
 from defusedxml.common import DefusedXmlException
 
-from backtest.loaders.base import positive_env_float, retry_with_budget
+from quant.backtest.loaders.base import positive_env_float, retry_with_budget
 
 logger = logging.getLogger(__name__)
 
@@ -312,7 +312,7 @@ class RSSHubEventProvider:
                 (an ``httpx.Client``-like). Injectable for offline testing.
             close_cutoff_hour: Knowable-date roll cutoff (0-23).
         """
-        from src.config.accessor import get_env_config
+        from quant.config.accessor import get_env_config
 
         resolved = (base_url if base_url is not None else get_env_config().data.rsshub_base_url).strip()
         self.base_url = resolved.rstrip("/")

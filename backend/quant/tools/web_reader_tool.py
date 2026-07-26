@@ -9,9 +9,9 @@ from urllib.parse import urlsplit
 
 import requests
 
-from src.agent.progress import emit_progress
-from src.agent.tools import BaseTool
-from src.security.scanner import with_security_warnings
+from quant.agent.progress import emit_progress
+from quant.agent.tools import BaseTool
+from quant.security.scanner import with_security_warnings
 
 logger = logging.getLogger(__name__)
 

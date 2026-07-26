@@ -10,8 +10,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.trading.connectors.ibkr import local
-from src.tools.trading_connector_tool import TradingPositionsTool
+from quant.trading.connectors.ibkr import local
+from quant.tools.trading_connector_tool import TradingPositionsTool
 
 pytestmark = pytest.mark.unit
 
@@ -174,7 +174,7 @@ def test_service_uses_persisted_ibkr_local_config(
     monkeypatch: pytest.MonkeyPatch, tmp_path
 ) -> None:
     """Configured local endpoint values must survive later connector calls."""
-    from src.trading import service
+    from quant.trading import service
 
     monkeypatch.setattr(local, "get_runtime_root", lambda: tmp_path)
     local.save_config(

@@ -92,7 +92,7 @@ def _all_engines() -> dict[str, type]:
 
 def _get_ocr_choice() -> str:
     """Return the configured OCR engine choice (cached per process)."""
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
 
     return get_env_config().ocr.vibe_trading_ocr_engine.strip().lower()
 
@@ -207,5 +207,5 @@ def get_ocr_install_hint(engine: OcrEngine | None) -> str:
 
 # Built-in engine self-registration — must stay after definitions above
 # because each imported module calls register_builtin() at import time.
-from src.tools.ocr import llm_vision_ocr as _llm_vision  # noqa: E402,F401
-from src.tools.ocr import rapid_ocr as _rapid  # noqa: E402,F401
+from quant.tools.ocr import llm_vision_ocr as _llm_vision  # noqa: E402,F401
+from quant.tools.ocr import rapid_ocr as _rapid  # noqa: E402,F401

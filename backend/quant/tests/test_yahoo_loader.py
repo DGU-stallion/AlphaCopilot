@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from backtest.loaders.yahoo_loader import (
+from quant.backtest.loaders.yahoo_loader import (
     DataLoader,
     _epoch_seconds,
     _is_intraday_interval,

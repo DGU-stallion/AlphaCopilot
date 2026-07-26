@@ -218,7 +218,10 @@ export const researchPageApi = {
   indices: () => researchApi.getIndices().then((r) => r.data),
   globalIndices: () => researchApi.getGlobalIndices().then((r) => r.data as unknown as GlobalIndex[]),
   marketOverview: () => researchApi.getMarketOverview().then((r) => r.data as unknown as PageMarketOverview),
-  emotion: () => request<ShortTermEmotion>("/market/emotion"),
+  emotion: async () => {
+    const res = await request<{ data: ShortTermEmotion }>("/market/emotion");
+    return res.data;
+  },
   turnoverTop: () => researchApi.getTurnoverTop().then((r) => r.data as unknown as TurnoverTop),
 
   // Quote
@@ -230,57 +233,135 @@ export const researchPageApi = {
     }),
 
   // Radar
-  radar: () => request<PageRadarData>("/radar"),
-  radarRefresh: () => request<PageRadarData>("/radar/refresh", { method: "POST" }),
+  radar: async () => {
+    const res = await request<{ data: PageRadarData }>("/radar");
+    return res.data;
+  },
+  radarRefresh: async () => {
+    const res = await request<{ data: PageRadarData }>("/radar/refresh", { method: "POST" });
+    return res.data;
+  },
 
   // Stock data
-  valuation: (code: string) => request<Valuation>(`/valuation?code=${code}`),
-  reports: (code: string) => request<ResearchReport[]>(`/reports?code=${code}&pages=2`),
-  percentile: (code: string) => request<ValPercentile>(`/valuation/percentile?code=${code}`),
-  financials: (code: string) => request<StockFinancials>(`/financials?code=${code}`),
-  announcements: (code: string) => request<Announcement[]>(`/announcements?code=${code}`),
-  news: (code: string) => request<NewsItem[]>(`/news?code=${code}&limit=20`),
-  globalStock: (symbol: string) => request<GlobalStock>(`/global/stock?symbol=${encodeURIComponent(symbol)}`),
+  valuation: async (code: string) => {
+    const res = await request<{ data: Valuation }>(`/valuation?code=${code}`);
+    return res.data;
+  },
+  reports: async (code: string) => {
+    const res = await request<{ data: ResearchReport[] }>(`/reports?code=${code}&pages=2`);
+    return res.data ?? [];
+  },
+  percentile: async (code: string) => {
+    const res = await request<{ data: ValPercentile }>(`/valuation/percentile?code=${code}`);
+    return res.data;
+  },
+  financials: async (code: string) => {
+    const res = await request<{ data: StockFinancials }>(`/financials?code=${code}`);
+    return res.data;
+  },
+  announcements: async (code: string) => {
+    const res = await request<{ data: Announcement[] }>(`/announcements?code=${code}`);
+    return res.data ?? [];
+  },
+  news: async (code: string) => {
+    const res = await request<{ data: NewsItem[] }>(`/news?code=${code}&limit=20`);
+    return res.data ?? [];
+  },
+  globalStock: async (symbol: string) => {
+    const res = await request<{ data: GlobalStock }>(`/global/stock?symbol=${encodeURIComponent(symbol)}`);
+    return res.data;
+  },
 
   // 资金面
-  margin: (code: string) => request<MarginRow[]>(`/margin?code=${code}`),
-  blockTrade: (code: string) => request<BlockTradeRow[]>(`/block-trade?code=${code}`),
-  holders: (code: string) => request<HolderRow[]>(`/holders?code=${code}`),
-  dividend: (code: string) => request<DividendRow[]>(`/dividend?code=${code}`),
-  fundFlow: (code: string) => request<FundFlowRow[]>(`/fund-flow?code=${code}`),
-  dragonTiger: (code: string) => request<DragonTiger>(`/dragon-tiger?code=${code}`),
-  lockup: (code: string) => request<Lockup>(`/lockup?code=${code}`),
-  blocks: (code: string) => request<Blocks>(`/blocks?code=${code}`),
-  hotConcepts: (code: string) => request<HotConcept[]>(`/hot-concepts?code=${code}`),
-  investorQa: (code: string) => request<QaRow[]>(`/investor-qa?code=${code}`),
+  margin: async (code: string) => {
+    const res = await request<{ data: MarginRow[] }>(`/margin?code=${code}`);
+    return res.data ?? [];
+  },
+  blockTrade: async (code: string) => {
+    const res = await request<{ data: BlockTradeRow[] }>(`/block-trade?code=${code}`);
+    return res.data ?? [];
+  },
+  holders: async (code: string) => {
+    const res = await request<{ data: HolderRow[] }>(`/holders?code=${code}`);
+    return res.data ?? [];
+  },
+  dividend: async (code: string) => {
+    const res = await request<{ data: DividendRow[] }>(`/dividend?code=${code}`);
+    return res.data ?? [];
+  },
+  fundFlow: async (code: string) => {
+    const res = await request<{ data: FundFlowRow[] }>(`/fund-flow?code=${code}`);
+    return res.data ?? [];
+  },
+  dragonTiger: async (code: string) => {
+    const res = await request<{ data: DragonTiger }>(`/dragon-tiger?code=${code}`);
+    return res.data;
+  },
+  lockup: async (code: string) => {
+    const res = await request<{ data: Lockup }>(`/lockup?code=${code}`);
+    return res.data;
+  },
+  blocks: async (code: string) => {
+    const res = await request<{ data: Blocks }>(`/blocks?code=${code}`);
+    return res.data;
+  },
+  hotConcepts: async (code: string) => {
+    const res = await request<{ data: HotConcept[] }>(`/hot-concepts?code=${code}`);
+    return res.data ?? [];
+  },
+  investorQa: async (code: string) => {
+    const res = await request<{ data: QaRow[] }>(`/investor-qa?code=${code}`);
+    return res.data ?? [];
+  },
 
   // Portfolio
-  portfolio: () => request<PagePortfolioData>("/portfolio"),
-  refreshPortfolio: () => request<PagePortfolioData>("/portfolio/refresh", { method: "POST" }),
-  addHolding: (code: string, shares: number, cost: number) =>
-    request<PagePortfolioData>("/portfolio/holding", {
+  portfolio: async () => {
+    const res = await request<{ data: PagePortfolioData }>("/portfolio");
+    return res.data;
+  },
+  refreshPortfolio: async () => {
+    const res = await request<{ data: PagePortfolioData }>("/portfolio/refresh", { method: "POST" });
+    return res.data;
+  },
+  addHolding: async (code: string, shares: number, cost: number) => {
+    const res = await request<{ data: PagePortfolioData }>("/portfolio/holding", {
       method: "POST",
       body: JSON.stringify({ code, shares, cost }),
-    }),
-  removeHolding: (code: string) =>
-    request<PagePortfolioData>(`/portfolio/holding?code=${code}`, { method: "DELETE" }),
-  closePosition: (code: string, date: string, price: number, shares: number, cost: number) =>
-    request<PagePortfolioData>("/portfolio/close", {
+    });
+    return res.data;
+  },
+  removeHolding: async (code: string) => {
+    const res = await request<{ data: PagePortfolioData }>(`/portfolio/holding?code=${code}`, { method: "DELETE" });
+    return res.data;
+  },
+  closePosition: async (code: string, date: string, price: number, shares: number, cost: number) => {
+    const res = await request<{ data: PagePortfolioData }>("/portfolio/close", {
       method: "POST",
       body: JSON.stringify({ code, date, price, shares, cost }),
-    }),
-  removeClosed: (i: number) =>
-    request<PagePortfolioData>(`/portfolio/close?index=${i}`, { method: "DELETE" }),
+    });
+    return res.data;
+  },
+  removeClosed: async (i: number) => {
+    const res = await request<{ data: PagePortfolioData }>(`/portfolio/close?index=${i}`, { method: "DELETE" });
+    return res.data;
+  },
 
   // My Reports
-  myReports: () => request<MyReport[]>("/myreports"),
-  uploadReport: (name: string, contentB64: string) =>
-    request<MyReport>("/myreports", {
+  myReports: async () => {
+    const res = await request<{ data: MyReport[] }>("/myreports");
+    return res.data ?? [];
+  },
+  uploadReport: async (name: string, contentB64: string) => {
+    const res = await request<{ data: MyReport }>("/myreports", {
       method: "POST",
       body: JSON.stringify({ name, content_b64: contentB64 }),
-    }),
-  deleteReport: (rid: string) =>
-    request<{ ok: boolean }>(`/myreports/${rid}`, { method: "DELETE" }),
+    });
+    return res.data;
+  },
+  deleteReport: async (rid: string) => {
+    const res = await request<{ data: { ok: boolean } }>(`/myreports/${rid}`, { method: "DELETE" });
+    return res.data;
+  },
 };
 
 /** Download a report file by triggering a browser download */

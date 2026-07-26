@@ -11,8 +11,8 @@ import json
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src.tools import research_reports_tool as rrt
-from src.tools.research_reports_tool import ResearchReportsTool
+from quant.tools import research_reports_tool as rrt
+from quant.tools.research_reports_tool import ResearchReportsTool
 
 _REPORT_PAYLOAD = {
     "data": [

@@ -21,8 +21,8 @@ import json
 import uuid
 from typing import Any
 
-from src.agent.tools import BaseTool
-from src.live.mandate.commit import _normalize_limits, save_proposal
+from quant.agent.tools import BaseTool
+from quant.live.mandate.commit import _normalize_limits, save_proposal
 
 #: Ordered profile templates synthesized when the caller gives no explicit
 #: profiles. Each is a fraction of the funded ceiling so they always clamp down.

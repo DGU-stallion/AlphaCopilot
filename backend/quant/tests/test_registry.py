@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
-from backtest.loaders.base import DataLoaderProtocol, NoAvailableSourceError
-from backtest.loaders.registry import (
+from quant.backtest.loaders.base import DataLoaderProtocol, NoAvailableSourceError
+from quant.backtest.loaders.registry import (
     FALLBACK_CHAINS,
     LOADER_REGISTRY,
     VALID_SOURCES,
@@ -205,7 +205,7 @@ class TestValidSources:
     def test_covers_all_registered_loaders(self) -> None:
         """Every registered loader name must be an accepted config source so a
         new loader can never be silently rejected by config validation."""
-        from backtest.loaders.registry import _ensure_registered
+        from quant.backtest.loaders.registry import _ensure_registered
 
         _ensure_registered()
         missing = set(LOADER_REGISTRY) - VALID_SOURCES

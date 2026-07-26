@@ -53,7 +53,7 @@ def detect_source(code: str) -> str:
 
 def get_loader(source: str):
     """Get loader class via registry with fallback support."""
-    from backtest.loaders.registry import get_loader_cls_with_fallback
+    from quant.backtest.loaders.registry import get_loader_cls_with_fallback
 
     return get_loader_cls_with_fallback(source)
 
@@ -109,8 +109,8 @@ def fetch_market_data(
     OKX → Binance → CCXT → Yahoo). At most ``max_fallback_attempts`` retries
     are attempted before the symbol is recorded as ``_unresolved``.
     """
-    from backtest.loaders.base import NoAvailableSourceError
-    from backtest.loaders.registry import FALLBACK_CHAINS
+    from quant.backtest.loaders.base import NoAvailableSourceError
+    from quant.backtest.loaders.registry import FALLBACK_CHAINS
 
     results: dict[str, Any] = {}
     result_aliases = {

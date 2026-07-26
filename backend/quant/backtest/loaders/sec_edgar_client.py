@@ -28,7 +28,7 @@ import logging
 import threading
 from typing import Any, Dict, Optional
 
-from backtest.loaders._http import (
+from quant.backtest.loaders._http import (
     DEFAULT_USER_AGENT,
     resolve_min_interval,
     throttled_get_json,
@@ -63,7 +63,7 @@ def _min_interval() -> float:
 
 def _user_agent() -> str:
     """Return the compliant contact UA, honoring the ``VIBE_TRADING_SEC_UA`` override."""
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
 
     override = get_env_config().data.vibe_trading_sec_ua
     if override and override.strip():

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from src.tools import qveris_tool as qt
+from quant.tools import qveris_tool as qt
 
 
 @pytest.fixture(autouse=True)

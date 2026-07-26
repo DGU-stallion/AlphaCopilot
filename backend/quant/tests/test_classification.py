@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from mcp.types import ToolAnnotations
 
-from src.live.classification import ToolClass, classify_tool
-from src.trading.connectors.ibkr.classification import IBKR_TOOL_CLASS
-from src.trading.connectors.robinhood.classification import ROBINHOOD_TOOL_CLASS
+from quant.live.classification import ToolClass, classify_tool
+from quant.trading.connectors.ibkr.classification import IBKR_TOOL_CLASS
+from quant.trading.connectors.robinhood.classification import ROBINHOOD_TOOL_CLASS
 
 
 def test_tier1_explicit_read_only_hint_true_is_read() -> None:

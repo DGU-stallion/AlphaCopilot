@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.factors.bench_runner import _compute_single_alpha, _init_bench_worker
+from quant.factors.bench_runner import _compute_single_alpha, _init_bench_worker
 
 
 def _make_mock_panel(n_symbols: int = 10, n_days: int = 100):
@@ -89,7 +89,7 @@ class TestParallelBench:
         reason="Windows spawn does not inherit the monkeypatched registry used by this mock test",
     )
     def test_parallel_matches_sequential(self, monkeypatch):
-        from src.factors.bench_runner import run_bench
+        from quant.factors.bench_runner import run_bench
 
         mock_reg = self._setup_mocks(monkeypatch)
 
@@ -104,7 +104,7 @@ class TestParallelBench:
         assert seq["n_alphas_tested"] == par["n_alphas_tested"]
 
     def test_progress_callback_fires(self, monkeypatch):
-        from src.factors.bench_runner import run_bench
+        from quant.factors.bench_runner import run_bench
 
         mock_reg = self._setup_mocks(monkeypatch, n_alphas=3)
         monkeypatch.setenv("VIBE_TRADING_BENCH_WORKERS", "2")
@@ -119,7 +119,7 @@ class TestParallelBench:
         assert len(calls) == 3
 
     def test_only_filter_with_parallel(self, monkeypatch):
-        from src.factors.bench_runner import run_bench
+        from quant.factors.bench_runner import run_bench
 
         mock_reg = self._setup_mocks(monkeypatch, n_alphas=5)
         monkeypatch.setenv("VIBE_TRADING_BENCH_WORKERS", "2")
@@ -134,7 +134,7 @@ class TestParallelBench:
         assert tested_ids <= {"alpha_0", "alpha_2"}
 
     def test_custom_registry_forces_sequential(self, monkeypatch):
-        from src.factors.bench_runner import run_bench
+        from quant.factors.bench_runner import run_bench
 
         mock_reg = self._setup_mocks(monkeypatch, n_alphas=2)
         monkeypatch.setenv("VIBE_TRADING_BENCH_WORKERS", "2")
@@ -145,7 +145,7 @@ class TestParallelBench:
         assert mock_reg.compute.call_count == 2
 
     def test_invalid_worker_env_falls_back(self, monkeypatch):
-        from src.factors.bench_runner import run_bench
+        from quant.factors.bench_runner import run_bench
 
         mock_reg = self._setup_mocks(monkeypatch, n_alphas=2)
         monkeypatch.setenv("VIBE_TRADING_BENCH_WORKERS", "not-an-int")

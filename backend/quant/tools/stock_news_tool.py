@@ -29,9 +29,9 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from backtest.loaders import eastmoney_client, yahoo_client
+from quant.backtest.loaders import eastmoney_client, yahoo_client
 
-from src.agent.tools import BaseTool
+from quant.agent.tools import BaseTool
 
 logger = logging.getLogger(__name__)
 

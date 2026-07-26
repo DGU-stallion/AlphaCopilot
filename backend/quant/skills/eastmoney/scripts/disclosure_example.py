@@ -8,9 +8,9 @@
 
 import json
 
-from src.tools.block_trades_tool import BlockTradesTool
-from src.tools.dragon_tiger_tool import DragonTigerTool
-from src.tools.margin_trading_tool import MarginTradingTool
+from quant.tools.block_trades_tool import BlockTradesTool
+from quant.tools.dragon_tiger_tool import DragonTigerTool
+from quant.tools.margin_trading_tool import MarginTradingTool
 
 
 def dragon_tiger_seats(date: str, code: str) -> None:

@@ -199,7 +199,7 @@ def compute_correlation_matrix(
     start_date = (datetime.now() - timedelta(days=days + 60)).strftime("%Y-%m-%d")
 
     # Import here to avoid circular
-    from backtest.loaders import registry
+    from quant.backtest.loaders import registry
 
     registry._ensure_registered()
     price_series: Dict[str, pd.DataFrame] = {}

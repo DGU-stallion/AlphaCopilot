@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.tools.pattern_tool import (
+from quant.tools.pattern_tool import (
     broadening,
     candlestick_patterns,
     double_top_bottom,

@@ -21,7 +21,7 @@ from typing import List, Tuple
 
 import pytest
 
-from src.tools.read_file_tool import ReadFileTool
+from quant.tools.read_file_tool import ReadFileTool
 
 # Bundled skills root (mirrors ReadFileTool's own allowed-root computation).
 _SKILLS_DIR = Path(__file__).resolve().parents[1] / "src" / "skills"

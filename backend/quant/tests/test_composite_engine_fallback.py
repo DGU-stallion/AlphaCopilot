@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backtest.engines.composite import CompositeEngine
+from quant.backtest.engines.composite import CompositeEngine
 
 
 class TestCompositeEngineFallback:

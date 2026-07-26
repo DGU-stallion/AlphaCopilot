@@ -14,8 +14,8 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from backtest.loaders import eastmoney_client
-from backtest.loaders.eastmoney_loader import DataLoader, _to_compact_date
+from quant.backtest.loaders import eastmoney_client
+from quant.backtest.loaders.eastmoney_loader import DataLoader, _to_compact_date
 
 
 def _client_rows() -> List[dict]:

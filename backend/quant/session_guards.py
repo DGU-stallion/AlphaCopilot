@@ -18,7 +18,7 @@ def validate_session_exists(session_id: str) -> None:
     Attempts to load session from store; raises HTTPException(404) on miss.
     """
     try:
-        from src.session.store import SessionStore
+        from quant.session.store import SessionStore
 
         store = SessionStore()
         session = store.load(session_id)
@@ -37,7 +37,7 @@ def validate_no_active_attempt(session_id: str) -> None:
     Prevents concurrent message sends to the same session.
     """
     try:
-        from src.session.service import SessionService
+        from quant.session.service import SessionService
 
         svc = SessionService()
         if svc.has_active_attempt(session_id):

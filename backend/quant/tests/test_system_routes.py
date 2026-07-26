@@ -16,7 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import api_server
-from src.api import system_routes
+from quant.api import system_routes
 
 
 # ---------------------------------------------------------------------------
@@ -83,8 +83,8 @@ def test_ready_returns_503_when_provider_not_ready(
 
 def test_readiness_helper_real_missing_credential(monkeypatch: pytest.MonkeyPatch):
     """The un-mocked helper flags a configured provider with no credential."""
-    import src.providers.llm as llm
-    from src.config.accessor import reset_env_config
+    import quant.providers.llm as llm
+    from quant.config.accessor import reset_env_config
 
     # Neutralize the .env reload inside _sync_provider_env so the test fully
     # controls the environment (otherwise a machine-local OPENAI_API_KEY leaks in).
@@ -101,7 +101,7 @@ def test_readiness_helper_real_missing_credential(monkeypatch: pytest.MonkeyPatc
 
 def test_readiness_helper_real_ready(monkeypatch: pytest.MonkeyPatch):
     """The un-mocked helper reports ready when provider+model+key are present."""
-    from src.config.accessor import reset_env_config
+    from quant.config.accessor import reset_env_config
 
     monkeypatch.setenv("LANGCHAIN_PROVIDER", "openai")
     monkeypatch.setenv("LANGCHAIN_MODEL_NAME", "gpt-4o-mini")
@@ -114,7 +114,7 @@ def test_readiness_helper_real_ready(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_readiness_helper_missing_provider(monkeypatch: pytest.MonkeyPatch):
-    from src.config.accessor import reset_env_config
+    from quant.config.accessor import reset_env_config
 
     monkeypatch.setenv("LANGCHAIN_PROVIDER", "")
     monkeypatch.setenv("LANGCHAIN_MODEL_NAME", "")
@@ -142,7 +142,7 @@ def test_correlation_allows_local_and_masks_generic_error(
     local_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ):
     """A generic backend failure must not leak its exception text to the client."""
-    import backtest.correlation as corr
+    import quant.backtest.correlation as corr
 
     def _boom(**_kwargs):
         raise RuntimeError("sensitive internal detail: db=prod host=10.0.0.5")
@@ -159,7 +159,7 @@ def test_correlation_value_error_still_surfaces_message(
     local_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ):
     """Hand-raised validation errors remain user-facing (unchanged behavior)."""
-    import backtest.correlation as corr
+    import quant.backtest.correlation as corr
 
     def _bad(**_kwargs):
         raise ValueError("Not enough overlapping history")
@@ -174,7 +174,7 @@ def test_correlation_rate_limit_returns_429(
     local_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ):
     """Exceeding the per-client window yields 429 with a generic message."""
-    import backtest.correlation as corr
+    import quant.backtest.correlation as corr
 
     monkeypatch.setattr(
         corr,

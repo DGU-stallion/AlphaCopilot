@@ -24,8 +24,8 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from backtest.loaders import eastmoney_client, sec_edgar_client, yahoo_client
-from src.agent.tools import BaseTool
+from quant.backtest.loaders import eastmoney_client, sec_edgar_client, yahoo_client
+from quant.agent.tools import BaseTool
 
 logger = logging.getLogger(__name__)
 

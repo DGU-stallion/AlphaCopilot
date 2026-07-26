@@ -20,7 +20,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.factors.base import ts_mean
+from quant.factors.base import ts_mean
 
 __alpha_meta__ = {
     'id': 'academic_smb',

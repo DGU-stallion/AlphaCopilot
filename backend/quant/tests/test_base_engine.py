@@ -9,9 +9,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backtest.engines.base import BaseEngine, _align, _load_optimizer
-from backtest.engines.china_a import ChinaAEngine
-from backtest.models import Position
+from quant.backtest.engines.base import BaseEngine, _align, _load_optimizer
+from quant.backtest.engines.china_a import ChinaAEngine
+from quant.backtest.models import Position
 
 
 # ---------------------------------------------------------------------------

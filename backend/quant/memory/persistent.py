@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.agent.frontmatter import parse_frontmatter as _parse_frontmatter
+from quant.agent.frontmatter import parse_frontmatter as _parse_frontmatter
 from typing import List, Optional
 
 logger = logging.getLogger(__name__)

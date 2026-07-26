@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from src.tools.financial_statements_tool import FinancialStatementsTool
+from quant.tools.financial_statements_tool import FinancialStatementsTool
 
 # Eastmoney datacenter report success body: result.data is a list of rows.
 _EM_PAYLOAD = {

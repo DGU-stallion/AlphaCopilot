@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from src.agent.tools import BaseTool
-from src.memory.persistent import PersistentMemory
+from quant.agent.tools import BaseTool
+from quant.memory.persistent import PersistentMemory
 
 
 class RememberTool(BaseTool):

@@ -14,14 +14,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backtest.engines.base import (
+from quant.backtest.engines.base import (
     BaseEngine,
     _align,
     _detect_market_for_align,
     _ffill_1d,
     _ffill_2d,
 )
-from backtest.engines.china_a import ChinaAEngine
+from quant.backtest.engines.china_a import ChinaAEngine
 
 
 # ---------------------------------------------------------------------------

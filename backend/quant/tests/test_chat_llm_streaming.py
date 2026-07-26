@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.providers.chat import ChatLLM, ProviderStreamError
+from quant.providers.chat import ChatLLM, ProviderStreamError
 
 
 class _FakeChunk:

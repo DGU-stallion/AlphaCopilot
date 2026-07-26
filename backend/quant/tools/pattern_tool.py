@@ -12,8 +12,8 @@ from typing import Any, Dict
 import numpy as np
 import pandas as pd
 
-from src.agent.tools import BaseTool
-from src.tools.path_utils import safe_run_dir
+from quant.agent.tools import BaseTool
+from quant.tools.path_utils import safe_run_dir
 
 
 # ---------------------------------------------------------------------------

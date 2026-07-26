@@ -14,10 +14,10 @@ from typing import Dict, List
 import pandas as pd
 import pytest
 
-from backtest.benchmark import resolve_benchmark
-from backtest.engines.crypto import CryptoEngine
-from backtest.engines.global_equity import GlobalEquityEngine
-from backtest.runner import _create_market_engine
+from quant.backtest.benchmark import resolve_benchmark
+from quant.backtest.engines.crypto import CryptoEngine
+from quant.backtest.engines.global_equity import GlobalEquityEngine
+from quant.backtest.runner import _create_market_engine
 
 
 class TestLocalSourceEngineRouting:

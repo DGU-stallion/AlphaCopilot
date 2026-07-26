@@ -17,7 +17,7 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
-from backtest.loaders.base import (
+from quant.backtest.loaders.base import (
     cached_loader_fetch,
     check_budget,
     positive_env_float,
@@ -25,7 +25,7 @@ from backtest.loaders.base import (
     retry_with_budget,
     validate_date_range,
 )
-from backtest.loaders.registry import register
+from quant.backtest.loaders.registry import register
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ class DataLoader:
     def _get_exchange(self, instrument_type: str = "spot"):
         """Create an exchange instance for spot or Binance USD-M swaps."""
         import ccxt
-        from src.config.accessor import get_env_config
+        from quant.config.accessor import get_env_config
 
         exchange_id = get_env_config().data.ccxt_exchange.lower()
         if instrument_type == "swap":

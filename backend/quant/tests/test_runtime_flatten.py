@@ -13,8 +13,8 @@ from typing import Any
 
 import pytest
 
-from src.live import audit, paths
-from src.live.runtime import flatten
+from quant.live import audit, paths
+from quant.live.runtime import flatten
 
 
 class _Broker:

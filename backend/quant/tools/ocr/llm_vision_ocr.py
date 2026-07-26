@@ -114,8 +114,8 @@ def _resolve_provider_config() -> dict[str, str]:
     etc.).  These are not part of the static ``EnvConfig`` schema, so
     reads go through ``os.getenv`` directly.
     """
-    from src.config.accessor import get_env_config
-    from src.providers.capabilities import provider_env_names
+    from quant.config.accessor import get_env_config
+    from quant.providers.capabilities import provider_env_names
 
     env = get_env_config()
     provider = env.llm.langchain_provider.strip().lower()
@@ -293,6 +293,6 @@ class LlmVisionOcrEngine:
 
 
 # Self-register to built-in engine table
-from src.tools.ocr.engine import register_builtin  # noqa: E402
+from quant.tools.ocr.engine import register_builtin  # noqa: E402
 
 register_builtin("llm-vision", LlmVisionOcrEngine)

@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from backtest.run_card import write_run_card
-from src.core.runner import Runner
+from quant.backtest.run_card import write_run_card
+from quant.core.runner import Runner
 
 
 def test_config_hash_is_deterministic_independent_of_key_order(tmp_path: Path) -> None:
@@ -259,7 +259,7 @@ def test_runner_artifact_spec_surfaces_run_card_paths() -> None:
 
 
 def test_options_backtest_writes_run_card(tmp_path: Path) -> None:
-    from backtest.engines.options_portfolio import run_options_backtest
+    from quant.backtest.engines.options_portfolio import run_options_backtest
 
     dates = pd.bdate_range("2025-01-01", periods=4)
     bars = pd.DataFrame(

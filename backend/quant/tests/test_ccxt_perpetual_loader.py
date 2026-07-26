@@ -7,8 +7,8 @@ import json
 import pytest
 import pandas as pd
 
-from backtest.loaders.base import make_loader_cache_key
-from backtest.loaders.ccxt_loader import _parse_ccxt_symbol
+from quant.backtest.loaders.base import make_loader_cache_key
+from quant.backtest.loaders.ccxt_loader import _parse_ccxt_symbol
 
 
 def _hourly_rows(opens: list[float]) -> list[list[float]]:
@@ -115,7 +115,7 @@ def test_perpetual_fetch_separates_execution_and_mark_prices(monkeypatch) -> Non
         lambda _self, instrument_type="spot": exchange,
     )
 
-    from backtest.loaders.ccxt_loader import DataLoader
+    from quant.backtest.loaders.ccxt_loader import DataLoader
 
     frame = DataLoader().fetch(
         ["BTC-USDT-PERP"], "2024-01-01", "2024-01-01", interval="1H"
@@ -140,7 +140,7 @@ def test_perpetual_fetch_rejects_unsynchronized_mark_rows(monkeypatch) -> None:
         lambda _self, instrument_type="spot": exchange,
     )
 
-    from backtest.loaders.ccxt_loader import DataLoader
+    from quant.backtest.loaders.ccxt_loader import DataLoader
 
     with pytest.raises(ValueError, match="mark-price timestamps"):
         DataLoader().fetch(
@@ -155,7 +155,7 @@ def test_perpetual_fetch_aligns_explicit_zero_funding_settlement(monkeypatch) ->
         lambda _self, instrument_type="spot": exchange,
     )
 
-    from backtest.loaders.ccxt_loader import DataLoader
+    from quant.backtest.loaders.ccxt_loader import DataLoader
 
     frame = DataLoader().fetch(
         ["BTC-USDT-PERP"], "2024-01-01", "2024-01-01", interval="1H"
@@ -173,7 +173,7 @@ def test_perpetual_fetch_rejects_missing_required_funding_settlement(monkeypatch
         lambda _self, instrument_type="spot": exchange,
     )
 
-    from backtest.loaders.ccxt_loader import DataLoader
+    from quant.backtest.loaders.ccxt_loader import DataLoader
 
     with pytest.raises(ValueError, match="funding settlement"):
         DataLoader().fetch(
@@ -192,7 +192,7 @@ def test_perpetual_fetch_rejects_duplicate_funding_settlement(monkeypatch) -> No
         lambda _self, instrument_type="spot": exchange,
     )
 
-    from backtest.loaders.ccxt_loader import DataLoader
+    from quant.backtest.loaders.ccxt_loader import DataLoader
 
     with pytest.raises(ValueError, match="duplicate funding settlement"):
         DataLoader().fetch(
@@ -207,7 +207,7 @@ def test_perpetual_fetch_attaches_versioned_maintenance_brackets(monkeypatch) ->
         lambda _self, instrument_type="spot": exchange,
     )
 
-    from backtest.loaders.ccxt_loader import DataLoader
+    from quant.backtest.loaders.ccxt_loader import DataLoader
 
     frame = DataLoader().fetch(
         ["BTC-USDT-PERP"], "2024-01-01", "2024-01-01", interval="1H"
@@ -236,7 +236,7 @@ def test_perpetual_fetch_attaches_versioned_maintenance_brackets(monkeypatch) ->
 
 
 def test_perpetual_fetch_bracket_version_changes_with_bracket_contents(monkeypatch) -> None:
-    from backtest.loaders.ccxt_loader import DataLoader
+    from quant.backtest.loaders.ccxt_loader import DataLoader
 
     exchange_a = _PerpetualExchange()
     monkeypatch.setattr(
@@ -271,7 +271,7 @@ def test_perpetual_fetch_rejects_empty_maintenance_brackets(monkeypatch) -> None
         lambda _self, instrument_type="spot": exchange,
     )
 
-    from backtest.loaders.ccxt_loader import DataLoader
+    from quant.backtest.loaders.ccxt_loader import DataLoader
 
     with pytest.raises(ValueError, match="maintenance bracket"):
         DataLoader().fetch(
@@ -288,7 +288,7 @@ def test_perpetual_fetch_rejects_maintenance_bracket_missing_field(monkeypatch) 
         lambda _self, instrument_type="spot": exchange,
     )
 
-    from backtest.loaders.ccxt_loader import DataLoader
+    from quant.backtest.loaders.ccxt_loader import DataLoader
 
     with pytest.raises(ValueError, match="maintenance bracket"):
         DataLoader().fetch(
@@ -306,7 +306,7 @@ def test_perpetual_fetch_rejects_non_monotonic_maintenance_brackets(monkeypatch)
         lambda _self, instrument_type="spot": exchange,
     )
 
-    from backtest.loaders.ccxt_loader import DataLoader
+    from quant.backtest.loaders.ccxt_loader import DataLoader
 
     with pytest.raises(ValueError, match="maintenance bracket"):
         DataLoader().fetch(

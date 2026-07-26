@@ -50,18 +50,11 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
-from pathlib import Path
 from typing import Any
-
-# Ensure agent/ is on sys.path
-AGENT_DIR = Path(__file__).resolve().parent
-if str(AGENT_DIR) not in sys.path:
-    sys.path.insert(0, str(AGENT_DIR))
 
 from fastmcp import Context, FastMCP
 from cli._version import __version__ as APP_VERSION
-from src.market_data import (
+from quant.market_data import (
     DEFAULT_MAX_ROWS,
     cap_rows,
     detect_source,
@@ -92,7 +85,7 @@ _include_shell_tools = False
 
 def _env_shell_tools_enabled() -> bool:
     """Return whether shell tools were explicitly enabled via the environment."""
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
 
     return get_env_config().api.vibe_trading_enable_shell_tools
 
@@ -309,7 +302,7 @@ def _build_network_app(transport: str, allowed_hosts: list[str]):
 def _get_skills_loader():
     global _skills_loader
     if _skills_loader is None:
-        from src.agent.skills import SkillsLoader
+        from quant.agent.skills import SkillsLoader
 
         _skills_loader = SkillsLoader()
     return _skills_loader
@@ -318,7 +311,7 @@ def _get_skills_loader():
 def _get_registry():
     global _registry
     if _registry is None:
-        from src.tools import build_registry
+        from quant.tools import build_registry
 
         _registry = build_registry(include_shell_tools=_include_shell_tools)
     return _registry
@@ -328,7 +321,7 @@ def _get_goal_store():
     """Return the shared finance goal store."""
     global _goal_store
     if _goal_store is None:
-        from src.goal import GoalStore
+        from quant.goal import GoalStore
 
         _goal_store = GoalStore()
     return _goal_store
@@ -350,7 +343,7 @@ def _json_error(error: str, *, error_type: str = "error") -> str:
 
 def _default_goal_criteria() -> list[str]:
     """Return the MVP finance protocol checklist."""
-    from src.goal.context import default_goal_criteria
+    from quant.goal.context import default_goal_criteria
 
     return default_goal_criteria()
 
@@ -370,7 +363,7 @@ def _blank_to_none(value: str | None) -> str | None:
 
 def _audit_rows_from_payload(value: list[dict[str, Any]] | None):
     """Parse MCP completion audit rows."""
-    from src.goal import AuditRow
+    from quant.goal import AuditRow
 
     rows = []
     for item in value or []:
@@ -391,7 +384,7 @@ def _audit_rows_from_payload(value: list[dict[str, Any]] | None):
 
 def _risk_tier_from_text(value: str):
     """Parse and validate goal risk tier."""
-    from src.goal import RiskTier
+    from quant.goal import RiskTier
 
     risk_tier = RiskTier(value)
     if risk_tier is RiskTier.LIVE_TRADING_OR_EXECUTION:
@@ -558,7 +551,7 @@ def add_goal_evidence(
         contradicts_claim_ids: Claim ids contradicted by this evidence.
     """
     try:
-        from src.goal import EvidenceInput, StaleGoalError
+        from quant.goal import EvidenceInput, StaleGoalError
 
         evidence = _get_goal_store().append_evidence(
             session_id=session_id.strip(),
@@ -623,7 +616,7 @@ def update_research_goal_status(
         recap: Optional concise status recap.
     """
     try:
-        from src.goal import GoalStatus, StaleGoalError
+        from quant.goal import GoalStatus, StaleGoalError
 
         updated = _get_goal_store().update_status(
             session_id=session_id.strip(),
@@ -669,7 +662,7 @@ def backtest(run_dir: str) -> str:
     Args:
         run_dir: Path to the run directory containing config.json and code/.
     """
-    from src.tools.backtest_tool import run_backtest
+    from quant.tools.backtest_tool import run_backtest
 
     return run_backtest(run_dir)
 
@@ -782,7 +775,7 @@ def read_url(url: str) -> str:
     Args:
         url: Target URL to read.
     """
-    from src.tools.web_reader_tool import read_url as _read_url
+    from quant.tools.web_reader_tool import read_url as _read_url
 
     return _read_url(url)
 
@@ -1103,7 +1096,7 @@ def list_swarm_presets() -> str:
     quant desk, risk committee) that collaborate on complex research tasks.
     Returns preset names, descriptions, agent counts, and required variables.
     """
-    from src.swarm.presets import list_presets
+    from quant.swarm.presets import list_presets
 
     presets = list_presets()
     return json.dumps(presets, ensure_ascii=False, indent=2)
@@ -1142,9 +1135,9 @@ async def run_swarm(
     """
     import asyncio
     import time
-    from src.config import load_swarm_agent_config
-    from src.swarm.runtime import SwarmRuntime
-    from src.swarm.store import SwarmStore, swarm_runs_root
+    from quant.config import load_swarm_agent_config
+    from quant.swarm.runtime import SwarmRuntime
+    from quant.swarm.store import SwarmStore, swarm_runs_root
 
     swarm_dir = swarm_runs_root()
     store = SwarmStore(base_dir=swarm_dir)
@@ -1322,8 +1315,8 @@ def _key_gated_tool_classes() -> dict[str, Any]:
     Returns:
         Mapping of MCP tool name to its ``BaseTool`` subclass.
     """
-    from src.tools.fred_macro_tool import FredMacroTool
-    from src.tools.iwencai_tool import IWenCaiSearchTool
+    from quant.tools.fred_macro_tool import FredMacroTool
+    from quant.tools.iwencai_tool import IWenCaiSearchTool
 
     return {
         "get_macro_series": FredMacroTool,
@@ -1720,7 +1713,7 @@ def iwencai_search(query: str, limit: int = 20) -> str:
 
 
 def _get_swarm_store():
-    from src.swarm.store import SwarmStore, swarm_runs_root
+    from quant.swarm.store import SwarmStore, swarm_runs_root
 
     swarm_dir = swarm_runs_root()
     swarm_dir.mkdir(parents=True, exist_ok=True)
@@ -1739,7 +1732,7 @@ def _run_to_dict(run, *, timed_out: bool = False, is_stale: bool = False) -> dic
     threshold. No disk state is changed by setting this — the explicit
     :func:`reap_stale_runs` tool is what finalizes a stale run.
     """
-    from src.swarm.serialization import run_level_error, serialize_task
+    from quant.swarm.serialization import run_level_error, serialize_task
 
     return {
         "run_id": run.id,
@@ -1898,9 +1891,9 @@ def retry_run(run_id: str) -> str:
         JSON payload for the newly created run (``run_id`` / ``status`` /
         ``preset`` …), or an ``error`` object if the run is missing or active.
     """
-    from src.config import load_swarm_agent_config
-    from src.swarm.models import RunStatus
-    from src.swarm.runtime import SwarmRuntime
+    from quant.config import load_swarm_agent_config
+    from quant.swarm.models import RunStatus
+    from quant.swarm.runtime import SwarmRuntime
 
     store = _get_swarm_store()
     try:
@@ -2144,7 +2137,7 @@ def main():
         # replacing the deprecated two-endpoint SSE transport for modern clients.
         import uvicorn
 
-        from src.config.accessor import get_env_config
+        from quant.config.accessor import get_env_config
 
         allowed_hosts = _parse_allowed_hosts(
             get_env_config().api.vibe_trading_mcp_allowed_hosts

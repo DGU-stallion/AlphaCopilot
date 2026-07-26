@@ -168,7 +168,7 @@ def test_runner_start_blocked_by_kill_switch(tmp_path: Path, monkeypatch) -> Non
     monkeypatch.setattr(
         api_server, "_active_mandate_state", lambda broker: _valid_mandate_state(broker)
     )
-    from src.live.halt import trip_halt
+    from quant.live.halt import trip_halt
 
     trip_halt(by="test", reason="safety", broker="robinhood")
 

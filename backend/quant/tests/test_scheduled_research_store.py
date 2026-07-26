@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from src.scheduled_research.models import JobStatus, ScheduledResearchJob, validate_schedule
-from src.scheduled_research.store import CorruptStoreError, ScheduledResearchJobStore
+from quant.scheduled_research.models import JobStatus, ScheduledResearchJob, validate_schedule
+from quant.scheduled_research.store import CorruptStoreError, ScheduledResearchJobStore
 
 
 # ---------------------------------------------------------------------------

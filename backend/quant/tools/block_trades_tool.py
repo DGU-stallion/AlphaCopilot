@@ -20,8 +20,8 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from backtest.loaders.eastmoney_client import get_json, resolve_secid
-from src.agent.tools import BaseTool
+from quant.backtest.loaders.eastmoney_client import get_json, resolve_secid
+from quant.agent.tools import BaseTool
 
 logger = logging.getLogger(__name__)
 

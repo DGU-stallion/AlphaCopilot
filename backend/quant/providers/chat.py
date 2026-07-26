@@ -11,9 +11,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
-from src.config.accessor import get_env_config
-from src.providers.content_filter import is_content_filter_triggered
-from src.providers.llm import build_llm
+from quant.config.accessor import get_env_config
+from quant.providers.content_filter import is_content_filter_triggered
+from quant.providers.llm import build_llm
 
 
 def _dedupe_finish_reason(raw: str) -> str:

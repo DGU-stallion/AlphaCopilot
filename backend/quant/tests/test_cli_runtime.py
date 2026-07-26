@@ -30,7 +30,7 @@ from unittest.mock import patch
 
 import pytest
 
-import src.live.paths as live_paths
+import quant.live.paths as live_paths
 
 # ``cli/__init__.py`` re-exports ``main`` as a function, shadowing the submodule
 # for attribute access; import the module object directly (mirrors test_cli_live).
@@ -434,7 +434,7 @@ class TestSlashDiscoverability:
 
 class TestReplResumeIntercept:
     def test_resume_clears_halt(self, live_root: Path) -> None:
-        from src.live.halt import halt_flag_set, trip_halt
+        from quant.live.halt import halt_flag_set, trip_halt
 
         trip_halt(by="cli", reason="test")
         assert halt_flag_set("robinhood") is True

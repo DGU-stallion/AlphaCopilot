@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from src.memory.persistent import PersistentMemory
-from src.tools.remember_tool import RememberTool
+from quant.memory.persistent import PersistentMemory
+from quant.tools.remember_tool import RememberTool
 
 
 @pytest.fixture()

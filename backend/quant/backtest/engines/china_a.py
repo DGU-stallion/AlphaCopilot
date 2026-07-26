@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from backtest.engines.base import BaseEngine
+from quant.backtest.engines.base import BaseEngine
 
 
 class ChinaAEngine(BaseEngine):

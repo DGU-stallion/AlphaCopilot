@@ -9,15 +9,15 @@ from pathlib import Path
 
 import pytest
 
-import src.live.paths as live_paths
-from src.live.daily_count import daily_order_lock
+import quant.live.paths as live_paths
+from quant.live.daily_count import daily_order_lock
 
 pytestmark = pytest.mark.unit
 
 
 def _child_lock_attempt(repo_root: Path, home: Path) -> subprocess.CompletedProcess[str]:
     script = """
-from src.live.daily_count import DailyOrderLockUnavailable, daily_order_lock
+from quant.live.daily_count import DailyOrderLockUnavailable, daily_order_lock
 try:
     with daily_order_lock("alpaca"):
         print("acquired")

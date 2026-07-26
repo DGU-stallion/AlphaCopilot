@@ -19,18 +19,18 @@ from typing import Any
 
 import pytest
 
-import src.live.enforcement as enforcement
-import src.live.order_guard as order_guard
-import src.live.paths as paths
-from src.live.classification import ToolClass
-from src.trading.connectors.robinhood.extractor import extract_order_intent
-from src.live.mandate.model import (
+import quant.live.enforcement as enforcement
+import quant.live.order_guard as order_guard
+import quant.live.paths as paths
+from quant.live.classification import ToolClass
+from quant.trading.connectors.robinhood.extractor import extract_order_intent
+from quant.live.mandate.model import (
     MANDATE_SCHEMA_VERSION,
     AssetClass,
     InstrumentType,
 )
-from src.trading.connectors.robinhood.classification import ROBINHOOD_TOOL_CLASS
-from src.tools.mcp import MCPRemoteToolSpec
+from quant.trading.connectors.robinhood.classification import ROBINHOOD_TOOL_CLASS
+from quant.tools.mcp import MCPRemoteToolSpec
 
 
 # --------------------------------------------------------------------------- #

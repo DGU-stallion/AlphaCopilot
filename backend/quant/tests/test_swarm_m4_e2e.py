@@ -28,11 +28,11 @@ from unittest.mock import patch
 from fastmcp.client.client import CallToolResult
 from mcp import types as mcp_types
 
-from src.config.schema import MCPServerConfig
-from src.providers.chat import LLMResponse, ToolCallRequest
-from src.swarm.models import SwarmAgentSpec, SwarmEvent, SwarmTask
-from src.swarm.worker import run_worker
-from src.tools.mcp import build_mcp_tool_wrappers
+from quant.config.schema import MCPServerConfig
+from quant.providers.chat import LLMResponse, ToolCallRequest
+from quant.swarm.models import SwarmAgentSpec, SwarmEvent, SwarmTask
+from quant.swarm.worker import run_worker
+from quant.tools.mcp import build_mcp_tool_wrappers
 
 
 # --------------------------------------------------------------------------- #
@@ -590,7 +590,7 @@ def _registry_with_remote(
     what the M2 path does in production, just without spinning up a real
     MCP server discovery cycle inside the test.
     """
-    from src.tools import build_swarm_registry as _real
+    from quant.tools import build_swarm_registry as _real
 
     registry = _real(tool_names, agent_config=None, include_shell_tools=include_shell_tools)
     whitelist = set(tool_names)

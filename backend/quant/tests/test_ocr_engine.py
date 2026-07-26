@@ -10,8 +10,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from src.config.accessor import reset_env_config
-from src.tools.ocr import engine as ocr_engine
+from quant.config.accessor import reset_env_config
+from quant.tools.ocr import engine as ocr_engine
 
 
 @pytest.fixture(autouse=True)
@@ -242,7 +242,7 @@ class TestProviderConfigResolution:
         monkeypatch.setenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
         reset_env_config()
 
-        from src.tools.ocr.llm_vision_ocr import _resolve_provider_config
+        from quant.tools.ocr.llm_vision_ocr import _resolve_provider_config
 
         config = _resolve_provider_config()
         assert config["provider"] == "deepseek"
@@ -258,7 +258,7 @@ class TestProviderConfigResolution:
         monkeypatch.delenv("OPENAI_API_BASE", raising=False)
         reset_env_config()
 
-        from src.tools.ocr.llm_vision_ocr import _resolve_provider_config
+        from quant.tools.ocr.llm_vision_ocr import _resolve_provider_config
 
         config = _resolve_provider_config()
         assert config["api_key"] == "sk-openai-test"
@@ -270,7 +270,7 @@ class TestProviderConfigResolution:
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         reset_env_config()
 
-        from src.tools.ocr.llm_vision_ocr import _resolve_provider_config
+        from quant.tools.ocr.llm_vision_ocr import _resolve_provider_config
 
         config = _resolve_provider_config()
         assert config["api_key"] == "ollama"
@@ -283,7 +283,7 @@ class TestProviderConfigResolution:
         monkeypatch.setenv("VIBE_TRADING_OCR_LLM_MODEL", "gpt-4o")
         reset_env_config()
 
-        from src.tools.ocr.llm_vision_ocr import _resolve_provider_config
+        from quant.tools.ocr.llm_vision_ocr import _resolve_provider_config
 
         config = _resolve_provider_config()
         assert config["model"] == "gpt-4o"
@@ -296,7 +296,7 @@ class TestProviderConfigResolution:
         monkeypatch.setenv("OPENAI_BASE_URL", "http://localhost:11434/v1")
         reset_env_config()
 
-        from src.tools.ocr.llm_vision_ocr import _resolve_provider_config
+        from quant.tools.ocr.llm_vision_ocr import _resolve_provider_config
 
         config = _resolve_provider_config()
         assert config["base_url"] == "http://localhost:11434/v1"
@@ -326,7 +326,7 @@ class TestRecognizeNoAdvisory:
         monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test")
         reset_env_config()
 
-        from src.tools.ocr.llm_vision_ocr import LlmVisionOcrEngine
+        from quant.tools.ocr.llm_vision_ocr import LlmVisionOcrEngine
 
         engine = LlmVisionOcrEngine()
         monkeypatch.setattr(
@@ -404,7 +404,7 @@ class TestBackwardCompatAliases:
         monkeypatch.delenv("VIBE_TRADING_OCR_LLM_MODEL", raising=False)
         reset_env_config()
 
-        from src.tools.ocr.llm_vision_ocr import _resolve_provider_config
+        from quant.tools.ocr.llm_vision_ocr import _resolve_provider_config
 
         with caplog.at_level("WARNING"):
             config = _resolve_provider_config()
@@ -422,7 +422,7 @@ class TestBackwardCompatAliases:
         monkeypatch.setenv("VIBE_TRADING_OCR_LLM_MODEL", "gpt-4o-new")
         reset_env_config()
 
-        from src.tools.ocr.llm_vision_ocr import _resolve_provider_config
+        from quant.tools.ocr.llm_vision_ocr import _resolve_provider_config
 
         config = _resolve_provider_config()
         assert config["model"] == "gpt-4o-new"
@@ -435,13 +435,13 @@ class TestBackwardCompatAliases:
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         reset_env_config()
 
-        from src.tools.ocr.llm_vision_ocr import _resolve_provider_config
+        from quant.tools.ocr.llm_vision_ocr import _resolve_provider_config
 
         config = _resolve_provider_config()
         # Should be empty string, NOT "ollama"
         assert config["api_key"] != "ollama"
         # is_available() should return False because empty api_key
-        from src.tools.ocr.llm_vision_ocr import LlmVisionOcrEngine
+        from quant.tools.ocr.llm_vision_ocr import LlmVisionOcrEngine
 
         engine = LlmVisionOcrEngine()
         assert engine.is_available() is False
@@ -454,7 +454,7 @@ class TestBackwardCompatAliases:
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         reset_env_config()
 
-        from src.tools.ocr.llm_vision_ocr import _resolve_provider_config
+        from quant.tools.ocr.llm_vision_ocr import _resolve_provider_config
 
         config = _resolve_provider_config()
         assert config["api_key"] == "ollama"

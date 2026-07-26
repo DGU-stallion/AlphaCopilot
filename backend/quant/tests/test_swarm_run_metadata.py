@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.swarm.models import SwarmRun
+from quant.swarm.models import SwarmRun
 
 
 def _base_kwargs() -> dict:

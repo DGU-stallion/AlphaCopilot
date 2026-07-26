@@ -4,15 +4,15 @@ import json
 
 import pandas as pd
 
-from src.market_data import fetch_market_data_json
-from src.swarm.models import SwarmAgentSpec
-from src.swarm.presets import list_presets, load_preset
-from src.swarm.worker import build_worker_prompt
-from src.tools import build_swarm_registry
+from quant.market_data import fetch_market_data_json
+from quant.swarm.models import SwarmAgentSpec
+from quant.swarm.presets import list_presets, load_preset
+from quant.swarm.worker import build_worker_prompt
+from quant.tools import build_swarm_registry
 
 
 def test_market_data_tool_exposes_longbridge_source():
-    from src.tools.market_data_tool import MarketDataTool
+    from quant.tools.market_data_tool import MarketDataTool
 
     source_schema = MarketDataTool.parameters["properties"]["source"]
     assert "longbridge" in source_schema["enum"]

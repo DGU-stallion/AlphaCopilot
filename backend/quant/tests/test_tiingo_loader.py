@@ -12,7 +12,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from backtest.loaders.tiingo_loader import (
+from quant.backtest.loaders.tiingo_loader import (
     DataLoader,
     _resolve_key,
     _rows_to_frame,
@@ -193,8 +193,8 @@ def test_fetch_rejects_bad_date_range(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_loader_self_registers() -> None:
-    import backtest.loaders.tiingo_loader  # noqa: F401  (import triggers @register)
-    from backtest.loaders.registry import LOADER_REGISTRY
+    import quant.backtest.loaders.tiingo_loader  # noqa: F401  (import triggers @register)
+    from quant.backtest.loaders.registry import LOADER_REGISTRY
 
     assert "tiingo" in LOADER_REGISTRY
     cls = LOADER_REGISTRY["tiingo"]

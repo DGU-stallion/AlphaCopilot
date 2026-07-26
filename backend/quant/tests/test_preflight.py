@@ -6,12 +6,12 @@ import sys
 
 import requests
 
-from src import preflight
+from quant import preflight
 
 
 def _configure_llm_preflight(monkeypatch) -> None:
     """Install a minimal OpenAI-compatible provider environment for preflight tests."""
-    import src.providers.llm as llm
+    import quant.providers.llm as llm
 
     monkeypatch.setenv("LANGCHAIN_PROVIDER", "openai")
     monkeypatch.setenv("LANGCHAIN_MODEL_NAME", "gpt-test")

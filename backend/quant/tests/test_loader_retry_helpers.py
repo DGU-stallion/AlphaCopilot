@@ -24,8 +24,8 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
-import backtest.loaders.base as base
-from backtest.loaders.base import (
+import quant.backtest.loaders.base as base
+from quant.backtest.loaders.base import (
     DEFAULT_BACKOFF,
     DEFAULT_MAX_RETRIES,
     LOADER_CACHE_ENV,
@@ -378,7 +378,7 @@ def test_tushare_daily_fetch_uses_opt_in_cache_for_bars_and_fields(
     api = _FakeApi()
     monkeypatch.setitem(sys.modules, "tushare", SimpleNamespace(pro_api=lambda token: api))
 
-    from backtest.loaders.tushare import DataLoader
+    from quant.backtest.loaders.tushare import DataLoader
 
     loader = DataLoader()
     first = loader.fetch(["000001.SZ"], "2025-01-01", "2025-01-03", fields=["pe"])
@@ -452,7 +452,7 @@ def test_loader_cache_real_duckdb_round_trip(tmp_path, monkeypatch, loader_cache
 def test_yfinance_loader_serves_second_fetch_from_cache(tmp_path, monkeypatch, fake_duckdb, loader_cache_root):
     """A batch loader (yfinance) must skip its bulk download on a full cache hit."""
     monkeypatch.setenv(LOADER_CACHE_ENV, "1")
-    import backtest.loaders.yfinance_loader as yfl
+    import quant.backtest.loaders.yfinance_loader as yfl
 
     calls = {"n": 0}
 

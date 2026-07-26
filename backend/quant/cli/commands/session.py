@@ -44,7 +44,7 @@ def cmd_search(ctx: Any = None, *args: str) -> int:  # noqa: ARG001
 
     query = " ".join(args)
     try:
-        from src.session.search import get_shared_index
+        from quant.session.search import get_shared_index
 
         index = get_shared_index()
         matches = index.search(query)

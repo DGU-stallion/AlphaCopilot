@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from src.agent.tools import BaseTool
+from quant.agent.tools import BaseTool
 
 
 class SessionSearchTool(BaseTool):
@@ -50,7 +50,7 @@ class SessionSearchTool(BaseTool):
         max_results = min(int(kwargs.get("max_results", 3)), 10)
 
         try:
-            from src.session.search import get_shared_index
+            from quant.session.search import get_shared_index
             matches = get_shared_index().search(query, max_sessions=max_results)
 
             if not matches:

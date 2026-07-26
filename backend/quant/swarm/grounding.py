@@ -55,7 +55,7 @@ import re
 from datetime import date, timedelta
 from typing import Iterable
 
-from src.config.accessor import get_env_config
+from quant.config.accessor import get_env_config
 
 logger = logging.getLogger(__name__)
 
@@ -187,8 +187,8 @@ def fetch_grounding_data(
     # raw code; ``_detect_market`` is the function ``runner.py`` already uses
     # to dispatch the same shapes we extract here, so reusing it keeps the
     # routing identical to the rest of the codebase.
-    from backtest.loaders.registry import resolve_loader
-    from backtest.runner import _detect_market
+    from quant.backtest.loaders.registry import resolve_loader
+    from quant.backtest.runner import _detect_market
 
     out: dict[str, list[dict]] = {}
     for code in symbols_list:

@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from src.tools import options_chain_tool as oc
+from quant.tools import options_chain_tool as oc
 
 
 def _sample_result() -> dict:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.factors.base import zscore
+from quant.factors.base import zscore
 
 __alpha_meta__ = {
     "id": "fund_asset_growth",

@@ -7,7 +7,7 @@ import tempfile
 
 import pytest
 
-from backtest import validation
+from quant.backtest import validation
 
 
 def test_rejects_missing_run_dir_argument() -> None:

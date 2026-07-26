@@ -8,9 +8,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.config.schema import AgentConfig, MCPServerConfig
-from src.tools import build_registry
-from src.tools.mcp import MCPRemoteTool
+from quant.config.schema import AgentConfig, MCPServerConfig
+from quant.tools import build_registry
+from quant.tools.mcp import MCPRemoteTool
 
 
 # ---------------------------------------------------------------------------

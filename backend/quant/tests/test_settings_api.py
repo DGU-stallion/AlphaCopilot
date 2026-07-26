@@ -430,7 +430,7 @@ def test_atomic_write_secret_is_crash_safe(
 ) -> None:
     """A crash during the replace must not corrupt or truncate the secret file,
     nor leave a stray temp file holding the secret behind."""
-    from src.api import helpers
+    from quant.api import helpers
 
     target = tmp_path / ".env"
     target.write_text("OLD=1\n", encoding="utf-8")
@@ -451,7 +451,7 @@ def test_atomic_write_secret_is_crash_safe(
 
 def test_atomic_write_secret_creates_0600_file(tmp_path: Path) -> None:
     """Fresh secret files are created owner-only via the atomic path."""
-    from src.api import helpers
+    from quant.api import helpers
 
     target = tmp_path / ".env"
     helpers._atomic_write_secret(target, "KEY=value\n")
@@ -465,7 +465,7 @@ def test_atomic_write_secret_supports_platforms_without_fchmod(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Windows must be able to persist Web UI settings without ``os.fchmod``."""
-    from src.api import helpers
+    from quant.api import helpers
 
     monkeypatch.delattr(helpers.os, "fchmod", raising=False)
     target = tmp_path / ".env"

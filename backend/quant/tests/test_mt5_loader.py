@@ -18,8 +18,8 @@ from typing import Any
 import numpy as np
 import pytest
 
-import backtest.loaders.mt5_loader as mt5_loader
-from backtest.loaders.mt5_loader import DataLoader, _to_query_base
+import quant.backtest.loaders.mt5_loader as mt5_loader
+from quant.backtest.loaders.mt5_loader import DataLoader, _to_query_base
 
 pytestmark = pytest.mark.unit
 
@@ -237,18 +237,18 @@ class TestAvailability:
 
 class TestRegistryWiring:
     def test_mt5_in_valid_sources(self) -> None:
-        from backtest.loaders.registry import VALID_SOURCES
+        from quant.backtest.loaders.registry import VALID_SOURCES
 
         assert "mt5" in VALID_SOURCES
 
     def test_mt5_registered(self) -> None:
-        from backtest.loaders.registry import LOADER_REGISTRY, _ensure_registered
+        from quant.backtest.loaders.registry import LOADER_REGISTRY, _ensure_registered
 
         _ensure_registered()
         assert "mt5" in LOADER_REGISTRY
 
     def test_mt5_heads_forex_chain(self) -> None:
-        from backtest.loaders.registry import FALLBACK_CHAINS
+        from quant.backtest.loaders.registry import FALLBACK_CHAINS
 
         assert FALLBACK_CHAINS["forex"][0] == "mt5"
         assert "akshare" in FALLBACK_CHAINS["forex"]  # degradation path intact
@@ -265,6 +265,6 @@ class TestRegistryWiring:
         ],
     )
     def test_detect_source_forex(self, code: str, expected: str) -> None:
-        from src.market_data import detect_source
+        from quant.market_data import detect_source
 
         assert detect_source(code) == expected

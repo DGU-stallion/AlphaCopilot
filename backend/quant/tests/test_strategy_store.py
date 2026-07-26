@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import pytest
 
-from src.strategy_store.models import (
+from quant.strategy_store.models import (
     Artifact,
     ArtifactStatus,
     ArtifactType,
@@ -14,8 +14,8 @@ from src.strategy_store.models import (
     DecaySnapshot,
     DecaySignal,
 )
-from src.strategy_store.store import InMemoryStrategyStore
-from src.strategy_store.decay import DecayEvaluator, DecayThresholds
+from quant.strategy_store.store import InMemoryStrategyStore
+from quant.strategy_store.decay import DecayEvaluator, DecayThresholds
 
 
 # ---------------------------------------------------------------------------
@@ -26,8 +26,8 @@ from src.strategy_store.decay import DecayEvaluator, DecayThresholds
 @pytest.fixture(autouse=True)
 def _reset_store(tmp_path):
     """Reset the shared store singleton before each test."""
-    import src.strategy_store._shared as shared
-    from src.strategy_store.sqlite_store import SqliteStrategyStore
+    import quant.strategy_store._shared as shared
+    from quant.strategy_store.sqlite_store import SqliteStrategyStore
 
     shared._store = SqliteStrategyStore(db_path=tmp_path / "test.db")
     yield
@@ -363,7 +363,7 @@ class TestSdmTools:
     """Integration tests for the three SDM BaseTool wrappers."""
 
     def test_register_tool_factor(self):
-        from src.tools.sdm_register_tool import SdmRegisterTool
+        from quant.tools.sdm_register_tool import SdmRegisterTool
 
         tool = SdmRegisterTool()
         result = json.loads(
@@ -381,7 +381,7 @@ class TestSdmTools:
         assert result["artifact"]["type"] == "factor"
 
     def test_register_tool_strategy(self):
-        from src.tools.sdm_register_tool import SdmRegisterTool
+        from quant.tools.sdm_register_tool import SdmRegisterTool
 
         tool = SdmRegisterTool()
         result = json.loads(
@@ -396,15 +396,15 @@ class TestSdmTools:
         assert result["artifact"]["type"] == "strategy"
 
     def test_register_tool_missing_required(self):
-        from src.tools.sdm_register_tool import SdmRegisterTool
+        from quant.tools.sdm_register_tool import SdmRegisterTool
 
         tool = SdmRegisterTool()
         result = json.loads(tool.execute(artifact_type="factor"))
         assert result["status"] == "error"
 
     def test_status_tool_list(self):
-        from src.tools.sdm_register_tool import SdmRegisterTool
-        from src.tools.sdm_status_tool import SdmStatusTool
+        from quant.tools.sdm_register_tool import SdmRegisterTool
+        from quant.tools.sdm_status_tool import SdmStatusTool
 
         SdmRegisterTool().execute(
             artifact_type="factor", name="f1", universe="CSI300"
@@ -414,8 +414,8 @@ class TestSdmTools:
         assert result["count"] == 1
 
     def test_status_tool_detail(self):
-        from src.tools.sdm_register_tool import SdmRegisterTool
-        from src.tools.sdm_status_tool import SdmStatusTool
+        from quant.tools.sdm_register_tool import SdmRegisterTool
+        from quant.tools.sdm_status_tool import SdmStatusTool
 
         reg_result = json.loads(
             SdmRegisterTool().execute(
@@ -430,8 +430,8 @@ class TestSdmTools:
         assert "decay_history" in result
 
     def test_status_tool_disable_enable(self):
-        from src.tools.sdm_register_tool import SdmRegisterTool
-        from src.tools.sdm_status_tool import SdmStatusTool
+        from quant.tools.sdm_register_tool import SdmRegisterTool
+        from quant.tools.sdm_status_tool import SdmStatusTool
 
         reg = json.loads(
             SdmRegisterTool().execute(
@@ -457,8 +457,8 @@ class TestSdmTools:
         assert en["artifact"]["status"] == "active"
 
     def test_status_tool_decay_check_insufficient(self):
-        from src.tools.sdm_register_tool import SdmRegisterTool
-        from src.tools.sdm_status_tool import SdmStatusTool
+        from quant.tools.sdm_register_tool import SdmRegisterTool
+        from quant.tools.sdm_status_tool import SdmStatusTool
 
         reg = json.loads(
             SdmRegisterTool().execute(
@@ -473,15 +473,15 @@ class TestSdmTools:
         assert result["signal"] == "insufficient_data"
 
     def test_decay_scan_tool_empty(self):
-        from src.tools.sdm_decay_scan_tool import SdmDecayScanTool
+        from quant.tools.sdm_decay_scan_tool import SdmDecayScanTool
 
         result = json.loads(SdmDecayScanTool().execute())
         assert result["status"] == "ok"
         assert result["summary"]["total_scanned"] == 0
 
     def test_decay_scan_tool_dry_run(self):
-        from src.tools.sdm_register_tool import SdmRegisterTool
-        from src.tools.sdm_decay_scan_tool import SdmDecayScanTool
+        from quant.tools.sdm_register_tool import SdmRegisterTool
+        from quant.tools.sdm_decay_scan_tool import SdmDecayScanTool
 
         # Register an ACTIVE factor with bench history
         reg = json.loads(
@@ -491,7 +491,7 @@ class TestSdmTools:
         )
         aid = reg["artifact"]["id"]
 
-        import src.strategy_store._shared as shared
+        import quant.strategy_store._shared as shared
 
         store = shared._store
         assert store is not None
@@ -511,7 +511,7 @@ class TestSdmTools:
 
     def test_register_tool_duplicate_rejected(self):
         """Registering the same (name, universe) twice returns an error."""
-        from src.tools.sdm_register_tool import SdmRegisterTool
+        from quant.tools.sdm_register_tool import SdmRegisterTool
 
         first = json.loads(
             SdmRegisterTool().execute(
@@ -529,8 +529,8 @@ class TestSdmTools:
 
     def test_decay_scan_no_evaluable_metrics_insufficient(self):
         """3+ bench rows with all-None metrics report insufficient_data, not HEALTHY."""
-        from src.tools.sdm_register_tool import SdmRegisterTool
-        from src.tools.sdm_decay_scan_tool import SdmDecayScanTool
+        from quant.tools.sdm_register_tool import SdmRegisterTool
+        from quant.tools.sdm_decay_scan_tool import SdmDecayScanTool
 
         reg = json.loads(
             SdmRegisterTool().execute(
@@ -539,7 +539,7 @@ class TestSdmTools:
         )
         aid = reg["artifact"]["id"]
 
-        import src.strategy_store._shared as shared
+        import quant.strategy_store._shared as shared
 
         store = shared._store
         assert store is not None
@@ -554,8 +554,8 @@ class TestSdmTools:
 
     def test_status_tool_decay_check_no_evaluable_metrics(self):
         """decay_check with all-None metrics reports insufficient_data."""
-        from src.tools.sdm_register_tool import SdmRegisterTool
-        from src.tools.sdm_status_tool import SdmStatusTool
+        from quant.tools.sdm_register_tool import SdmRegisterTool
+        from quant.tools.sdm_status_tool import SdmStatusTool
 
         reg = json.loads(
             SdmRegisterTool().execute(
@@ -564,7 +564,7 @@ class TestSdmTools:
         )
         aid = reg["artifact"]["id"]
 
-        import src.strategy_store._shared as shared
+        import quant.strategy_store._shared as shared
 
         store = shared._store
         assert store is not None
@@ -579,8 +579,8 @@ class TestSdmTools:
 
     def test_decay_scan_tool_active_to_monitoring_transition(self):
         """Non-dry-run scan transitions active → monitoring after 3+ warnings."""
-        from src.tools.sdm_register_tool import SdmRegisterTool
-        from src.tools.sdm_decay_scan_tool import SdmDecayScanTool
+        from quant.tools.sdm_register_tool import SdmRegisterTool
+        from quant.tools.sdm_decay_scan_tool import SdmDecayScanTool
 
         reg = json.loads(
             SdmRegisterTool().execute(
@@ -589,7 +589,7 @@ class TestSdmTools:
         )
         aid = reg["artifact"]["id"]
 
-        import src.strategy_store._shared as shared
+        import quant.strategy_store._shared as shared
 
         store = shared._store
         assert store is not None
@@ -638,7 +638,7 @@ class TestSqliteStore:
     @pytest.fixture(autouse=True)
     def _setup(self, tmp_path):
         """Create a temporary SQLite store for each test."""
-        from src.strategy_store.sqlite_store import SqliteStrategyStore
+        from quant.strategy_store.sqlite_store import SqliteStrategyStore
 
         self.store = SqliteStrategyStore(db_path=tmp_path / "sqlite_test.db")
 
@@ -839,7 +839,7 @@ class TestSqliteStore:
 
     def test_persistence_across_instances(self):
         """Data persists when creating a new store instance with same db_path."""
-        from src.strategy_store.sqlite_store import SqliteStrategyStore
+        from quant.strategy_store.sqlite_store import SqliteStrategyStore
 
         db_path = self.store.db_path
         aid = self.store.register_artifact(_make_artifact(name="persist_factor"))
@@ -868,7 +868,7 @@ class TestSqliteStore:
 
     def test_protocol_satisfied(self):
         """SqliteStrategyStore satisfies StrategyStoreProtocol."""
-        from src.strategy_store.store import StrategyStoreProtocol
+        from quant.strategy_store.store import StrategyStoreProtocol
 
         assert isinstance(self.store, StrategyStoreProtocol)
 

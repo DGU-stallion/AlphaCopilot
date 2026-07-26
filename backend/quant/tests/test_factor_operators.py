@@ -284,14 +284,14 @@ class TestDecayLinear:
 class TestBackend:
     def test_bottleneck_available(self):
         """bottleneck should be available in test environment."""
-        from src.factors._backend import HAS_BOTTLENECK
+        from quant.factors._backend import HAS_BOTTLENECK
 
         assert HAS_BOTTLENECK is True
 
     def test_disable_env_var(self):
         """VIBE_TRADING_DISABLE_BOTTLENECK=1 should disable bottleneck."""
         _reload_base_with_bottleneck(False)
-        from src.factors._backend import HAS_BOTTLENECK
+        from quant.factors._backend import HAS_BOTTLENECK
 
         assert HAS_BOTTLENECK is False
         # Restore

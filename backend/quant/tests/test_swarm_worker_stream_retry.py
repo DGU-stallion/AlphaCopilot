@@ -13,10 +13,10 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-from src.providers.chat import LLMResponse, ProviderStreamError
-from src.swarm.models import SwarmAgentSpec, SwarmTask, WorkerResult
-import src.swarm.worker as worker_mod
-from src.swarm.worker import run_worker
+from quant.providers.chat import LLMResponse, ProviderStreamError
+from quant.swarm.models import SwarmAgentSpec, SwarmTask, WorkerResult
+import quant.swarm.worker as worker_mod
+from quant.swarm.worker import run_worker
 
 # Substantive prose so _classify_deliverable accepts the tool-less worker.
 FINAL_TEXT = (

@@ -14,8 +14,8 @@ from urllib.parse import urlsplit
 
 from pydantic import PrivateAttr
 
-from src.config.accessor import get_env_config, reset_env_config
-from src.providers.capabilities import (
+from quant.config.accessor import get_env_config, reset_env_config
+from quant.providers.capabilities import (
     get_llm_credentials,
     get_provider_capabilities,
 )
@@ -688,7 +688,7 @@ def build_llm(*, model_name: Optional[str] = None, callbacks: Any = None) -> Any
     provider = get_env_config().llm.langchain_provider.lower()
     caps = get_provider_capabilities(provider, name)
     if provider in {"openai-codex", "openai_codex"}:
-        from src.providers.openai_codex import OpenAICodexLLM
+        from quant.providers.openai_codex import OpenAICodexLLM
 
         effort = get_env_config().llm.langchain_reasoning_effort.strip().lower()
         return OpenAICodexLLM(

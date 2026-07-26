@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 import requests
 
-from backtest.loaders import stooq_loader
+from quant.backtest.loaders import stooq_loader
 
 _CSV = (
     "Date,Open,High,Low,Close,Volume\n"

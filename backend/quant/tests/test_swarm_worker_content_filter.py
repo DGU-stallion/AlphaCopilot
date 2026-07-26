@@ -11,10 +11,10 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-from src.providers.chat import LLMResponse, ToolCallRequest
-from src.swarm.models import SwarmAgentSpec, SwarmEvent, SwarmTask, WorkerResult
-import src.swarm.worker as worker_mod
-from src.swarm.worker import run_worker
+from quant.providers.chat import LLMResponse, ToolCallRequest
+from quant.swarm.models import SwarmAgentSpec, SwarmEvent, SwarmTask, WorkerResult
+import quant.swarm.worker as worker_mod
+from quant.swarm.worker import run_worker
 
 FINAL_TEXT = (
     "# BTC-USDT — Short-Term View\n\n"

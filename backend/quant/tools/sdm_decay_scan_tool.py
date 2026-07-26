@@ -5,15 +5,15 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from src.agent.tools import BaseTool
-from src.strategy_store.decay import DecayEvaluator
-from src.strategy_store.metrics import compute_decay_metrics, has_decay_inputs
-from src.strategy_store.models import (
+from quant.agent.tools import BaseTool
+from quant.strategy_store.decay import DecayEvaluator
+from quant.strategy_store.metrics import compute_decay_metrics, has_decay_inputs
+from quant.strategy_store.models import (
     ArtifactStatus,
     ArtifactType,
     DecaySnapshot,
 )
-from src.strategy_store._shared import get_store as _get_store
+from quant.strategy_store._shared import get_store as _get_store
 
 
 def _ok(payload: dict[str, Any]) -> str:

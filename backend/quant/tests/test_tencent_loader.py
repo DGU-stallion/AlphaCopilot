@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from backtest.loaders import tencent_loader
+from quant.backtest.loaders import tencent_loader
 
 
 def test_intraday_request_does_not_return_daily_bars(monkeypatch) -> None:

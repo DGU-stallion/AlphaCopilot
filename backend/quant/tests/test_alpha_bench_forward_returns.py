@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.tools.alpha_bench_tool import _compute_forward_returns
+from quant.tools.alpha_bench_tool import _compute_forward_returns
 
 
 def test_forward_returns_preserve_missing_close_boundaries() -> None:

@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-from src.config.accessor import get_env_config
+from quant.config.accessor import get_env_config
 
 _TUSHARE_TOKEN_PLACEHOLDERS = {"", "your-tushare-token"}
 

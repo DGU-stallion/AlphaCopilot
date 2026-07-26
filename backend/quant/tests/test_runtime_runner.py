@@ -21,7 +21,7 @@ from typing import Any, Mapping
 
 import pytest
 
-from src.live.mandate.model import (
+from quant.live.mandate.model import (
     AssetClass,
     ConsentMeta,
     HardCaps,
@@ -30,7 +30,7 @@ from src.live.mandate.model import (
     UniverseConstraint,
     MANDATE_SCHEMA_VERSION,
 )
-from src.live.runtime.runner import (
+from quant.live.runtime.runner import (
     LiveRunner,
     TICK_ERROR,
     TICK_EXPIRED,
@@ -419,7 +419,7 @@ def test_run_loop_synthesizes_jobs_from_triggers() -> None:
     # No explicit jobs, no durable store entries -> the runner must recompute its
     # watch cadence from the injected triggers (R3) so it actually wakes, instead
     # of starting an empty scheduler that never fires (the C3 integration gap).
-    from src.live.runtime.triggers import Trigger
+    from quant.live.runtime.triggers import Trigger
 
     tracker = _OrderTracker()
     sched = _FakeScheduler()
@@ -450,7 +450,7 @@ def test_market_watch_cadence_is_operator_configurable() -> None:
     # The MARKET watch cadence is no longer a hardcoded constant — it is an
     # injectable operational knob (default 60s). A custom value flows into the
     # synthesized job's interval schedule.
-    from src.live.runtime.triggers import Trigger
+    from quant.live.runtime.triggers import Trigger
 
     tracker = _OrderTracker()
     sched = _FakeScheduler()
@@ -475,7 +475,7 @@ def test_market_watch_cadence_is_operator_configurable() -> None:
 
 
 def test_market_watch_cadence_defaults_when_nonpositive() -> None:
-    from src.live.runtime.triggers import Trigger
+    from quant.live.runtime.triggers import Trigger
 
     tracker = _OrderTracker()
     sched = _FakeScheduler()
@@ -502,8 +502,8 @@ def test_market_watch_cadence_defaults_when_nonpositive() -> None:
 def test_run_loop_resumes_persisted_jobs_over_triggers() -> None:
     # A restart with durable jobs must resume THEM (resume-via-recompute), not
     # re-synthesize from triggers.
-    from src.live.runtime.scheduler import Job
-    from src.live.runtime.triggers import Trigger
+    from quant.live.runtime.scheduler import Job
+    from quant.live.runtime.triggers import Trigger
 
     tracker = _OrderTracker()
     sched = _FakeScheduler()
@@ -542,8 +542,8 @@ def test_stop_loop_idempotent() -> None:
 def test_real_audit_write_on_halt(monkeypatch, tmp_path) -> None:
     # Isolate the runtime root so the real ledger lands under tmp.
     monkeypatch.setattr("src.config.paths.Path.home", lambda: tmp_path)
-    from src.live.audit import audit_ledger_path, write_live_action
-    from src.live.halt import halt_flag_set, trip_halt
+    from quant.live.audit import audit_ledger_path, write_live_action
+    from quant.live.halt import halt_flag_set, trip_halt
 
     tracker = _OrderTracker()
     runner = LiveRunner(

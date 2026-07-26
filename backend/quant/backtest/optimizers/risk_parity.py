@@ -5,7 +5,7 @@ from typing import Any, Dict
 import numpy as np
 import pandas as pd
 
-from backtest.optimizers.base import BaseOptimizer
+from quant.backtest.optimizers.base import BaseOptimizer
 
 
 class RiskParityOptimizer(BaseOptimizer):

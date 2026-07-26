@@ -120,7 +120,7 @@ _SESSION_STORE_CACHE: Any = None
 
 def _probe_model_name() -> str:
     """Return the configured LLM model id, or a placeholder."""
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
 
     name = get_env_config().llm.langchain_model_name or get_env_config().llm.openai_model
     if name:
@@ -143,7 +143,7 @@ def _probe_model_name() -> str:
 def _probe_tool_count() -> int:
     """Count registered tools without blocking startup on import errors."""
     try:
-        from src.tools import build_registry
+        from quant.tools import build_registry
 
         return len(build_registry())
     except Exception:  # noqa: BLE001 — never block startup on stats
@@ -158,7 +158,7 @@ def _probe_skill_count() -> int:
     plus ``~/.vibe-trading/skills/user/``.
     """
     try:
-        from src.agent.skills import SkillsLoader
+        from quant.agent.skills import SkillsLoader
 
         loader = SkillsLoader()
         return len(loader.skills)
@@ -370,7 +370,7 @@ def _session_store() -> Any:
     global _SESSION_STORE_CACHE
     if _SESSION_STORE_CACHE is None:
         from cli._legacy import SESSIONS_DIR  # filesystem path constant
-        from src.session.store import SessionStore
+        from quant.session.store import SessionStore
 
         _SESSION_STORE_CACHE = SessionStore(base_dir=SESSIONS_DIR)
     return _SESSION_STORE_CACHE
@@ -405,7 +405,7 @@ def _new_session(prompt_preview: str) -> Optional[str]:
     """
     title = prompt_preview[:60] or "untitled"
     try:
-        from src.session.models import Session, SessionStatus
+        from quant.session.models import Session, SessionStatus
 
         store = _session_store()
         session = Session(
@@ -419,7 +419,7 @@ def _new_session(prompt_preview: str) -> Optional[str]:
     # Index in SQLite for FTS5 cross-session search. Best-effort — never
     # block the turn if the search index is unavailable.
     try:
-        from src.session.search import get_shared_index
+        from quant.session.search import get_shared_index
 
         get_shared_index().index_session(session.session_id, title)
     except Exception:  # noqa: BLE001
@@ -447,7 +447,7 @@ def _append_message(session_id: str, role: str, content: str) -> None:
     if not session_id or not content:
         return
     try:
-        from src.session.models import Message
+        from quant.session.models import Message
 
         store = _session_store()
         store.append_message(
@@ -459,7 +459,7 @@ def _append_message(session_id: str, role: str, content: str) -> None:
     # FTS5 cross-session search. Independent try/except so a JSONL write
     # that succeeded is not retried just because the search index failed.
     try:
-        from src.session.search import get_shared_index
+        from quant.session.search import get_shared_index
 
         get_shared_index().index_message(session_id, role, content)
     except Exception:  # noqa: BLE001
@@ -522,7 +522,7 @@ def _start_preflight_async() -> threading.Thread:
     """
     def _worker() -> None:
         try:
-            from src.preflight import run_preflight
+            from quant.preflight import run_preflight
 
             run_preflight(get_console())
         except Exception:  # noqa: BLE001
@@ -852,7 +852,7 @@ def _trip_halt_from_repl(console: Any, *, reason: str) -> None:
         reason: Human-readable reason recorded in the sentinel.
     """
     try:
-        from src.live.halt import trip_halt
+        from quant.live.halt import trip_halt
 
         path = trip_halt(by="cli", reason=reason)
     except Exception as exc:  # noqa: BLE001 — never let a halt failure kill the loop
@@ -877,7 +877,7 @@ def _clear_halt_from_repl(console: Any) -> None:
         console: Rich console for the confirmation notice.
     """
     try:
-        from src.live.halt import clear_halt
+        from quant.live.halt import clear_halt
 
         cleared = clear_halt()
     except Exception as exc:  # noqa: BLE001 — never let a resume failure kill the loop
@@ -1043,8 +1043,8 @@ def _commit_mandate(proposal: Dict[str, Any], selected_ordinal: int) -> Dict[str
     """
     import httpx
 
-    from src.api.live_routes import CommitMandateRequest
-    from src.config.accessor import get_env_config, reset_env_config
+    from quant.api.live_routes import CommitMandateRequest
+    from quant.config.accessor import get_env_config, reset_env_config
 
     reset_env_config()
     api_config = get_env_config().api

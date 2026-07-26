@@ -10,8 +10,8 @@ from __future__ import annotations
 import json
 from typing import Any, Dict
 
-from src.tools import fred_macro_tool
-from src.tools.fred_macro_tool import FredMacroTool
+from quant.tools import fred_macro_tool
+from quant.tools.fred_macro_tool import FredMacroTool
 
 
 def _ok_payload() -> Dict[str, Any]:

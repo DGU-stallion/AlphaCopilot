@@ -12,8 +12,8 @@ from typing import Mapping
 
 import pytest
 
-from src.live.runtime import triggers
-from src.live.runtime.triggers import (
+from quant.live.runtime import triggers
+from quant.live.runtime.triggers import (
     Trigger,
     TriggerKind,
     due_now,

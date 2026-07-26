@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.factors.registry import Registry, RegistryError, SkipAlpha
+from quant.factors.registry import Registry, RegistryError, SkipAlpha
 
 
 # ---------------------------------------------------------------- constants

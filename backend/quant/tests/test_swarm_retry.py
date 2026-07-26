@@ -11,10 +11,10 @@ import json
 from datetime import datetime, timezone
 
 import mcp_server
-import src.swarm.runtime as rt
-from src.swarm.models import RunStatus, SwarmAgentSpec, SwarmRun, SwarmTask, TaskStatus
-from src.swarm.store import SwarmStore
-from src.swarm.task_store import TaskStore
+import quant.swarm.runtime as rt
+from quant.swarm.models import RunStatus, SwarmAgentSpec, SwarmRun, SwarmTask, TaskStatus
+from quant.swarm.store import SwarmStore
+from quant.swarm.task_store import TaskStore
 
 
 def _make_run(run_id: str, status: RunStatus) -> SwarmRun:

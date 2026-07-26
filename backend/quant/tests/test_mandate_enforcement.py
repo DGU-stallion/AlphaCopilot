@@ -16,17 +16,17 @@ from typing import Any
 
 import pytest
 
-import src.live.enforcement as enforcement
-import src.live.order_guard as order_guard
-import src.live.paths as paths
-from src.live.enforcement import (
+import quant.live.enforcement as enforcement
+import quant.live.order_guard as order_guard
+import quant.live.paths as paths
+from quant.live.enforcement import (
     BREACH_KIND_INSTRUMENT,
     BREACH_KIND_QUANTITATIVE,
     BREACH_KIND_UNIVERSE,
     OrderIntent,
     check_mandate,
 )
-from src.live.mandate.model import (
+from quant.live.mandate.model import (
     MANDATE_SCHEMA_VERSION,
     AssetClass,
     ConsentMeta,
@@ -35,7 +35,7 @@ from src.live.mandate.model import (
     Mandate,
     UniverseConstraint,
 )
-from src.tools.mcp import MCPRemoteToolSpec
+from quant.tools.mcp import MCPRemoteToolSpec
 
 
 # --------------------------------------------------------------------------- #

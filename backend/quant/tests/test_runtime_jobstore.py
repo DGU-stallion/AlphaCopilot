@@ -16,13 +16,13 @@ from pathlib import Path
 
 import pytest
 
-from src.live import paths
-from src.live.runtime.jobstore import (
+from quant.live import paths
+from quant.live.runtime.jobstore import (
     CorruptJobStoreError,
     JobStore,
     runtime_dir,
 )
-from src.live.runtime.scheduler import Job
+from quant.live.runtime.scheduler import Job
 
 
 @pytest.fixture

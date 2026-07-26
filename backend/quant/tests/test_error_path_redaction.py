@@ -14,11 +14,11 @@ from pathlib import Path
 
 import pytest
 
-import src.swarm.runtime as rt
-from src.swarm.presets import load_preset
-from src.swarm.store import SwarmStore
-from src.swarm.models import SwarmAgentSpec, SwarmRun, SwarmTask, WorkerResult
-from src.tools.path_utils import safe_path
+import quant.swarm.runtime as rt
+from quant.swarm.presets import load_preset
+from quant.swarm.store import SwarmStore
+from quant.swarm.models import SwarmAgentSpec, SwarmRun, SwarmTask, WorkerResult
+from quant.tools.path_utils import safe_path
 
 _LEAKS = (str(Path.home()), "site-packages", ".venvs", str(Path.cwd()))
 

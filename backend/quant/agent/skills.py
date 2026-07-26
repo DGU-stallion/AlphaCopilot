@@ -52,7 +52,7 @@ class Skill:
             return None
 
 
-from src.agent.frontmatter import parse_frontmatter as _parse_frontmatter  # shared util
+from quant.agent.frontmatter import parse_frontmatter as _parse_frontmatter  # shared util
 
 
 def _load_skill_dir(dir_path: Path) -> Optional[Skill]:

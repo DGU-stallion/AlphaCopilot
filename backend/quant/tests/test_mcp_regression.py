@@ -42,7 +42,7 @@ def test_build_registry_without_agent_config_loads_local_tools_only() -> None:
     This is the "zero-change" contract for callers that do not opt into MCP
     config yet.
     """
-    from src.tools import build_registry
+    from quant.tools import build_registry
 
     registry = build_registry()
 
@@ -57,7 +57,7 @@ def test_build_registry_without_agent_config_loads_local_tools_only() -> None:
 
 def test_build_registry_without_agent_config_does_not_raise() -> None:
     """build_registry() with default arguments must not raise any exception."""
-    from src.tools import build_registry
+    from quant.tools import build_registry
 
     try:
         registry = build_registry()
@@ -69,7 +69,7 @@ def test_build_registry_without_agent_config_does_not_raise() -> None:
 
 def test_build_registry_without_agent_config_returns_well_known_local_tools() -> None:
     """Well-known local tool names must survive a no-config build_registry call."""
-    from src.tools import build_registry
+    from quant.tools import build_registry
 
     registry = build_registry()
     names = set(registry.tool_names)
@@ -225,7 +225,7 @@ def test_mcp_resolve_shell_tools_env_opt_in(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_mcp_registry_omits_shell_tools_under_default_policy(monkeypatch: pytest.MonkeyPatch) -> None:
     """A registry built with the server's fail-closed default omits bash tools."""
-    from src.tools import build_registry
+    from quant.tools import build_registry
 
     monkeypatch.delenv("VIBE_TRADING_ENABLE_SHELL_TOOLS", raising=False)
     mod = _import_mcp_server()

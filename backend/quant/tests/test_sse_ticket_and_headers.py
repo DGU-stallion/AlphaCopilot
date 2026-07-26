@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import api_server
-from src.api import security
+from quant.api import security
 
 
 def _remote_client() -> TestClient:

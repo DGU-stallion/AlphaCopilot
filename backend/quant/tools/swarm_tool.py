@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from src.agent.tools import BaseTool
+from quant.agent.tools import BaseTool
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ def _max_wait_seconds() -> int:
     _mod = _sys.modules.get(__name__)
     if _mod is not None and "_MAX_WAIT_SECONDS" in _mod.__dict__:
         return _mod.__dict__["_MAX_WAIT_SECONDS"]
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
     return get_env_config().swarm.swarm_timeout
 
 # Preset matching: (preset_name, keyword_patterns, weight_boost). Patterns match user intent (EN + ZH).
@@ -445,7 +445,7 @@ def _normalize_preset_name(value: str) -> str | None:
     normalized = re.sub(r"[\s-]+", "_", value.strip().lower())
     if normalized in _PRESET_NAMES:
         return normalized
-    from src.swarm.presets import resolve_preset_path
+    from quant.swarm.presets import resolve_preset_path
 
     try:
         if resolve_preset_path(normalized) is not None:
@@ -755,9 +755,9 @@ class SwarmTool(BaseTool):
             prompt[:100],
         )
 
-        from src.config import load_swarm_agent_config
-        from src.swarm.runtime import SwarmRuntime
-        from src.swarm.store import SwarmStore
+        from quant.config import load_swarm_agent_config
+        from quant.swarm.runtime import SwarmRuntime
+        from quant.swarm.store import SwarmStore
 
         swarm_base_dir = Path(__file__).resolve().parents[2] / ".swarm" / "runs"
         swarm_base_dir.mkdir(parents=True, exist_ok=True)
@@ -766,7 +766,7 @@ class SwarmTool(BaseTool):
         # agent tool, the config path is resolved from disk / env, never from
         # the calling LLM's prompt (R-06).
         agent_config = load_swarm_agent_config()
-        from src.config.accessor import get_env_config
+        from quant.config.accessor import get_env_config
 
         runtime = SwarmRuntime(
             store=store,
@@ -882,7 +882,7 @@ def _format_result(
     Returns:
         JSON string with run status, report, task summaries, and token usage.
     """
-    from src.swarm.serialization import run_level_error, serialize_task
+    from quant.swarm.serialization import run_level_error, serialize_task
 
     task_summaries = [serialize_task(task) for task in run.tasks]
 

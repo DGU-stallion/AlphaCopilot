@@ -21,8 +21,8 @@ import json
 import logging
 from typing import Any
 
-from backtest.loaders.eastmoney_client import get_json
-from src.agent.tools import BaseTool
+from quant.backtest.loaders.eastmoney_client import get_json
+from quant.agent.tools import BaseTool
 
 logger = logging.getLogger(__name__)
 

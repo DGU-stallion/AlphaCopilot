@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from backtest.loaders.tushare import (
+from quant.backtest.loaders.tushare import (
     DataLoader,
     _is_crypto,
     _is_etf_listed,

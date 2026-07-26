@@ -19,7 +19,7 @@
 - [x] 11. Handle prefill parameter on Agent page: Read `prefill` searchParam on Agent.tsx mount, populate input without auto-sending, clear param from URL. (Requirements: 7.3)
 - [x] 12. Add contextual agent entries to research pages: Add ContextualAgentEntry to StockData, DailyReview, and Intel pages with appropriate prompt templates. (Requirements: 7.1, 7.2)
 - [x] 13. Implement session-level guards: Add 404 for non-existent session, 409 for concurrent attempt in quant session routes. (Requirements: 5.6, 5.7)
-- [-] 14. End-to-end smoke test: Start backend + frontend, verify sidebar renders, research pages load data, Agent page loads, health endpoint accessible. Commit and push. (Requirements: 1.4, 9.1, 9.2)
+- [x] 14. End-to-end smoke test: Start backend + frontend, verify sidebar renders, research pages load data, Agent page loads, health endpoint accessible. Commit and push. (Requirements: 1.4, 9.1, 9.2)
 
 ## Task Dependency Graph
 

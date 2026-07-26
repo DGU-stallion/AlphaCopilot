@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.agent.tools import BaseTool
-from src.market_data import DEFAULT_MAX_ROWS, fetch_market_data_json
+from quant.agent.tools import BaseTool
+from quant.market_data import DEFAULT_MAX_ROWS, fetch_market_data_json
 
 
 class MarketDataTool(BaseTool):

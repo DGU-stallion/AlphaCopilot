@@ -8,8 +8,8 @@
 
 import json
 
-from src.tools.fund_flow_tool import FundFlowTool
-from src.tools.sector_tool import SectorInfoTool
+from quant.tools.fund_flow_tool import FundFlowTool
+from quant.tools.sector_tool import SectorInfoTool
 
 
 def study_main_force(code: str, days: int = 30) -> dict | None:

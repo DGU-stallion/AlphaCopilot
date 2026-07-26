@@ -14,15 +14,15 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from backtest.engines.crypto import CryptoEngine
-from backtest.engines._market_hooks import (
+from quant.backtest.engines.crypto import CryptoEngine
+from quant.backtest.engines._market_hooks import (
     FUNDING_HOURS as _FUNDING_HOURS,
     _TIER_TABLE,
     calc_crypto_funding_fee,
     check_crypto_liquidation,
     _maintenance_rate,
 )
-from backtest.models import Position
+from quant.backtest.models import Position
 
 
 # ---------------------------------------------------------------------------

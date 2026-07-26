@@ -14,15 +14,15 @@ from typing import Any, Dict, Optional
 # Dedicated thread pool limited to four concurrent agents to avoid exhausting the default executor.
 _AGENT_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="agent")
 
-from src.session.events import EventBus
-from src.session.models import (
+from quant.session.events import EventBus
+from quant.session.models import (
     Attempt,
     AttemptStatus,
     Message,
     Session,
 )
-from src.session.search import get_shared_index
-from src.session.store import SessionStore
+from quant.session.search import get_shared_index
+from quant.session.store import SessionStore
 
 
 class SessionService:
@@ -213,11 +213,12 @@ class SessionService:
         Returns:
             Result dictionary containing status, run_dir, run_id, metrics, and related fields.
         """
-        from src.tools import build_registry
-        from src.providers.chat import ChatLLM
-        from src.agent.loop import AgentLoop
-        from src.memory.persistent import PersistentMemory
-        from src.config.loader import load_runtime_agent_config, sanitize_session_overrides
+        from quant.tools import build_registry
+        from quant.providers.chat import ChatLLM
+        from quant.agent.loop import AgentLoop
+        from quant.memory.persistent import PersistentMemory
+        from quant.config.loader import load_runtime_agent_config, sanitize_session_overrides
+        from quant.agent.tuning import AgentTuning
 
         llm = ChatLLM()
         pm = PersistentMemory()
@@ -253,6 +254,7 @@ class SessionService:
         agent = AgentLoop(
             registry=registry,
             llm=llm,
+            tuning=AgentTuning.from_env_config(),
             event_callback=event_callback,
             max_iterations=50,
             persistent_memory=pm,

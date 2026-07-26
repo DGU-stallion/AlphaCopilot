@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.tools.redaction import _internal_roots, redact_internal_paths
+from quant.tools.redaction import _internal_roots, redact_internal_paths
 
 
 def test_none_and_empty_and_nonstr_safe():

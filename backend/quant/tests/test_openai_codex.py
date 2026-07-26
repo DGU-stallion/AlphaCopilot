@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from src.providers import llm as llm_mod
-from src.providers.chat import ProviderStreamError
-from src.providers.openai_codex import (
+from quant.providers import llm as llm_mod
+from quant.providers.chat import ProviderStreamError
+from quant.providers.openai_codex import (
     DEFAULT_CODEX_URL,
     CodexStreamError,
     OpenAICodexLLM,
@@ -141,7 +141,7 @@ def test_stream_non_200_response_raises_http_error(monkeypatch: pytest.MonkeyPat
         def stream(self, *args: object, **kwargs: object) -> _FakeResponse:
             return _FakeResponse()
 
-    import src.providers.openai_codex as codex_mod
+    import quant.providers.openai_codex as codex_mod
 
     monkeypatch.setattr(codex_mod.httpx, "Client", _FakeClient)
     adapter = OpenAICodexLLM(model=DEFAULT_CODEX_MODEL)
@@ -187,7 +187,7 @@ def test_stream_non_200_response_raises_typed_codex_stream_error(
         def stream(self, *args: object, **kwargs: object) -> _FakeResponse:
             return _FakeResponse()
 
-    import src.providers.openai_codex as codex_mod
+    import quant.providers.openai_codex as codex_mod
 
     monkeypatch.setattr(codex_mod.httpx, "Client", _FakeClient)
     adapter = OpenAICodexLLM(model=DEFAULT_CODEX_MODEL)

@@ -6,8 +6,8 @@ import json
 
 import pytest
 
-from src.tools.doc_reader_tool import read_document
-from src.tools.path_utils import safe_document_path, safe_user_path
+from quant.tools.doc_reader_tool import read_document
+from quant.tools.path_utils import safe_document_path, safe_user_path
 
 
 @pytest.fixture(autouse=True)

@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from backtest.loaders.registry import VALID_SOURCES
+from quant.backtest.loaders.registry import VALID_SOURCES
 
 # SKILL.md lives next to the loader registry under the source tree:
 # agent/backtest/loaders/registry.py -> agent/src/skills/data-routing/SKILL.md
@@ -130,8 +130,8 @@ def test_capability_market_coverage_matches_tool_descriptions() -> None:
     expected markets from the tools themselves so the doc can never under-state
     coverage again.
     """
-    from src.tools.financial_statements_tool import FinancialStatementsTool
-    from src.tools.stock_news_tool import StockNewsTool
+    from quant.tools.financial_statements_tool import FinancialStatementsTool
+    from quant.tools.stock_news_tool import StockNewsTool
 
     coverage = _capability_markets_in_skill()
     tools = {

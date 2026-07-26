@@ -22,10 +22,10 @@ import pytest
 from openai import AuthenticationError
 
 import mcp_server
-import src.swarm.runtime as rt
-from src.swarm.models import SwarmAgentSpec, SwarmRun, SwarmTask, WorkerResult
-from src.swarm.store import SwarmStore
-from src.tools.swarm_tool import _format_result
+import quant.swarm.runtime as rt
+from quant.swarm.models import SwarmAgentSpec, SwarmRun, SwarmTask, WorkerResult
+from quant.swarm.store import SwarmStore
+from quant.tools.swarm_tool import _format_result
 
 
 def _run(tmp_path: Path) -> SwarmRun:

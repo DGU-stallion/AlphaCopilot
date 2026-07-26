@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from backtest.loaders._fundamental_schema import (
+from quant.backtest.loaders._fundamental_schema import (
     DERIVED_FIELDS,
     RAW_FIELDS,
     SEC_CONCEPT_MAP,

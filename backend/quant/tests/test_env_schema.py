@@ -19,13 +19,13 @@ import concurrent.futures
 
 import pytest
 
-from src.config.accessor import (
+from quant.config.accessor import (
     _parse_bool,
     get_env_config,
     get_env_or,
     reset_env_config,
 )
-from src.config.env_schema import (
+from quant.config.env_schema import (
     APIConfig,
     AgentTuningConfig,
     DataConfig,

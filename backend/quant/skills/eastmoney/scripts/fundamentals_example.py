@@ -9,9 +9,9 @@
 
 import json
 
-from src.tools.financial_statements_tool import FinancialStatementsTool
-from src.tools.research_reports_tool import ResearchReportsTool
-from src.tools.shareholder_count_tool import ShareholderCountTool
+from quant.tools.financial_statements_tool import FinancialStatementsTool
+from quant.tools.research_reports_tool import ResearchReportsTool
+from quant.tools.shareholder_count_tool import ShareholderCountTool
 
 
 def broker_consensus(code: str, limit: int = 10) -> None:

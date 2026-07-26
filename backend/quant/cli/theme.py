@@ -61,7 +61,7 @@ def _is_dark_terminal(console: Console) -> bool:
         ``True`` if dark mode should be assumed.
     """
 
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
 
     override = get_env_config().paths.vibe_trading_theme.strip().lower()
     if override in {"dark", "light"}:

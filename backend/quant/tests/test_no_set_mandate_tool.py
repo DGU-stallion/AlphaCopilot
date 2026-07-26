@@ -21,7 +21,7 @@ import ast
 import re
 from pathlib import Path
 
-import src.live.mandate.store as store
+import quant.live.mandate.store as store
 
 AGENT_DIR = Path(__file__).resolve().parent.parent
 LIVE_DIR = AGENT_DIR / "src" / "live"
@@ -104,7 +104,7 @@ def test_agent_reachable_modules_never_open_mandate_for_write() -> None:
 
 def test_registry_has_no_mandate_write_tool() -> None:
     """The assembled tool registry exposes no tool that can write a mandate."""
-    from src.tools import build_registry
+    from quant.tools import build_registry
 
     registry = build_registry()
     names = list(getattr(registry, "_tools", {}).keys())

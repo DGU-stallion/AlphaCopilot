@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.memory.persistent import (
+from quant.memory.persistent import (
     MAX_ENTRY_CHARS,
     MemoryEntry,
     PersistentMemory,

@@ -19,11 +19,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backtest.engines.base import _align
-from backtest.engines import base as base_engine
-from backtest.engines.china_a import ChinaAEngine
-from backtest.loaders.base import validate_date_range
-from backtest.runner import BacktestConfigSchema
+from quant.backtest.engines.base import _align
+from quant.backtest.engines import base as base_engine
+from quant.backtest.engines.china_a import ChinaAEngine
+from quant.backtest.loaders.base import validate_date_range
+from quant.backtest.runner import BacktestConfigSchema
 
 
 # ---------------------------------------------------------------------------
@@ -400,7 +400,7 @@ class TestBacktestConfigSchema:
     def test_valid_sources_covers_all_registered_loaders(self) -> None:
         """Every registered loader name must be an accepted config source, so a
         new loader can never be silently rejected by the config schema."""
-        from backtest.loaders.registry import (
+        from quant.backtest.loaders.registry import (
             LOADER_REGISTRY,
             VALID_SOURCES,
             _ensure_registered,
@@ -453,7 +453,7 @@ class TestDateRangeValidation:
 
     def test_yfinance_loader_validates_dates(self) -> None:
         """yfinance loader should raise on reversed dates before fetching."""
-        from backtest.loaders.yfinance_loader import DataLoader
+        from quant.backtest.loaders.yfinance_loader import DataLoader
 
         loader = DataLoader()
         with pytest.raises(ValueError):
@@ -461,7 +461,7 @@ class TestDateRangeValidation:
 
     def test_okx_loader_validates_dates(self) -> None:
         """OKX loader should raise on reversed dates before fetching."""
-        from backtest.loaders.okx import DataLoader
+        from quant.backtest.loaders.okx import DataLoader
 
         loader = DataLoader()
         with pytest.raises(ValueError):
@@ -469,7 +469,7 @@ class TestDateRangeValidation:
 
     def test_ccxt_loader_validates_dates(self) -> None:
         """CCXT loader should raise on reversed dates before fetching."""
-        from backtest.loaders.ccxt_loader import DataLoader
+        from quant.backtest.loaders.ccxt_loader import DataLoader
 
         loader = DataLoader()
         with pytest.raises(ValueError):
@@ -477,7 +477,7 @@ class TestDateRangeValidation:
 
     def test_akshare_loader_validates_dates(self) -> None:
         """AKShare loader should raise on reversed dates before fetching."""
-        from backtest.loaders.akshare_loader import DataLoader
+        from quant.backtest.loaders.akshare_loader import DataLoader
 
         loader = DataLoader()
         with pytest.raises(ValueError):
@@ -485,7 +485,7 @@ class TestDateRangeValidation:
 
     def test_tushare_loader_validates_dates(self) -> None:
         """Tushare loader should raise on reversed dates before fetching."""
-        from backtest.loaders.tushare import DataLoader
+        from quant.backtest.loaders.tushare import DataLoader
 
         # Tushare requires TUSHARE_TOKEN at init; skip if unavailable
         import os

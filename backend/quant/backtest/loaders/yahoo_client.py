@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from backtest.loaders._http import (
+from quant.backtest.loaders._http import (
     DEFAULT_USER_AGENT,
     resolve_min_interval,
     throttled_get,

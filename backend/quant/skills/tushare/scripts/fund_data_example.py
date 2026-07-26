@@ -9,7 +9,7 @@ import pandas as pd
 import os
 
 # 读取环境变量中的token, 或者读取本地记录的token
-from src.config.accessor import get_env_config
+from quant.config.accessor import get_env_config
 
 token = get_env_config().data.tushare_token or ts.get_token()
 

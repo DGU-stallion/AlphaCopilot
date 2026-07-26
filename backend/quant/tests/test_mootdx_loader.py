@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
-import backtest.loaders.mootdx_loader as ml
-from backtest.loaders.mootdx_loader import DataLoader, _is_a_share, _is_bj
+import quant.backtest.loaders.mootdx_loader as ml
+from quant.backtest.loaders.mootdx_loader import DataLoader, _is_a_share, _is_bj
 
 
 # ---------------------------------------------------------------------------
@@ -229,7 +229,7 @@ def test_is_available_true_when_mootdx_present(fake_client: _FakeStdQuotes) -> N
 
 
 def test_registry_lists_mootdx_in_a_share_chain() -> None:
-    from backtest.loaders.registry import FALLBACK_CHAINS, _ensure_registered, LOADER_REGISTRY
+    from quant.backtest.loaders.registry import FALLBACK_CHAINS, _ensure_registered, LOADER_REGISTRY
 
     _ensure_registered()
     assert "mootdx" in LOADER_REGISTRY

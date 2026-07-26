@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 import cli
-from src.memory.persistent import PersistentMemory
+from quant.memory.persistent import PersistentMemory
 
 
 def _seed(tmp_path: Path) -> PersistentMemory:

@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from src.hypotheses import HypothesisRegistry
-from src.hypotheses.cli_handlers import (
+from quant.hypotheses import HypothesisRegistry
+from quant.hypotheses.cli_handlers import (
     add_subparser,
     dispatch,
 )

@@ -12,12 +12,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from backtest.loaders.ccxt_loader import (
+from quant.backtest.loaders.ccxt_loader import (
     _CCXT_TIMEOUT_MS,
     _ccxt_proxy_config,
 )
-from backtest.loaders.ccxt_loader import DataLoader as CcxtDataLoader
-from backtest.loaders.registry import register
+from quant.backtest.loaders.ccxt_loader import DataLoader as CcxtDataLoader
+from quant.backtest.loaders.registry import register
 
 
 @register

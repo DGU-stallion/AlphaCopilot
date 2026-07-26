@@ -14,8 +14,7 @@ from typing import Any, Callable
 
 import pytest
 
-import src.agent.loop as loop_mod
-from src.providers.chat import LLMResponse, ProviderStreamError
+from quant.providers.chat import LLMResponse, ProviderStreamError
 
 
 class _FlakyLoopLLM:
@@ -105,7 +104,6 @@ def _bad_request_error() -> ProviderStreamError:
 
 
 def _run(
-    monkeypatch,
     tmp_path: Path,
     llm: _FlakyLoopLLM,
     events: list[tuple[str, dict[str, Any]]] | None = None,
@@ -113,7 +111,6 @@ def _run(
     """Run an AgentLoop turn against the given scripted LLM.
 
     Args:
-        monkeypatch: pytest monkeypatch fixture (zeroes the retry sleep).
         tmp_path: Scratch run directory.
         llm: The scripted LLM stub.
         events: Optional event sink collecting ``(event_type, data)`` tuples.
@@ -121,15 +118,16 @@ def _run(
     Returns:
         The AgentLoop result dict.
     """
-    from src.agent.loop import AgentLoop
-    from src.memory.persistent import PersistentMemory
-    from src.tools import build_registry
+    from quant.agent.loop import AgentLoop
+    from quant.memory.persistent import PersistentMemory
+    from quant.tools import build_registry
+    from conftest import make_test_tuning
 
-    monkeypatch.setattr(loop_mod, "STREAM_RETRY_DELAY_S", 0.0)
     pm = PersistentMemory()
     agent = AgentLoop(
         registry=build_registry(persistent_memory=pm, include_shell_tools=False),
         llm=llm,
+        tuning=make_test_tuning(),
         event_callback=(
             (lambda event_type, data: events.append((event_type, data)))
             if events is not None
@@ -145,13 +143,13 @@ def _run(
 
 
 def test_transient_stream_failure_is_retried_and_run_succeeds(
-    monkeypatch, tmp_path: Path
+    tmp_path: Path,
 ) -> None:
     """One transient ProviderStreamError then success → run completes (2 calls)."""
     llm = _FlakyLoopLLM([_transient_error()], "Final answer.")
     events: list[tuple[str, dict[str, Any]]] = []
 
-    result = _run(monkeypatch, tmp_path, llm, events)
+    result = _run(tmp_path, llm, events)
 
     assert result["status"] == "success"
     assert result["content"] == "Final answer."
@@ -171,22 +169,22 @@ def test_transient_stream_failure_is_retried_and_run_succeeds(
     assert reset["model"] == "deepseek-v4-pro"
 
 
-def test_double_stream_failure_fails_run(monkeypatch, tmp_path: Path) -> None:
+def test_double_stream_failure_fails_run(tmp_path: Path) -> None:
     """Two consecutive transient failures → failed run, no third attempt."""
     llm = _FlakyLoopLLM([_transient_error(), _transient_error()], "Final answer.")
 
-    result = _run(monkeypatch, tmp_path, llm)
+    result = _run(tmp_path, llm)
 
     assert result["status"] == "failed"
     assert result["error_code"] == "provider_stream_error"
     assert llm.calls == 2
 
 
-def test_non_retryable_4xx_fails_without_retry(monkeypatch, tmp_path: Path) -> None:
+def test_non_retryable_4xx_fails_without_retry(tmp_path: Path) -> None:
     """A deterministic 4xx ProviderStreamError fails immediately (1 call)."""
     llm = _FlakyLoopLLM([_bad_request_error()], "Final answer.")
 
-    result = _run(monkeypatch, tmp_path, llm)
+    result = _run(tmp_path, llm)
 
     assert result["status"] == "failed"
     assert result["error_code"] == "provider_stream_error"

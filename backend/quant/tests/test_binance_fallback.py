@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from backtest.loaders.registry import FALLBACK_CHAINS
-from src import market_data
+from quant.backtest.loaders.registry import FALLBACK_CHAINS
+from quant import market_data
 
 
 def test_market_data_falls_back_from_okx_to_binance() -> None:

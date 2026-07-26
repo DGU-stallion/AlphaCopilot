@@ -19,9 +19,9 @@ from typing import Any
 
 import pandas as pd
 
-from src.agent.tools import BaseTool
-from src.tools.path_utils import safe_user_path
-from src.tools.trade_journal_parsers import (
+from quant.agent.tools import BaseTool
+from quant.tools.path_utils import safe_user_path
+from quant.tools.trade_journal_parsers import (
     parse_file,
     records_to_dataframe,
 )

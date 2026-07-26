@@ -114,7 +114,7 @@ class TushareFundamentalProvider:
         if api is None:
             import tushare as ts
 
-            from src.config.accessor import get_env_config
+            from quant.config.accessor import get_env_config
 
             token = get_env_config().data.tushare_token.strip()
             if token in TUSHARE_TOKEN_PLACEHOLDERS:

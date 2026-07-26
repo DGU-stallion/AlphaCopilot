@@ -20,9 +20,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 import api_server
-from src.api import scheduled_routes
-from src.scheduled_research.models import JobStatus, ScheduledResearchJob
-from src.scheduled_research.store import ScheduledResearchJobStore
+from quant.api import scheduled_routes
+from quant.scheduled_research.models import JobStatus, ScheduledResearchJob
+from quant.scheduled_research.store import ScheduledResearchJobStore
 
 
 @pytest.fixture

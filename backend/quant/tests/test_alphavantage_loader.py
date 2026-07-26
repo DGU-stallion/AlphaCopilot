@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from backtest.loaders import alphavantage_loader as av
+from quant.backtest.loaders import alphavantage_loader as av
 
 
 def _payload(*dates_rows) -> dict:

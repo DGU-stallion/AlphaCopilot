@@ -49,7 +49,7 @@ def cmd_model(ctx: Any = None, *args: str) -> int:  # noqa: ARG001 — ctx unuse
 
         _show_settings()
     except Exception as exc:  # noqa: BLE001 — legacy may be absent on partial install
-        from src.config.accessor import get_env_config
+        from quant.config.accessor import get_env_config
 
         cfg = get_env_config()
         provider = cfg.llm.langchain_provider or "(not set)"

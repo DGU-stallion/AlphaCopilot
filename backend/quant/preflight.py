@@ -15,7 +15,7 @@ from typing import List, Optional
 from rich.console import Console
 from rich.table import Table
 
-from src.config.accessor import get_env_config, reset_env_config
+from quant.config.accessor import get_env_config, reset_env_config
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,7 @@ class CheckResult:
 
 def _check_llm_provider() -> CheckResult:
     """Verify LLM provider connectivity."""
-    from src.providers.llm import _ensure_dotenv, _sync_provider_env, provider_diagnostics
+    from quant.providers.llm import _ensure_dotenv, _sync_provider_env, provider_diagnostics
 
     _ensure_dotenv()
     # The EnvConfig singleton may have been cached before _ensure_dotenv()
@@ -73,7 +73,7 @@ def _check_llm_provider() -> CheckResult:
 
     if provider.lower() in {"openai-codex", "openai_codex"}:
         try:
-            from src.providers.openai_codex import get_openai_codex_login_status
+            from quant.providers.openai_codex import get_openai_codex_login_status
 
             token = get_openai_codex_login_status()
         except Exception as exc:

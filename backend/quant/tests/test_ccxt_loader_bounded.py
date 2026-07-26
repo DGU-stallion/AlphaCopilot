@@ -17,9 +17,9 @@ import pytest
 
 import ccxt
 
-import backtest.loaders.ccxt_loader as cl
-from backtest.loaders.base import DEFAULT_MAX_RETRIES
-from backtest.loaders.ccxt_loader import DataLoader
+import quant.backtest.loaders.ccxt_loader as cl
+from quant.backtest.loaders.base import DEFAULT_MAX_RETRIES
+from quant.backtest.loaders.ccxt_loader import DataLoader
 
 SINCE = int(pd.Timestamp("2026-05-01").timestamp() * 1000)
 END = int((pd.Timestamp("2026-05-05") + pd.Timedelta(days=1)).timestamp() * 1000)

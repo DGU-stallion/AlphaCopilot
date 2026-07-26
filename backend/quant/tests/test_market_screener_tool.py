@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from src.tools.market_screener_tool import MarketScreenerTool
+from quant.tools.market_screener_tool import MarketScreenerTool
 
 _CLIST_PAYLOAD = {
     "data": {

@@ -21,7 +21,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.factors.base import delta, ts_mean
+from quant.factors.base import delta, ts_mean
 
 __alpha_meta__ = {
     'id': 'academic_cma',

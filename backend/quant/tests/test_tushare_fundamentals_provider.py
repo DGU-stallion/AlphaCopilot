@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
-from backtest.loaders.tushare_fundamentals import (
+from quant.backtest.loaders.tushare_fundamentals import (
     SchemaValidationError,
     TushareFundamentalProvider,
     UnknownTableError,

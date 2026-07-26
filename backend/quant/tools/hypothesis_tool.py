@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from src.agent.tools import BaseTool
-from src.hypotheses import HypothesisRegistry
+from quant.agent.tools import BaseTool
+from quant.hypotheses import HypothesisRegistry
 
 
 def _ok(payload: dict[str, Any]) -> str:

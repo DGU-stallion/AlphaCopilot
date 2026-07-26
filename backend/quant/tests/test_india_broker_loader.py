@@ -11,8 +11,8 @@ import datetime as dt
 
 import pandas as pd
 
-from backtest.loaders import india_broker_loader as mod
-from backtest.loaders.india_broker_loader import DataLoader, _base_symbol, _exchange_for
+from quant.backtest.loaders import india_broker_loader as mod
+from quant.backtest.loaders.india_broker_loader import DataLoader, _base_symbol, _exchange_for
 
 
 def _epoch(date_str: str) -> int:

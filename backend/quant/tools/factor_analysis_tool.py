@@ -8,8 +8,8 @@ from typing import Any
 
 import pandas as pd
 
-from src.agent.tools import BaseTool
-from src.factors.factor_analysis_core import compute_ic_series, compute_group_equity
+from quant.agent.tools import BaseTool
+from quant.factors.factor_analysis_core import compute_ic_series, compute_group_equity
 
 # Backward-compatible aliases for any external imports of the private names.
 _compute_ic_series = compute_ic_series

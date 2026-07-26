@@ -6,10 +6,10 @@ import asyncio
 import time
 from pathlib import Path
 
-from src.session.events import EventBus
-from src.session.models import Attempt
-from src.session.service import SessionService
-from src.session.store import SessionStore
+from quant.session.events import EventBus
+from quant.session.models import Attempt
+from quant.session.service import SessionService
+from quant.session.store import SessionStore
 
 
 class _DummyIndex:

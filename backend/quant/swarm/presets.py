@@ -24,8 +24,8 @@ from string import Formatter
 
 import yaml
 
-from src.swarm.models import RunStatus, SwarmAgentSpec, SwarmRun, SwarmTask, TaskStatus
-from src.swarm.task_store import topological_layers, validate_dag
+from quant.swarm.models import RunStatus, SwarmAgentSpec, SwarmRun, SwarmTask, TaskStatus
+from quant.swarm.task_store import topological_layers, validate_dag
 
 PRESETS_DIR = Path(__file__).resolve().parent / "presets"
 #: User-created presets; searched before the bundled directory so user files

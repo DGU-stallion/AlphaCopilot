@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from src.core import runner as runner_mod
-from src.core.runner import (
+from quant.core import runner as runner_mod
+from quant.core.runner import (
     Runner,
     _make_rlimit_preexec,
     _prepare_sandbox_home,

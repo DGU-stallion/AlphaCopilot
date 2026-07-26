@@ -7,9 +7,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.trading import profiles, service
-from src.tools import build_registry
-from src.tools.trading_connector_tool import TradingPlaceOrderTool, TradingSelectConnectionTool
+from quant.trading import profiles, service
+from quant.tools import build_registry
+from quant.tools.trading_connector_tool import TradingPlaceOrderTool, TradingSelectConnectionTool
 
 pytestmark = pytest.mark.unit
 

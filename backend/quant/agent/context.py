@@ -8,12 +8,12 @@ import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from src.agent.memory import WorkspaceMemory
-from src.agent.skills import SkillsLoader
-from src.agent.tools import ToolRegistry
+from quant.agent.memory import WorkspaceMemory
+from quant.agent.skills import SkillsLoader
+from quant.agent.tools import ToolRegistry
 
 if TYPE_CHECKING:
-    from src.memory.persistent import PersistentMemory
+    from quant.memory.persistent import PersistentMemory
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +206,7 @@ class ContextBuilder:
         number of loaders. Falls back to a static count if the import fails.
         """
         try:
-            from backtest.loaders.registry import VALID_SOURCES
+            from quant.backtest.loaders.registry import VALID_SOURCES
 
             return len(VALID_SOURCES - {"auto"})
         except Exception:  # noqa: BLE001 - prompt count must never break startup

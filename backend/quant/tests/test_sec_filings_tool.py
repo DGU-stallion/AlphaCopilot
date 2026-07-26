@@ -10,8 +10,8 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from src.tools import sec_filings_tool as sft
-from src.tools.sec_filings_tool import SecFilingsTool
+from quant.tools import sec_filings_tool as sft
+from quant.tools.sec_filings_tool import SecFilingsTool
 
 _SUBMISSIONS = {
     "cik": "320193",

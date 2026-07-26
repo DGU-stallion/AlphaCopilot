@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backtest.engines.options_portfolio import _calc_options_metrics
+from quant.backtest.engines.options_portfolio import _calc_options_metrics
 
 
 def test_empty_equity_returns_json_safe_undefined_metrics() -> None:

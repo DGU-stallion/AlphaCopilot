@@ -25,7 +25,7 @@ import logging
 import re
 from typing import Any
 
-from backtest.loaders._http import resolve_min_interval, throttled_get_json
+from quant.backtest.loaders._http import resolve_min_interval, throttled_get_json
 
 logger = logging.getLogger(__name__)
 

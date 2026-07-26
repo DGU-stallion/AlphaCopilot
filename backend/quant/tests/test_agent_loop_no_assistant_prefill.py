@@ -14,9 +14,9 @@ from typing import Any
 
 import pytest
 
-import src.agent.loop as loop_mod
-from src.agent.loop import AgentLoop
-from src.agent.trace import TraceWriter
+import quant.agent.loop as loop_mod
+from quant.agent.loop import AgentLoop
+from quant.agent.trace import TraceWriter
 
 
 class _StubLLM:
@@ -66,13 +66,15 @@ class _StubLLM:
 
 
 def _build_agent(llm: Any, max_iter: int = 3, tmp_run_dir: Path | None = None) -> AgentLoop:
-    from src.tools import build_registry
-    from src.memory.persistent import PersistentMemory
+    from quant.tools import build_registry
+    from quant.memory.persistent import PersistentMemory
+    from conftest import make_test_tuning
 
     pm = PersistentMemory()
     agent = AgentLoop(
         registry=build_registry(persistent_memory=pm, include_shell_tools=False),
         llm=llm,
+        tuning=make_test_tuning(),
         event_callback=None,
         max_iterations=max_iter,
         persistent_memory=pm,

@@ -6,7 +6,7 @@ from types import ModuleType
 import pandas as pd
 import pytest
 
-from backtest.loaders import fundamentals_loader
+from quant.backtest.loaders import fundamentals_loader
 
 
 def _install_schema_stub(monkeypatch: pytest.MonkeyPatch) -> None:

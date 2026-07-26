@@ -12,12 +12,12 @@ from contextlib import nullcontext
 
 import pytest
 
-import src.live.paths as live_paths
-from src.config.accessor import reset_env_config
-from src.live import sdk_order_gate as gate
-from src.live.daily_count import read_daily_count
-from src.live.enforcement import OrderIntent
-from src.live.mandate.model import (
+import quant.live.paths as live_paths
+from quant.config.accessor import reset_env_config
+from quant.live import sdk_order_gate as gate
+from quant.live.daily_count import read_daily_count
+from quant.live.enforcement import OrderIntent
+from quant.live.mandate.model import (
     AssetClass,
     ConsentMeta,
     HardCaps,
@@ -25,8 +25,8 @@ from src.live.mandate.model import (
     Mandate,
     UniverseConstraint,
 )
-from src.trading import service
-from src.trading.connectors.longbridge import credentials as lb_credentials
+from quant.trading import service
+from quant.trading.connectors.longbridge import credentials as lb_credentials
 
 pytestmark = pytest.mark.unit
 
@@ -228,7 +228,7 @@ def test_service_place_order_live_routes_through_gate(monkeypatch) -> None:
 
 
 def test_no_longbridge_live_trade_profile() -> None:
-    from src.trading import profiles
+    from quant.trading import profiles
 
     ids = {p.id for p in profiles.list_profiles()}
     assert "longbridge-paper-trade" in ids
@@ -236,7 +236,7 @@ def test_no_longbridge_live_trade_profile() -> None:
 
 
 def test_trade_profiles_have_place_capability() -> None:
-    from src.trading import profiles
+    from quant.trading import profiles
 
     for pid in ("alpaca-live-trade", "okx-live-trade", "binance-live-trade", "futu-live-trade", "tiger-live-trade"):
         prof = profiles.profile_by_id(pid)
@@ -385,7 +385,7 @@ def test_gate_quantity_unpriceable_denies(monkeypatch) -> None:
 
 
 def test_longbridge_place_order_paper_only_guard() -> None:
-    from src.trading.connectors.longbridge import sdk as lb
+    from quant.trading.connectors.longbridge import sdk as lb
 
     cfg = lb.LongbridgeConfig(app_key="k", app_secret="s", access_token="t", profile="live-readonly")
     out = lb.place_order(cfg, symbol="700.HK", side="buy", quantity=100)
@@ -415,7 +415,7 @@ def test_connector_place_order_rejects_both_qty_and_notional(connector) -> None:
 
 
 def test_okx_order_result_rejects_failed_scode() -> None:
-    from src.trading.connectors.okx import sdk as ox
+    from quant.trading.connectors.okx import sdk as ox
 
     cfg = ox.OKXConfig(api_key="k", api_secret="s", passphrase="p")
     # A 200 envelope (code 0) whose per-order sCode != 0 is a FAILED order.

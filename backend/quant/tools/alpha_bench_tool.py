@@ -41,8 +41,8 @@ from typing import Any
 
 import pandas as pd
 
-from src.agent.tools import BaseTool
-from src.config.accessor import get_env_config
+from quant.agent.tools import BaseTool
+from quant.config.accessor import get_env_config
 
 logger = logging.getLogger(__name__)
 
@@ -376,7 +376,7 @@ def _load_csi300_panel(start: str, end: str) -> dict[str, pd.DataFrame]:
     # = (amount * 1000 CNY) / (volume * 100 shares). Matches
     # ``src.factors.base.vwap(EQUITY_CN)``.
     if "amount" in panel and "volume" in panel:
-        from src.factors.base import safe_div
+        from quant.factors.base import safe_div
 
         panel["vwap"] = safe_div(
             panel["amount"] * 1000.0, panel["volume"] * 100.0 + 1.0
@@ -408,7 +408,7 @@ def _load_sp500_panel(start: str, end: str) -> dict[str, pd.DataFrame]:
 
     # yfinance loader expects project-style symbols (``AAPL.US``).
     project_codes = [f"{c}.US" for c in codes]
-    from backtest.loaders.registry import resolve_loader
+    from quant.backtest.loaders.registry import resolve_loader
 
     loader = resolve_loader("us_equity")
     fetched = _retry(lambda: loader.fetch(project_codes, start, end)) or {}
@@ -464,7 +464,7 @@ def _fetch_sp500_constituents() -> list[str]:
 
 def _load_btc_panel(start: str, end: str) -> dict[str, pd.DataFrame]:
     """Single-instrument BTC-USDT panel via OKX. Adds vwap = typical price."""
-    from backtest.loaders.registry import resolve_loader
+    from quant.backtest.loaders.registry import resolve_loader
 
     loader = resolve_loader("crypto")
     fetched = _retry(lambda: loader.fetch(["BTC-USDT"], start, end)) or {}
@@ -546,7 +546,7 @@ def _bench_one_alpha(
     return_df: pd.DataFrame,
 ) -> dict[str, Any]:
     """Compute IC stats for one alpha. Returns a dict, may raise SkipAlpha / RegistryError."""
-    from src.factors.factor_analysis_core import compute_ic_series  # local import
+    from quant.factors.factor_analysis_core import compute_ic_series  # local import
 
     factor_df = registry.compute(alpha_id, panel)
     ic_series = compute_ic_series(factor_df, return_df)
@@ -764,7 +764,7 @@ def run_alpha_bench(**kwargs: Any) -> dict[str, Any]:
     output_dir = Path(output_dir_raw).expanduser().resolve()
 
     try:
-        from src.factors.registry import (
+        from quant.factors.registry import (
             RegistryError,
             SkipAlpha,
             get_default_registry,

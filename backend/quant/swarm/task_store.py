@@ -10,7 +10,7 @@ import threading
 from collections import defaultdict, deque
 from pathlib import Path
 
-from src.swarm.models import SwarmTask, TaskStatus
+from quant.swarm.models import SwarmTask, TaskStatus
 
 
 class TaskStore:

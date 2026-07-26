@@ -9,9 +9,9 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
-from backtest.loaders._symbol_utils import _is_etf_listed
-from backtest.loaders.base import cached_loader_fetch, validate_date_range
-from backtest.loaders.registry import register
+from quant.backtest.loaders._symbol_utils import _is_etf_listed
+from quant.backtest.loaders.base import cached_loader_fetch, validate_date_range
+from quant.backtest.loaders.registry import register
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ class DataLoader:
 
     def is_available(self) -> bool:
         """Available when TUSHARE_TOKEN is set."""
-        from src.config.accessor import get_env_config
+        from quant.config.accessor import get_env_config
 
         return get_env_config().data.tushare_token.strip() not in TUSHARE_TOKEN_PLACEHOLDERS
 
@@ -65,7 +65,7 @@ class DataLoader:
         """Initialize Tushare pro API."""
         import tushare as ts
 
-        from src.config.accessor import get_env_config
+        from quant.config.accessor import get_env_config
 
         token = get_env_config().data.tushare_token
         self.api = ts.pro_api(token)

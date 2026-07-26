@@ -8,8 +8,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-import backtest.loaders.local_loader as local_loader
-from backtest.loaders.base import validate_ohlc
+import quant.backtest.loaders.local_loader as local_loader
+from quant.backtest.loaders.base import validate_ohlc
 
 
 def _frame(rows: list[tuple[float, float, float, float, float]]) -> pd.DataFrame:
@@ -120,7 +120,7 @@ def test_sanitize_data_map_guards_every_source() -> None:
     itself (the large majority) still cannot leak a structurally-invalid bar
     into the backtest, because every fetched map converges through here.
     """
-    from backtest.runner import _sanitize_data_map
+    from quant.backtest.runner import _sanitize_data_map
 
     data_map = {
         "AAA.US": _frame(

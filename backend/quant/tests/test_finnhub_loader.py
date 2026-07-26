@@ -11,8 +11,8 @@ from typing import Any, Dict, List
 
 import pandas as pd
 
-from backtest.loaders import finnhub_loader
-from backtest.loaders.finnhub_loader import (
+from quant.backtest.loaders import finnhub_loader
+from quant.backtest.loaders.finnhub_loader import (
     DataLoader,
     _to_epoch_seconds,
     _to_finnhub_symbol,

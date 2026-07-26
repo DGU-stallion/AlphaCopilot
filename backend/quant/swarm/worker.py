@@ -13,36 +13,36 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from src.agent.context import ContextBuilder
-from src.agent.progress import HeartbeatTimer
-from src.agent.skills import SkillsLoader
-from src.agent.tools import ToolRegistry
-from src.config.schema import AgentConfig
-from src.providers.chat import ChatLLM, LLMResponse, ProviderStreamError
-from src.providers.content_filter import (
+from quant.agent.context import ContextBuilder
+from quant.agent.progress import HeartbeatTimer
+from quant.agent.skills import SkillsLoader
+from quant.agent.tools import ToolRegistry
+from quant.config.schema import AgentConfig
+from quant.providers.chat import ChatLLM, LLMResponse, ProviderStreamError
+from quant.providers.content_filter import (
     CONTENT_FILTER_SKIP_MESSAGE,
     MAX_CONSECUTIVE_CONTENT_FILTER_SKIPS,
     compute_content_filter_warnings,
 )
-from src.swarm.models import (
+from quant.swarm.models import (
     SwarmAgentSpec,
     SwarmEvent,
     SwarmTask,
     WorkerResult,
 )
-from src.tools import build_swarm_registry
-from src.tools.mcp import MCPRemoteTool
-from src.tools.redaction import is_sensitive_arg, redact_payload
+from quant.tools import build_swarm_registry
+from quant.tools.mcp import MCPRemoteTool
+from quant.tools.redaction import is_sensitive_arg, redact_payload
 
 logger = logging.getLogger(__name__)
 
 def _default_max_iterations() -> int:
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
     return get_env_config().swarm.swarm_worker_max_iter
 
 
 def _default_timeout_seconds() -> int:
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
     return get_env_config().swarm.swarm_worker_timeout
 
 
@@ -53,7 +53,7 @@ def _heartbeat_interval_s() -> float:
     — both sides use the same env var, so they must fail the same way. A bad
     value (``"abc"``, empty) falls back to 3.0s instead of crashing import.
     """
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
 
     return get_env_config().swarm.swarm_heartbeat_interval_s
 
@@ -66,7 +66,7 @@ def _stream_retry_delay_s() -> float:
         retry. Configurable via ``SWARM_STREAM_RETRY_DELAY_S``; a bad value
         falls back to 1.0s instead of crashing import.
     """
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
 
     return get_env_config().swarm.swarm_stream_retry_delay_s
 
@@ -152,7 +152,7 @@ def _estimate_tokens(
         zero — that simply means the provider didn't report it and the
         fallback couldn't compute it either (e.g. binary content).
     """
-    from src.providers.chat import LLMResponse
+    from quant.providers.chat import LLMResponse
 
     if isinstance(response, LLMResponse) and response.usage_metadata:
         usage = response.usage_metadata

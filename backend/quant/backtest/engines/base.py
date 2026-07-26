@@ -22,23 +22,23 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-from backtest.loaders.rsshub_events import (
+from quant.backtest.loaders.rsshub_events import (
     FeedSpec,
     RSSHubEventProvider,
     enrich_price_frames_with_events,
     feed_specs_from_config,
 )
-from backtest.loaders.tushare_fundamentals import (
+from quant.backtest.loaders.tushare_fundamentals import (
     TushareFundamentalProvider,
     enrich_price_frames_with_fundamentals,
 )
-from backtest.metrics import (
+from quant.backtest.metrics import (
     by_exit_reason_stats,
     by_symbol_stats,
     calc_metrics,
     calc_trade_turnover_series,
 )
-from backtest.models import EquitySnapshot, Position, TradeRecord
+from quant.backtest.models import EquitySnapshot, Position, TradeRecord
 
 logger = logging.getLogger(__name__)
 
@@ -529,7 +529,7 @@ class BaseEngine(ABC):
         # ── External benchmark fetch ──────────────────────────────────────────
         bench_ticker = config.get("benchmark")
         if bench_ticker and bench_ticker != "auto":
-            from backtest.benchmark import resolve_benchmark
+            from quant.backtest.benchmark import resolve_benchmark
             bench_source = config.get("source", "yfinance")
             bench_result = resolve_benchmark(
                 strategy_codes=codes,
@@ -570,7 +570,7 @@ class BaseEngine(ABC):
 
         # 7. Validation (optional — triggered by config["validation"])
         if config.get("validation"):
-            from backtest.validation import run_validation, write_validation_json
+            from quant.backtest.validation import run_validation, write_validation_json
             v_results = run_validation(
                 config, equity_series, self.trades, self.initial_capital, bars_per_year,
             )
@@ -589,7 +589,7 @@ class BaseEngine(ABC):
         )
 
         # 9. Trust Layer run card
-        from backtest.run_card import write_run_card
+        from quant.backtest.run_card import write_run_card
         write_run_card(
             run_dir,
             config,

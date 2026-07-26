@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from src.agent.progress import (
+from quant.agent.progress import (
     HeartbeatTimer,
     ProgressEvent,
     _get_emitter,

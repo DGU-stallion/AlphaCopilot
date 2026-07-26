@@ -26,9 +26,9 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
-from backtest.loaders._http import resolve_min_interval, throttled_get_json
-from backtest.loaders.base import cached_loader_fetch, validate_date_range
-from backtest.loaders.registry import register
+from quant.backtest.loaders._http import resolve_min_interval, throttled_get_json
+from quant.backtest.loaders.base import cached_loader_fetch, validate_date_range
+from quant.backtest.loaders.registry import register
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def _resolve_api_key() -> str:
     Returns:
         The trimmed key, or ``""`` when the env var is absent or a placeholder.
     """
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
 
     key = get_env_config().data.alphavantage_api_key.strip()
     return "" if key in _API_KEY_PLACEHOLDERS else key

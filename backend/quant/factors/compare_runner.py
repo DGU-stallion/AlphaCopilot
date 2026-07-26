@@ -19,8 +19,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Iterable
 
-from src.factors import bench_runner
-from src.factors.registry import Registry
+from quant.factors import bench_runner
+from quant.factors.registry import Registry
 
 logger = logging.getLogger(__name__)
 

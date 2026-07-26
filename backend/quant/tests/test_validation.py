@@ -16,8 +16,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backtest.models import TradeRecord
-from backtest.validation import (
+from quant.backtest.models import TradeRecord
+from quant.backtest.validation import (
     bootstrap_sharpe_ci,
     monte_carlo_test,
     run_validation,

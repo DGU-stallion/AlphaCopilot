@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from backtest.runner import _load_module_from_file
+from quant.backtest.runner import _load_module_from_file
 
 
 def _module_name() -> str:

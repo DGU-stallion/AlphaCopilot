@@ -13,8 +13,8 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from backtest.loaders.yahoo_client import get_quote_summary
-from src.agent.tools import BaseTool
+from quant.backtest.loaders.yahoo_client import get_quote_summary
+from quant.agent.tools import BaseTool
 
 logger = logging.getLogger(__name__)
 

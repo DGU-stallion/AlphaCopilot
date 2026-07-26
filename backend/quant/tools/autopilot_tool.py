@@ -15,8 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from src.agent.tools import BaseTool
-from src.hypotheses import HypothesisRegistry
+from quant.agent.tools import BaseTool
+from quant.hypotheses import HypothesisRegistry
 
 
 def _ok(payload: dict[str, Any]) -> str:
@@ -141,7 +141,7 @@ class RunResearchAutopilotTool(BaseTool):
                 "Record evidence: link_backtest to hypothesis and add_goal_evidence",
             ]
 
-            from src.goal import GoalStore
+            from quant.goal import GoalStore
 
             store = GoalStore()
 
@@ -222,7 +222,7 @@ def _resolve_source(data_sources: list[str] | None) -> tuple[str, str | None]:
     """
     candidate = (data_sources or ["auto"])[0]
     try:
-        from backtest.loaders.registry import VALID_SOURCES
+        from quant.backtest.loaders.registry import VALID_SOURCES
     except Exception:  # pragma: no cover - registry import is environment-stable
         return candidate, None
     if candidate in VALID_SOURCES:
@@ -471,7 +471,7 @@ class ScaffoldSignalEngineTool(BaseTool):
                     ensure_ascii=False,
                 )
 
-            from src.tools.path_utils import safe_run_dir
+            from quant.tools.path_utils import safe_run_dir
 
             try:
                 run_path = safe_run_dir(run_dir_raw)
@@ -590,7 +590,7 @@ class LinkAutopilotBacktestTool(BaseTool):
                     ensure_ascii=False,
                 )
 
-            from src.tools.path_utils import safe_run_dir
+            from quant.tools.path_utils import safe_run_dir
 
             try:
                 run_path = safe_run_dir(run_dir_raw)

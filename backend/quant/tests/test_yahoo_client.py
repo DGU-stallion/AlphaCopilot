@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 import pytest
 import requests
 
-from backtest.loaders import yahoo_client
+from quant.backtest.loaders import yahoo_client
 
 
 class _FakeResponse:

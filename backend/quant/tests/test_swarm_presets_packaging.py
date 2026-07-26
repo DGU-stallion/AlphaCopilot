@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from src.swarm.presets import PRESETS_DIR, list_presets, load_preset
+from quant.swarm.presets import PRESETS_DIR, list_presets, load_preset
 
 
 # Lock to the canonical roster shipped today. Bump intentionally if a preset
@@ -24,7 +24,7 @@ EXPECTED_PRESET_COUNT = 30
 
 def test_presets_dir_lives_inside_swarm_package() -> None:
     """PRESETS_DIR must be a sibling of presets.py so wheels can find it."""
-    import src.swarm.presets as presets_module
+    import quant.swarm.presets as presets_module
 
     module_dir = Path(presets_module.__file__).resolve().parent
     assert PRESETS_DIR == module_dir / "presets"
@@ -43,7 +43,7 @@ def test_list_presets_returns_full_roster() -> None:
 
 def test_value_investing_committee_is_routable() -> None:
     """value_investing_committee must be in the routing table, not just on disk."""
-    from src.tools.swarm_tool import _PRESET_NAMES, _normalize_preset_name
+    from quant.tools.swarm_tool import _PRESET_NAMES, _normalize_preset_name
 
     assert "value_investing_committee" in _PRESET_NAMES
     assert _normalize_preset_name("value_investing_committee") == "value_investing_committee"
@@ -95,7 +95,7 @@ variables:
 
 @pytest.fixture()
 def user_presets_dir(tmp_path, monkeypatch):
-    import src.swarm.presets as presets_module
+    import quant.swarm.presets as presets_module
 
     user_dir = tmp_path / "user-presets"
     user_dir.mkdir()
@@ -128,7 +128,7 @@ def test_user_preset_overrides_bundled_stem(user_presets_dir) -> None:
 
 
 def test_missing_user_dir_changes_nothing(tmp_path, monkeypatch) -> None:
-    import src.swarm.presets as presets_module
+    import quant.swarm.presets as presets_module
 
     monkeypatch.setattr(presets_module, "USER_PRESETS_DIR", tmp_path / "absent")
     assert load_preset("risk_committee")["agents"]
@@ -150,7 +150,7 @@ def test_missing_preset_error_names_both_locations(user_presets_dir) -> None:
 
 def test_explicit_user_preset_accepted_by_swarm_tool(user_presets_dir) -> None:
     """run_swarm(preset_name=...) reaches user presets; keyword routing does not."""
-    from src.tools.swarm_tool import _match_preset, _normalize_preset_name
+    from quant.tools.swarm_tool import _match_preset, _normalize_preset_name
 
     (user_presets_dir / "my_custom_desk.yaml").write_text(
         _USER_PRESET_YAML, encoding="utf-8"

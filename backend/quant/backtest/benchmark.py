@@ -11,7 +11,7 @@ from typing import Any, Optional
 
 import pandas as pd
 
-from backtest.loaders.yfinance_loader import DataLoader as YfinanceLoader
+from quant.backtest.loaders.yfinance_loader import DataLoader as YfinanceLoader
 
 
 # -------------------------------------------------------------------

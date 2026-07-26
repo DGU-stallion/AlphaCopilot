@@ -16,7 +16,7 @@ import urllib.request
 
 import pytest
 
-from src.trading import tap_forward as tf
+from quant.trading import tap_forward as tf
 
 pytestmark = pytest.mark.unit
 

@@ -16,10 +16,10 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-from src.config.schema import AgentConfig, MCPServerConfig
-from src.swarm.models import SwarmAgentSpec, SwarmTask, WorkerResult, WorkerStatus
-from src.swarm.runtime import SwarmRuntime
-from src.swarm.store import SwarmStore
+from quant.config.schema import AgentConfig, MCPServerConfig
+from quant.swarm.models import SwarmAgentSpec, SwarmTask, WorkerResult, WorkerStatus
+from quant.swarm.runtime import SwarmRuntime
+from quant.swarm.store import SwarmStore
 
 
 def _make_runtime(tmp_path: Path, **kwargs) -> SwarmRuntime:

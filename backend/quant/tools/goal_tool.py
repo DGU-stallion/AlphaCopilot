@@ -7,10 +7,10 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
-from src.agent.tools import BaseTool
-from src.goal import AuditRow, EvidenceInput, GoalStatus, GoalStore, RiskTier, StaleGoalError
-from src.goal.context import default_goal_criteria
-from src.tools.path_utils import safe_run_dir
+from quant.agent.tools import BaseTool
+from quant.goal import AuditRow, EvidenceInput, GoalStatus, GoalStore, RiskTier, StaleGoalError
+from quant.goal.context import default_goal_criteria
+from quant.tools.path_utils import safe_run_dir
 
 
 def _json_error(error: str, *, error_type: str = "validation") -> str:

@@ -16,8 +16,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from backtest.loaders.eastmoney_client import get_json, resolve_secid
-from src.agent.tools import BaseTool
+from quant.backtest.loaders.eastmoney_client import get_json, resolve_secid
+from quant.agent.tools import BaseTool
 
 # Eastmoney datacenter report endpoint + the shareholder-number report id.
 _DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"

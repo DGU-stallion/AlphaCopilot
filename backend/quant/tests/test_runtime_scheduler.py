@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 
-from src.live.runtime.scheduler import (
+from quant.live.runtime.scheduler import (
     DEFAULT_INTERVAL_MS,
     DEFAULT_MAX_RECHECK_MS,
     Job,

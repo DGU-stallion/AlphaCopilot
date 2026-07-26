@@ -7,8 +7,9 @@ import time
 from types import SimpleNamespace
 from typing import Any
 
-from src.agent import loop as loop_mod
-from src.agent.loop import AgentLoop
+from quant.agent.loop import AgentLoop
+
+from conftest import make_test_tuning
 
 
 class _SlowRegistry:
@@ -39,14 +40,14 @@ class _SlowWriteRegistry:
         return '{"status":"ok"}'
 
 
-def test_tool_timeout_returns_error_and_stops_heartbeats(monkeypatch) -> None:
+def test_tool_timeout_returns_error_and_stops_heartbeats() -> None:
     """A hung tool should become a bounded diagnostic instead of heartbeating forever."""
-    monkeypatch.setattr(loop_mod, "TOOL_TIMEOUT_SECONDS", 0.05)
-    monkeypatch.setattr(loop_mod, "HEARTBEAT_INTERVAL_S", 0.01)
+    _tuning = make_test_tuning(heartbeat_interval_s=0.01, tool_timeout_seconds=0.05)
     events: list[tuple[str, dict[str, Any]]] = []
     agent = AgentLoop(
         registry=_SlowRegistry(),  # type: ignore[arg-type]
         llm=SimpleNamespace(),
+        tuning=_tuning,
         event_callback=lambda event_type, data: events.append((event_type, data)),
         max_iterations=1,
     )
@@ -63,15 +64,15 @@ def test_tool_timeout_returns_error_and_stops_heartbeats(monkeypatch) -> None:
     assert len(events) == event_count_at_return
 
 
-def test_write_tool_timeout_warns_but_does_not_return_before_completion(monkeypatch) -> None:
+def test_write_tool_timeout_warns_but_does_not_return_before_completion() -> None:
     """Write tools must not report failure while their side effect continues."""
-    monkeypatch.setattr(loop_mod, "TOOL_TIMEOUT_SECONDS", 0.02)
-    monkeypatch.setattr(loop_mod, "HEARTBEAT_INTERVAL_S", 0.01)
+    _tuning = make_test_tuning(heartbeat_interval_s=0.01, tool_timeout_seconds=0.02)
     events: list[tuple[str, dict[str, Any]]] = []
     registry = _SlowWriteRegistry()
     agent = AgentLoop(
         registry=registry,  # type: ignore[arg-type]
         llm=SimpleNamespace(),
+        tuning=_tuning,
         event_callback=lambda event_type, data: events.append((event_type, data)),
         max_iterations=1,
     )

@@ -19,7 +19,7 @@ import threading
 import time
 from datetime import datetime, timezone, timedelta
 
-import astock
+import research.astock as astock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _OLD_PF_FILE = os.path.join(HERE, ".cache", "portfolio.json")  # ≤v0.1.1 旧位置

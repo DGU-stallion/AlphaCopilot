@@ -88,8 +88,8 @@ def test_remote_tools_appear_in_registry_after_local_tools(tmp_path: Path) -> No
     - Tool names follow the stable mcp_<server>_<tool> convention.
     - Remote tools are positioned after all local tools.
     """
-    from src.config.loader import load_agent_config
-    from src.tools import build_registry
+    from quant.config.loader import load_agent_config
+    from quant.tools import build_registry
 
     cfg_path = _make_agent_json(tmp_path, "fake")
     agent_config = load_agent_config(config_path=cfg_path)
@@ -112,8 +112,8 @@ def test_remote_tools_appear_in_registry_after_local_tools(tmp_path: Path) -> No
 
 def test_remote_tool_is_callable_and_returns_expected_result(tmp_path: Path) -> None:
     """The remote echo tool can be called and returns the correct result."""
-    from src.config.loader import load_agent_config
-    from src.tools import build_registry
+    from quant.config.loader import load_agent_config
+    from quant.tools import build_registry
 
     cfg_path = _make_agent_json(tmp_path, "fake")
     agent_config = load_agent_config(config_path=cfg_path)
@@ -130,8 +130,8 @@ def test_remote_tool_is_callable_and_returns_expected_result(tmp_path: Path) -> 
 
 def test_remote_tool_add_returns_correct_sum(tmp_path: Path) -> None:
     """The remote add tool computes the correct sum."""
-    from src.config.loader import load_agent_config
-    from src.tools import build_registry
+    from quant.config.loader import load_agent_config
+    from quant.tools import build_registry
 
     cfg_path = _make_agent_json(tmp_path, "fake")
     agent_config = load_agent_config(config_path=cfg_path)
@@ -149,8 +149,8 @@ def test_remote_tool_is_serial_only(tmp_path: Path) -> None:
 
     v1 design: MCP tools never enter the parallel readonly path.
     """
-    from src.config.loader import load_agent_config
-    from src.tools import build_registry
+    from quant.config.loader import load_agent_config
+    from quant.tools import build_registry
 
     cfg_path = _make_agent_json(tmp_path, "fake")
     agent_config = load_agent_config(config_path=cfg_path)
@@ -167,8 +167,8 @@ def test_remote_tool_is_serial_only(tmp_path: Path) -> None:
 
 def test_enabled_tools_filter_limits_remote_tools(tmp_path: Path) -> None:
     """enabledTools allowlist restricts which remote tools appear in the registry."""
-    from src.config.loader import load_agent_config
-    from src.tools import build_registry
+    from quant.config.loader import load_agent_config
+    from quant.tools import build_registry
 
     cfg_path = _make_agent_json(tmp_path, "fake", enabledTools=["echo"])
     agent_config = load_agent_config(config_path=cfg_path)
@@ -188,8 +188,8 @@ def test_broken_server_command_does_not_block_local_tools(tmp_path: Path) -> Non
     external MCP server must never prevent the agent from using its built-in
     local toolset.
     """
-    from src.config.loader import load_agent_config
-    from src.tools import build_registry
+    from quant.config.loader import load_agent_config
+    from quant.tools import build_registry
 
     config: dict[str, Any] = {
         "mcpServers": {

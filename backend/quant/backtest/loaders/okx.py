@@ -31,7 +31,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-from backtest.loaders.base import (
+from quant.backtest.loaders.base import (
     cached_loader_fetch,
     check_budget,
     positive_env_float,
@@ -39,7 +39,7 @@ from backtest.loaders.base import (
     retry_with_budget,
     validate_date_range,
 )
-from backtest.loaders.registry import register
+from quant.backtest.loaders.registry import register
 
 BASE_URL = "https://www.okx.com/api/v5"
 CANDLES_PATH = f"{BASE_URL}/market/candles"

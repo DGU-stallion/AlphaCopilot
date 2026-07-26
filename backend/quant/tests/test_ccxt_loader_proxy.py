@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ccxt
 
-from backtest.loaders.ccxt_loader import DataLoader
+from quant.backtest.loaders.ccxt_loader import DataLoader
 
 
 class _FakeExchange:

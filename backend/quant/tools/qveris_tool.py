@@ -15,7 +15,7 @@ from typing import Any
 
 import httpx
 
-from src.agent.tools import BaseTool
+from quant.agent.tools import BaseTool
 
 SIGNUP_URL = "https://qveris.ai/?ref=Vyjjo5G_1cAHJA"
 INVITE_CODE = "Vyjjo5G_1cAHJA"
@@ -72,7 +72,7 @@ def _read_config_file() -> QVerisConfig:
 
 def load_qveris_config() -> QVerisConfig:
     """Load QVeris config with environment overrides applied."""
-    from src.config.accessor import get_env_config
+    from quant.config.accessor import get_env_config
 
     cfg = _read_config_file()
     env_key = get_env_config().data.qveris_api_key

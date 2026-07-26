@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backtest.loaders import eastmoney_client as ec
+from quant.backtest.loaders import eastmoney_client as ec
 
 
 @pytest.fixture(autouse=True)

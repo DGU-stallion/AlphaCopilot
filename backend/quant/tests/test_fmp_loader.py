@@ -9,8 +9,8 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from backtest.loaders import fmp_loader as fl
-from backtest.loaders.fmp_loader import DataLoader, _fmp_symbol, _parse_historical
+from quant.backtest.loaders import fmp_loader as fl
+from quant.backtest.loaders.fmp_loader import DataLoader, _fmp_symbol, _parse_historical
 
 
 def _body(symbol, bars):
@@ -28,7 +28,7 @@ class TestRegistration:
     """Loader self-registers with the expected metadata."""
 
     def test_registered_in_registry(self):
-        from backtest.loaders import registry
+        from quant.backtest.loaders import registry
 
         registry._ensure_registered()
         # Importing the module fired @register regardless of registry bootstrap.

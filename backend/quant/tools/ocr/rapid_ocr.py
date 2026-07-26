@@ -37,6 +37,6 @@ class RapidOcrEngine:
 
 
 # Self-register to built-in engine table
-from src.tools.ocr.engine import register_builtin  # noqa: E402
+from quant.tools.ocr.engine import register_builtin  # noqa: E402
 
 register_builtin("rapid", RapidOcrEngine)

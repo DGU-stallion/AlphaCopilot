@@ -7,14 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from src.hypotheses import HypothesisRegistry
-from src.tools import build_registry
-from src.tools.autopilot_tool import (
+from quant.hypotheses import HypothesisRegistry
+from quant.tools import build_registry
+from quant.tools.autopilot_tool import (
     GenerateBacktestConfigTool,
     RunResearchAutopilotTool,
     _lookup_codes,
 )
-from src.tools.path_utils import safe_run_dir
+from quant.tools.path_utils import safe_run_dir
 
 
 def _seed_hypothesis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, universe: str):
