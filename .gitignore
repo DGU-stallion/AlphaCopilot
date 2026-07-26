@@ -31,3 +31,10 @@ backend/research/.cache/
 .vscode/
 .idea/
 *.swp
+
+# Kiro IDE — session state, spec drafts, personal steering, temp files
+.kiro/
+
+# Temp scripts at repo root
+_commit*.sh
+_stage*.sh
