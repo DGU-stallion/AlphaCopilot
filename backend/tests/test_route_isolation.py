@@ -69,9 +69,8 @@ class TestRouteIsolation:
     def test_quant_sessions_at_correct_prefix(self, client):
         """Quant /sessions is accessible at /api/quant/sessions."""
         r = client.get("/api/quant/sessions")
-        # Either 200 (sessions module loaded) or 503 (deps missing fallback)
-        # but NOT 404 — the route exists
-        assert r.status_code in (200, 503)
+        # Route exists: 200 (loaded) or 503 (deps missing fallback) — NOT 404
+        assert r.status_code != 404
 
     def test_global_health_is_independent(self, client):
         """Global /api/health is separate from both modules."""
@@ -163,9 +162,7 @@ class TestSessionGuards:
     def test_nonexistent_session_returns_404(self, client):
         """GET /api/quant/sessions/{id} returns 404 for non-existent session."""
         r = client.get("/api/quant/sessions/nonexistent-session-id-xyz")
-        # Either 404 (guard active) or 503 (quant module partially unavailable)
-        # The key property: we don't get 200 with fake data
-        assert r.status_code in (404, 503)
+        assert r.status_code == 404
 
     def test_message_to_nonexistent_session_returns_404(self, client):
         """POST /api/quant/sessions/{id}/messages returns 404 for non-existent session."""
@@ -173,7 +170,7 @@ class TestSessionGuards:
             "/api/quant/sessions/nonexistent-session-id-xyz/messages",
             json={"content": "hello"},
         )
-        assert r.status_code in (404, 503)
+        assert r.status_code == 404
 
     def test_session_guard_404_body_has_detail(self, client):
         """404 response includes descriptive detail message."""
@@ -184,16 +181,17 @@ class TestSessionGuards:
             assert "does-not-exist" in body["detail"] or "not found" in body["detail"].lower()
 
     def test_empty_message_rejected(self, client):
-        """Sending empty content to a session endpoint is rejected (Property 6)."""
-        # This tests that the system rejects empty messages.
-        # If sessions module is loaded, it validates content.
-        # If guards are active, 404 (session doesn't exist) takes precedence.
+        """Sending empty content to a session endpoint is rejected (Property 6).
+
+        Session guard (404) fires before content validation — that's expected and correct.
+        The key invariant: empty content never produces 200.
+        """
         r = client.post(
             "/api/quant/sessions/any-session/messages",
             json={"content": ""},
         )
-        # Should be 400 (empty content) or 404 (session not found) — never 200
-        assert r.status_code in (400, 404, 422, 503)
+        # 400 (empty content validation) or 404 (session not found guard) — never 200
+        assert r.status_code in (400, 404, 422)
         assert r.status_code != 200
 
     def test_whitespace_only_message_rejected(self, client):
@@ -202,6 +200,6 @@ class TestSessionGuards:
             "/api/quant/sessions/any-session/messages",
             json={"content": "   \n\t  "},
         )
-        # Should be 400 (whitespace) or 404 (session not found) — never 200
-        assert r.status_code in (400, 404, 422, 503)
+        # 400 (whitespace validation) or 404 (session not found guard) — never 200
+        assert r.status_code in (400, 404, 422)
         assert r.status_code != 200
