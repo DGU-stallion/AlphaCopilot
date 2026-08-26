@@ -4,10 +4,16 @@ Registers the chart/plot session event family and a keyed ECharts renderer
 for the dsh web chat UI.
 */
 import type { Context } from '@deepseek-ai/cordis'
+import { chartPlotDefinition } from './definition'
 
 export const inject = ['slots', 'conversationEvents'] as const
 
-export function apply(_ctx: Context): void {
-  // Host half: no-op in this skeleton. Actual chart rendering lives in the
-  // client half (see cordis.patch.yml + separate client build).
+export function apply(ctx: Context): void {
+  ctx.conversationEvents.register(chartPlotDefinition)
+  ctx.slots.inject('conversation.chat.node', () =>
+    ctx.slots.register(
+      { name: 'conversation.chat.node', key: 'chart.plot' },
+      (_props: unknown) => null,
+    ),
+  )
 }
