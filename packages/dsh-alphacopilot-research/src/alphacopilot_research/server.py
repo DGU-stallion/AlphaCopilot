@@ -15,9 +15,9 @@ _BACKEND = Path(__file__).resolve().parents[4] / "backend"
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
-from mcp.server.fastmcp import FastMCP  # noqa: E402
+from mcp.server.fastmcp import FastMCP
 
-from alphacopilot_research.tools import quote  # noqa: E402
+from alphacopilot_research.tools import quote
 
 mcp = FastMCP("alphacopilot-research")
 
