@@ -13,7 +13,7 @@ if str(_BACKEND) not in sys.path:
 
 from mcp.server.fastmcp import FastMCP
 
-from alphacopilot_research.tools import flows, fundamental, quote
+from alphacopilot_research.tools import events, fundamental, flows, quote
 
 mcp = FastMCP("alphacopilot-research")
 
@@ -32,6 +32,11 @@ mcp.tool()(flows.get_dragon_tiger)
 mcp.tool()(flows.get_block_trade)
 mcp.tool()(flows.get_holder_changes)
 mcp.tool()(flows.get_dividend_history)
+
+# 资讯/事件（2）
+mcp.tool()(events.get_news)
+mcp.tool()(events.get_announcements)
+mcp.tool()(events.get_radar)
 
 
 def main() -> None:
