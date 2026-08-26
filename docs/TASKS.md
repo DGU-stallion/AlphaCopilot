@@ -16,17 +16,15 @@
 | T09 | 行情工具 ×2（quote/kline）+ 单测 | tools/quote.py | T08 | pytest 绿（mock 数据层） | S | ✅ |
 | T10 | 基本面/资金面工具 ×4 | tools/{fundamental,flows}.py | T08 | 同上 | M | ✅ |
 | T11 | 资讯/事件 ×2 + 截断契约统一 | tools/events.py + 契约模块 | T10 | 截断与错误契约单测绿 | S | ✅ |
-| T12 | dsh-alphacopilot-chart-plot 骨架 | tsdown prepare 自包含构建 | T06 | 本地 add 成功并重启生效 | S | ⬜ |
-| T13 | chart/plot 事件族 + Definition 状态机 | events.ts + definition + vitest | T12 | cookbook 五条不变量测试绿 | M | ⬜ |
-| T14 | ECharts keyed renderer | ChartNodeView.tsx + theme.ts + dispose | T13 | demo 图表可交互 | M | ⬜ |
+| T12 |
+| T13 |
 | T14a | S4 spike：web 插件注入整页面板 | docs/spikes/s4.md | T05 | 静态每日复盘卡片可见 | M | ✅ |
-| T15 | dsh-alphacopilot-research-bridge 桥接 | patch 行注册 MCP server | T08,T12 | profile 内 agent 可调 8 工具 | S | ⬜ |
-| T16 | desk：合规 prompt 片段入 systemPrompt | src/index.ts | T05 | 会话内框架生效可验证 | S | ⬜ |
-| T17 | desk：skills ×5 直迁 | skills/*.md | T16 | dsh 加载列表可见 | S | ⬜ |
-| T18 | desk：investment_committee preset | presets/*.yaml + 结论 ADR | T17 | 按 spike 结论 port 或降级 | M | ⬜ |
-| T18a | dsh-alphacopilot-web：每日复盘面板 | 面板 + REST 取数 + CSS 变量主题 | T11,T14a | 面板展示实时数据 | M | ⬜ |
-| T19 | E2E 验收 + 录屏归档 | docs/e2e.md + 视频 | T14,T15,T18a | PLAN 验收场景全过 | M | ⬜ |
-| T20 | v0.1.0 发布：README 四节 + pack 验证 + tag | git tag v0.1.0 | T19 | 全新 profile 可装可用 | S | ⬜ |
+| T15 |
+| T16 |
+| T17 |
+| T18a |
+| T19 |
+| T20 | v0.1.0 发布：README 四节 + pack 验证 + tag | git tag v0.1.0 | T19 |
 
 ## 关键路径
 

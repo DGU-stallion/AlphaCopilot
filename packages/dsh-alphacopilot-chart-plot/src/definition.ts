@@ -1,11 +1,18 @@
-import type { ConversationNodeDefinition, ConversationMatch } from '@deepseek-ai/dsh-client-runtime/client'
+import type {
+  ConversationMatch,
+  ConversationNodeDefinition,
+} from '@deepseek-ai/dsh-client-runtime/client'
 import type { ChartPlotData } from './events'
 
 export const chartPlotDefinition: ConversationNodeDefinition<ChartPlotData> = {
   kind: 'chart.plot',
   target: 'chat',
   match(event: { type: string; data?: unknown }): ConversationMatch | null {
-    if (event.type === 'chart/plot' && event.data && typeof (event.data as ChartPlotData).chartId === 'string') {
+    if (
+      event.type === 'chart/plot' &&
+      event.data &&
+      typeof (event.data as ChartPlotData).chartId === 'string'
+    ) {
       return { id: String((event.data as ChartPlotData).chartId), role: 'start' }
     }
     return null
