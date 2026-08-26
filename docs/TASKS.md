@@ -16,13 +16,14 @@
 | T09 | 行情工具 ×2（quote/kline）+ 单测 | tools/quote.py | T08 | pytest 绿（mock 数据层） | S | ✅ |
 | T10 | 基本面/资金面工具 ×4 | tools/{fundamental,flows}.py | T08 | 同上 | M | ✅ |
 | T11 | 资讯/事件 ×2 + 截断契约统一 | tools/events.py + 契约模块 | T10 | 截断与错误契约单测绿 | S | ✅ |
-| T12 |
-| T13 |
+| T12 | chart-plot 骨架（events/definition） | src/events.ts + definition.ts | T05 | 事件族+状态机单测绿 | S | ✅ |
+| T13 | chart-plot Definition 状态机 | src/definition.ts + tests | T12 | 5 不变量单测绿 | S | ✅ |
+| T14 | chart-plot ECharts 渲染 | ChartNodeView.tsx + renderer.ts | T13 | keyed renderer 可见 | S | ✅ |
 | T14a | S4 spike：web 插件注入整页面板 | docs/spikes/s4.md | T05 | 静态每日复盘卡片可见 | M | ✅ |
-| T15 |
+| T15 | research-bridge bundle | cordis.patch.yml MCP stdio | T11 | dump-config 见 mcp 行 | S | ✅ |
 | T16 | desk 合规 prompt 注册 | src/index.ts `ctx.systemPrompt.section` | T15 | compliance section order=110 可见 | S | ✅ |
 | T17 | skills 迁移 + preset stub | skills/*.md ×5 + presets/*.yaml | T16 | 5 skills + stub preset 到位 | S | ✅ |
-| T18a |
+| T18a | 每日复盘一级页面（侧边栏平行） | dsh-alphacopilot-web sidebar+DailyReviewPage | T05 | 侧边栏 nav 切 chat/每日复盘，4 段 mock 卡片可见 | M | ✅ |
 | T19 |
 | T20 | v0.1.0 发布：README 四节 + pack 验证 + tag | git tag v0.1.0 | T19 |
 

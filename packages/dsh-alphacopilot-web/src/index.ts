@@ -1,1 +1,2 @@
-export const PLUGIN_NAME = 'dsh-alphacopilot-web'
+export const name = 'dsh-alphacopilot-web'
+export function apply(): void {}
