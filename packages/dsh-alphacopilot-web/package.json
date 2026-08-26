@@ -1,0 +1,9 @@
+{
+  "name": "dsh-alphacopilot-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AlphaCopilot web surfaces — Daily Review panel injected into the dsh web UI, plus shared theme tokens",
+  "main": "src/index.ts",
+  "files": ["src/", "cordis.patch.yml"]
+}

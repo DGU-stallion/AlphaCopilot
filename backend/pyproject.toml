@@ -1,0 +1,28 @@
+[project]
+name = "alphacopilot-research"
+version = "0.1.0"
+description = "AlphaCopilot research data layer — 65 pure data functions (A-share/global/news/portfolio), consumed by the dsh-alphacopilot-research MCP server."
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+# Heavy optional sources; absent deps degrade gracefully at call time.
+full = [
+    "akshare>=1.10",
+    "mootdx>=0.10",
+    "pandas>=2.0",
+]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "pyright>=1.1",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["research"]

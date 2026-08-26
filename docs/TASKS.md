@@ -1,0 +1,42 @@
+# 任务清单（TASKS）
+
+> 依据 `docs/PLAN.md`。每任务一分支一 PR：`feat/T<nn>-<slug>`，squash merge。
+> 规模：S ≤半天，M 1–2 天。
+
+| ID | 任务 | 产出 | 依赖 | DoD | 规模 | 状态 |
+|----|------|------|------|-----|------|------|
+| T01 | 分支手术：归档旧线、orphan 新 main、默认分支切换 | 本仓库新 main | - | 远端见 archive/pre-dsh + 新 main | M | ✅ |
+| T02 | backend 裁剪：仅保留 research 数据层库代码 | 瘦身 backend/ | T01 | research 模块可 import；无 FastAPI 胶水 | S | ✅ |
+| T03 | 归档 frontend/（新 main 不含） | - | T01 | 新 main 无 frontend 目录 | S | ✅ |
+| T04 | monorepo 脚手架：pnpm workspace + CI 双管线（TS/Python） | CI 配置 + 5 包骨架 | T02 | 空 build 过 CI | S | ⬜ |
+| T05 | S1 spike：bundle 安装流程验证 | docs/spikes/s1.md | T04 | dump-config 见 hello bundle | S | ⬜ |
+| T06 | S2 spike：自定义图表节点渲染 | docs/spikes/s2.md + demo | T05 | mock 折线出现在聊天流 | M | ⬜ |
+| T07 | S3 spike：MCP server 接入（transport 定论） | docs/spikes/s3.md | T05 | agent 调通 get_quote | M | ⬜ |
+| T08 | dsh-alphacopilot-research 包骨架 | server.py + tools/ 空壳 + pytest 骨架 | T07 | python -m 启动、工具清单可见 | S | ⬜ |
+| T09 | 行情工具 ×2（quote/kline）+ 单测 | tools/quote.py | T08 | pytest 绿（mock 数据层） | S | ⬜ |
+| T10 | 基本面/资金面工具 ×4 | tools/{fundamental,flows}.py | T08 | 同上 | M | ⬜ |
+| T11 | 资讯/事件 ×2 + 截断契约统一 | tools/events.py + 契约模块 | T10 | 截断与错误契约单测绿 | S | ⬜ |
+| T12 | dsh-alphacopilot-chart-plot 骨架 | tsdown prepare 自包含构建 | T06 | 本地 add 成功并重启生效 | S | ⬜ |
+| T13 | chart/plot 事件族 + Definition 状态机 | events.ts + definition + vitest | T12 | cookbook 五条不变量测试绿 | M | ⬜ |
+| T14 | ECharts keyed renderer | ChartNodeView.tsx + theme.ts + dispose | T13 | demo 图表可交互 | M | ⬜ |
+| T14a | S4 spike：web 插件注入整页面板 | docs/spikes/s4.md | T05 | 静态每日复盘卡片可见 | M | ⬜ |
+| T15 | dsh-alphacopilot-research-bridge 桥接 | patch 行注册 MCP server | T08,T12 | profile 内 agent 可调 8 工具 | S | ⬜ |
+| T16 | desk：合规 prompt 片段入 systemPrompt | src/index.ts | T05 | 会话内框架生效可验证 | S | ⬜ |
+| T17 | desk：skills ×5 直迁 | skills/*.md | T16 | dsh 加载列表可见 | S | ⬜ |
+| T18 | desk：investment_committee preset | presets/*.yaml + 结论 ADR | T17 | 按 spike 结论 port 或降级 | M | ⬜ |
+| T18a | dsh-alphacopilot-web：每日复盘面板 | 面板 + REST 取数 + CSS 变量主题 | T11,T14a | 面板展示实时数据 | M | ⬜ |
+| T19 | E2E 验收 + 录屏归档 | docs/e2e.md + 视频 | T14,T15,T18a | PLAN 验收场景全过 | M | ⬜ |
+| T20 | v0.1.0 发布：README 四节 + pack 验证 + tag | git tag v0.1.0 | T19 | 全新 profile 可装可用 | S | ⬜ |
+
+## 关键路径
+
+```
+T01 → {T02,T03} → T04 → T05 → {T06,T07,T14a}
+  → {T08→T09→T10→T11 ‖ T12→T13→T14} → T15 → {T16→T17→T18, T18a} → T19 → T20
+```
+
+## 工作流约定
+
+每个任务：开分支 → 红-绿-重构 → lint+test 全绿 → squash PR
+（`feat(T09): kline tool wrapper`）→ 删分支。spike 类任务允许无测试，
+但必须产出结论文档（含截图/命令输出）。

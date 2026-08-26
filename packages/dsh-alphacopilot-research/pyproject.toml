@@ -1,0 +1,18 @@
+[project]
+name = "dsh-alphacopilot-research"
+version = "0.1.0"
+description = "AlphaCopilot research data as MCP tools + REST (stdio server registered by dsh-alphacopilot-research-bridge)"
+requires-python = ">=3.11"
+dependencies = [
+    # MCP SDK —— T08 落地时锁定版本（FastMCP 或 mcp 官方包）
+    # 对本地数据层的引用 —— T08 落地时二选一：
+    #   开发期: pip install -e ../../backend
+    #   发布期: alphacopilot-research @ git+https://github.com/DGU-stallion/AlphaCopilot@archive-v0.3
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6", "pyright>=1.1"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

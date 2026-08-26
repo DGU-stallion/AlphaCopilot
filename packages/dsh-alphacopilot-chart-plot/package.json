@@ -1,0 +1,12 @@
+{
+  "name": "dsh-alphacopilot-chart-plot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AlphaCopilot interactive charts in dsh chat flow — chart/plot session event family + ECharts keyed renderer (ConversationNodeDefinition)",
+  "main": "src/index.ts",
+  "files": ["src/", "cordis.patch.yml"],
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm --out-dir lib"
+  }
+}

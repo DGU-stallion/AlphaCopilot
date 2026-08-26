@@ -1,0 +1,30 @@
+# ── Node / TS（packages/*）─────────────────────────────
+node_modules/
+dist/
+lib/
+*.tsbuildinfo
+
+# ── Python（backend / dsh-alphacopilot-research）───────
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+
+# ── 运行时数据 ─────────────────────────────────────────
+.cache/
+sessions/
+
+# ── 环境与密钥 ─────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── 编辑器 / 系统 ──────────────────────────────────────
+.DS_Store
+.vscode/
+.idea/
+.kiro/

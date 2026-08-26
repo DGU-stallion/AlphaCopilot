@@ -1,0 +1,12 @@
+{
+  "name": "dsh-alphacopilot-desk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AlphaCopilot analyst desk config — compliance prompt fragments, domain skills, swarm agent presets for dsh",
+  "main": "src/index.ts",
+  "files": ["src/", "skills/", "presets/", "cordis.patch.yml"],
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm --out-dir lib"
+  }
+}

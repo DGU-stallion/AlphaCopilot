@@ -1,0 +1,9 @@
+{
+  "name": "dsh-alphacopilot-research-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Registers the dsh-alphacopilot-research MCP server as a trusted command row for dsh",
+  "main": "src/index.ts",
+  "files": ["src/", "cordis.patch.yml"]
+}

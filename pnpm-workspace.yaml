@@ -1,0 +1,8 @@
+packages:
+  - "packages/dsh-alphacopilot-chart-plot"
+  - "packages/dsh-alphacopilot-desk"
+  - "packages/dsh-alphacopilot-research-bridge"
+  - "packages/dsh-alphacopilot-web"
+
+# Python 服务（dsh-alphacopilot-research）不是 pnpm 成员：
+# 它是 MCP server，由 research-bridge 以受信任子进程方式注册。
