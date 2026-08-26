@@ -5,8 +5,15 @@
   "type": "module",
   "description": "AlphaCopilot interactive charts in dsh chat flow — chart/plot session event family + ECharts keyed renderer (ConversationNodeDefinition)",
   "main": "src/index.ts",
-  "files": ["src/", "cordis.patch.yml"],
+  "files": [
+    "src/",
+    "cordis.patch.yml"
+  ],
   "scripts": {
     "build": "tsdown src/index.ts --format esm --out-dir lib"
+  },
+  "devDependencies": {
+    "tsdown": "^0.22.14",
+    "typescript": "^7.0.2"
   }
 }

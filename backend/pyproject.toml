@@ -5,6 +5,7 @@ description = "AlphaCopilot research data layer — 65 pure data functions (A-sh
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.31",
+    "pydantic>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -26,3 +27,21 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["research"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["research/caches.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# 遗留库代码冻结区：中文注释/文档串超长行不重排；astock 闭包捕获模式维持原样。
+"research/**" = ["E501"]
+"research/astock.py" = ["E501", "B023"]
+
+[tool.pyright]
+include = ["research"]
+exclude = ["research/caches.py"]
+typeCheckingMode = "basic"

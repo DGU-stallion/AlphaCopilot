@@ -1,0 +1,15 @@
+{
+  "name": "alphacopilot-dsh-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AlphaCopilot as DeepSeek Harness plugins — workspace root",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r --if-present test",
+    "lint": "biome check .",
+    "format": "biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0"
+  }
+}

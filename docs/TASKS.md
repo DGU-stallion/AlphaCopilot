@@ -8,7 +8,7 @@
 | T01 | 分支手术：归档旧线、orphan 新 main、默认分支切换 | 本仓库新 main | - | 远端见 archive/pre-dsh + 新 main | M | ✅ |
 | T02 | backend 裁剪：仅保留 research 数据层库代码 | 瘦身 backend/ | T01 | research 模块可 import；无 FastAPI 胶水 | S | ✅ |
 | T03 | 归档 frontend/（新 main 不含） | - | T01 | 新 main 无 frontend 目录 | S | ✅ |
-| T04 | monorepo 脚手架：pnpm workspace + CI 双管线（TS/Python） | CI 配置 + 5 包骨架 | T02 | 空 build 过 CI | S | ⬜ |
+| T04 | monorepo 脚手架：pnpm workspace + CI 双管线（TS/Python） | CI 配置 + 5 包骨架 | T02 | 空 build 过 CI | S | ✅ |
 | T05 | S1 spike：bundle 安装流程验证 | docs/spikes/s1.md | T04 | dump-config 见 hello bundle | S | ⬜ |
 | T06 | S2 spike：自定义图表节点渲染 | docs/spikes/s2.md + demo | T05 | mock 折线出现在聊天流 | M | ⬜ |
 | T07 | S3 spike：MCP server 接入（transport 定论） | docs/spikes/s3.md | T05 | agent 调通 get_quote | M | ⬜ |

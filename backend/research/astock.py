@@ -1,3 +1,4 @@
+# pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportOptionalIterable=false, reportOptionalMemberAccess=false
 """A股全栈数据层 —— 移植自 a-stock-data 工具包（五层数据源，自包含）。
 
 分级依赖：
@@ -14,11 +15,9 @@ from __future__ import annotations
 import math
 import os
 import random
-import re
 import time
 import urllib.request
 from datetime import datetime, timedelta
-from pathlib import Path
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
 

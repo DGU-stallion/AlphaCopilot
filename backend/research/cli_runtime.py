@@ -1,3 +1,4 @@
+# pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportOptionalIterable=false, reportOptionalMemberAccess=false
 """订阅接入：调本机已装、已登录的 AI CLI（Claude Code / Qwen / DeepSeek / Codex），
 用用户自己的订阅额度作答、免 API key。移植自 SDesign-opensource 的 cli-runtime（Node），
 改为 Python subprocess + 一次性（非流式）取纯文本。
