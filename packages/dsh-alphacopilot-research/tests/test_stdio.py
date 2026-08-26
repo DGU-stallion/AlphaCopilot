@@ -18,17 +18,21 @@ SERVER = StdioServerParameters(
 
 
 async def _list_tools():
-    async with stdio_client(SERVER) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            return await session.list_tools()
+    async with (
+        stdio_client(SERVER) as (read, write),
+        ClientSession(read, write) as session,
+    ):
+        await session.initialize()
+        return await session.list_tools()
 
 
 async def _call_quote():
-    async with stdio_client(SERVER) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            return await session.call_tool("get_quote", {"codes": ["600519"]})
+    async with (
+        stdio_client(SERVER) as (read, write),
+        ClientSession(read, write) as session,
+    ):
+        await session.initialize()
+        return await session.call_tool("get_quote", {"codes": ["600519"]})
 
 
 @pytest.mark.asyncio
