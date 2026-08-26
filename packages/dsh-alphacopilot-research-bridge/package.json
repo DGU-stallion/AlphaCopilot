@@ -3,17 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Registers the dsh-alphacopilot-research MCP server as a trusted command row for dsh",
-  "main": "src/index.ts",
-  "files": [
-    "src/",
-    "cordis.patch.yml"
-  ],
+  "description": "Registers the dsh-alphacopilot-research MCP server as a trusted subprocess",
+  "main": "lib/index.js",
+  "files": ["lib/", "cordis.patch.yml"],
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm --out-dir lib"
+  },
   "devDependencies": {
     "tsdown": "^0.22.14",
     "typescript": "^7.0.2"
-  },
-  "scripts": {
-    "build": "tsdown src/index.ts --format esm --out-dir lib"
   }
 }
