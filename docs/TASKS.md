@@ -10,7 +10,7 @@
 | T03 | 归档 frontend/（新 main 不含） | - | T01 | 新 main 无 frontend 目录 | S | ✅ |
 | T04 | monorepo 脚手架：pnpm workspace + CI 双管线（TS/Python） | CI 配置 + 5 包骨架 | T02 | 空 build 过 CI | S | ✅ |
 | T05 | S1 spike：bundle 安装流程验证 | docs/spikes/s1.md | T04 | dump-config 见 hello bundle | S | ✅ |
-| T06 | S2 spike：自定义图表节点渲染 | docs/spikes/s2.md + demo | T05 | mock 折线出现在聊天流 | M | ⬜ |
+| T06 | S2 spike：自定义图表节点渲染 | docs/spikes/s2.md + demo | T05 | mock 折线出现在聊天流 | M | ✅ |
 | T07 | S3 spike：MCP server 接入（transport 定论） | docs/spikes/s3.md | T05 | agent 调通 get_quote | M | ✅ d73e3d0（stdio 定论；mootdx 冲突遗留见 s3.md） |
 | T08 | dsh-alphacopilot-research 包骨架 | server.py + tools/ 空壳 + pytest 骨架 | T07 | python -m 启动、工具清单可见 | S | ⬜ |
 | T09 | 行情工具 ×2（quote/kline）+ 单测 | tools/quote.py | T08 | pytest 绿（mock 数据层） | S | ⬜ |
@@ -19,7 +19,7 @@
 | T12 | dsh-alphacopilot-chart-plot 骨架 | tsdown prepare 自包含构建 | T06 | 本地 add 成功并重启生效 | S | ⬜ |
 | T13 | chart/plot 事件族 + Definition 状态机 | events.ts + definition + vitest | T12 | cookbook 五条不变量测试绿 | M | ⬜ |
 | T14 | ECharts keyed renderer | ChartNodeView.tsx + theme.ts + dispose | T13 | demo 图表可交互 | M | ⬜ |
-| T14a | S4 spike：web 插件注入整页面板 | docs/spikes/s4.md | T05 | 静态每日复盘卡片可见 | M | ⬜ |
+| T14a | S4 spike：web 插件注入整页面板 | docs/spikes/s4.md | T05 | 静态每日复盘卡片可见 | M | ✅ |
 | T15 | dsh-alphacopilot-research-bridge 桥接 | patch 行注册 MCP server | T08,T12 | profile 内 agent 可调 8 工具 | S | ⬜ |
 | T16 | desk：合规 prompt 片段入 systemPrompt | src/index.ts | T05 | 会话内框架生效可验证 | S | ⬜ |
 | T17 | desk：skills ×5 直迁 | skills/*.md | T16 | dsh 加载列表可见 | S | ⬜ |
