@@ -6,6 +6,34 @@ build-backend = "setuptools.build_meta"
 name = "alphacopilot-backend"
 version = "0.2.0"
 requires-python = ">=3.11"
+dependencies = [
+    # Web framework & server
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    # Data validation (Pydantic v2, required by quant config layer)
+    "pydantic>=2.0",
+    # HTTP clients
+    "requests>=2.31",
+    "httpx>=0.24",          # FastAPI TestClient + async requests
+
+    # ── Research data sources (轻量，秒装) ────────────────────────────────
+    # Heavy optional sources (akshare, mootdx, pandas) are NOT listed here.
+    # When absent, endpoints gracefully return 501 + install hint.
+    # Install manually: pip install akshare mootdx pandas
+]
+
+[project.optional-dependencies]
+# Full data stack — enables all research endpoints
+research-full = [
+    "akshare>=1.10",
+    "mootdx>=0.10",
+    "pandas>=2.0",
+]
+# Development & testing
+dev = [
+    "pytest>=7",
+    "pytest-asyncio>=0.23",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -28,7 +28,11 @@ AlphaCopilot/
 
 ```bash
 # 后端（:8900）
-cd backend && python3 -m venv .venv && .venv/bin/pip install -r research/requirements.txt
+cd backend
+python3 -m venv .venv
+.venv/bin/pip install -e .                        # 安装核心依赖
+# 可选：完整数据源（akshare / mootdx / pandas）
+# .venv/bin/pip install -e ".[research-full]"
 .venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8900
 
 # 前端（:5899）

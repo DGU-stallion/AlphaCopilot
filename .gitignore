@@ -38,3 +38,6 @@ backend/research/.cache/
 # Temp scripts at repo root
 _commit*.sh
 _stage*.sh
+
+# runtime agent sessions
+backend/quant/sessions/
