@@ -1,0 +1,28 @@
+name: ci-ts
+
+on:
+  push:
+    branches: [main]
+    paths: ["packages/**", "package.json", "pnpm-lock.yaml", "biome.json", ".github/workflows/ci-ts.yml"]
+  pull_request:
+    paths: ["packages/**", "package.json", "pnpm-lock.yaml", "biome.json", ".github/workflows/ci-ts.yml"]
+
+jobs:
+  lint-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile=false
+      - name: Lint (biome)
+        run: pnpm exec biome check packages
+      - name: Build all bundles
+        run: pnpm -r build
+      - name: Test
+        run: pnpm -r --if-present test

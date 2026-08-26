@@ -15,7 +15,7 @@ import re
 import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -49,7 +49,7 @@ def _parse_dt(s: str):
     if dt is None:
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt
 
 
@@ -103,7 +103,7 @@ def fetch_radar() -> dict:
     cfg = json.load(open(SOURCES_FILE, encoding="utf-8"))
     days = cfg.get("fetch", {}).get("recent_days", 7)
     per = cfg.get("fetch", {}).get("per_source", 6)
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
     redline = [k.lower() for k in cfg.get("redline_keywords", [])]
 
     byhint: dict[str, list] = {}
