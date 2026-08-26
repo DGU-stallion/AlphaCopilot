@@ -1,0 +1,4 @@
+# S1 spike fixture — minimal bundle patch: top-level array, one insert row.
+- insert:
+    - id: acp-hello
+      name: acp-hello-plugin
