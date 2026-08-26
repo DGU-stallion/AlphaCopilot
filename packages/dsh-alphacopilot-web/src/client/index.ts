@@ -20,19 +20,12 @@ export function apply(ctx: ClientContext): void {
   }, 'acp theme vars')
 
   // Sidebar replacement — shadow original at lower priority (lowest renders)
+  // Do not re-declare children (already declared by original sidebar, would collide)
   ctx.slots.inject('sidebar', () => {
     return ctx.slots.register(
       {
         name: 'sidebar',
         priority: -10,
-        // Re-declare children so other plugins' injections still land
-        children: {
-          'sidebar.brand.mark': { kind: 'single', scope: 'root' as const },
-          'sidebar.brand.name': { kind: 'single', scope: 'root' as const },
-          'sidebar.workspaces': { kind: 'single', scope: 'root' as const },
-          'sidebar.settings': { kind: 'single', scope: 'root' as const },
-          'sidebar.footer.action': { kind: 'list', scope: 'root' as const },
-        },
         inject: () => ({
           startSession: () => (ctx as any).workspaces?.startSession?.(),
           toggleSidebar: () => (ctx as any).layout?.toggleSidebar?.(),
