@@ -1,4 +1,4 @@
-# pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportOptionalIterable=false, reportOptionalMemberAccess=false
+# pyright: reportMissingImports=false, reportArgumentType=false, reportAttributeAccessIssue=false, reportOptionalIterable=false, reportOptionalMemberAccess=false
 """市场总览数据层 —— 市场情绪 + 板块资金流（板块/大盘级公开数据，不涉个股推荐）。
 
 省流量：全站共享一份缓存（TTL 默认 5 分钟），多个用户/多次打开只抓一次；
