@@ -1,0 +1,4 @@
+# Registers the chart-plot bundle into the dsh plugin tree.
+- insert:
+    - id: alphacopilot-chart-plot
+      name: dsh-alphacopilot-chart-plot
