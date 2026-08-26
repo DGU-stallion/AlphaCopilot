@@ -6,6 +6,8 @@ import { CustomSidebar, createPageStore } from './Sidebar.tsx'
 export const inject = ['slots', 'layout', 'sessions', 'workspaces', 'locale'] as const
 
 export function apply(ctx: ClientContext): void {
+  // eslint-disable-next-line no-console
+  console.log('[acp-web] apply: registering sidebar + overlay')
   const store = createPageStore('chat')
 
   // Inject global theme vars once

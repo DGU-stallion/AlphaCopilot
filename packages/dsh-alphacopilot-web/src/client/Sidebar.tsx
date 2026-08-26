@@ -88,6 +88,8 @@ export function CustomSidebar({
         width: wide ? (collapsed ? lastWideWidth.current : width) : undefined,
       }}
     >
+      {/* DEBUG banner — proves custom sidebar rendered */}
+      <div style={{ background: '#f97316', color: '#fff', fontSize: 10, textAlign: 'center', padding: '2px 0', flexShrink: 0 }}>ACP WEB ✓</div>
       {/* Logo row */}
       <div
         style={{

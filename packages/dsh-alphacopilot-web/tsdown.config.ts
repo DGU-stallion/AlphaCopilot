@@ -19,7 +19,7 @@ export default defineConfig([
     target: 'es2024',
     dts: false,
     clean: false,
-    external: ['react', 'react/jsx-runtime', /^@deepseek-ai\/.*/],
+    external: [/^@deepseek-ai\/.*/],
     outputOptions: {
       entryFileNames: 'client.js',
       banner: `window.__ModuleLoader__.load({ id: "dsh-alphacopilot-web", factory: (require) => {`,
