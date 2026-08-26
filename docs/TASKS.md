@@ -14,8 +14,8 @@
 | T07 | S3 spike：MCP server 接入（transport 定论） | docs/spikes/s3.md | T05 | agent 调通 get_quote | M | ✅ d73e3d0（stdio 定论；mootdx 冲突遗留见 s3.md） |
 | T08 | dsh-alphacopilot-research 包骨架 | server.py + tools/ 空壳 + pytest 骨架 | T07 | python -m 启动、工具清单可见 | S | ✅ |
 | T09 | 行情工具 ×2（quote/kline）+ 单测 | tools/quote.py | T08 | pytest 绿（mock 数据层） | S | ✅ |
-| T10 | 基本面/资金面工具 ×4 | tools/{fundamental,flows}.py | T08 | 同上 | M | ⬜ |
-| T11 | 资讯/事件 ×2 + 截断契约统一 | tools/events.py + 契约模块 | T10 | 截断与错误契约单测绿 | S | ⬜ |
+| T10 | 基本面/资金面工具 ×4 | tools/{fundamental,flows}.py | T08 | 同上 | M | ✅ |
+| T11 | 资讯/事件 ×2 + 截断契约统一 | tools/events.py + 契约模块 | T10 | 截断与错误契约单测绿 | S | ✅ |
 | T12 | dsh-alphacopilot-chart-plot 骨架 | tsdown prepare 自包含构建 | T06 | 本地 add 成功并重启生效 | S | ⬜ |
 | T13 | chart/plot 事件族 + Definition 状态机 | events.ts + definition + vitest | T12 | cookbook 五条不变量测试绿 | M | ⬜ |
 | T14 | ECharts keyed renderer | ChartNodeView.tsx + theme.ts + dispose | T13 | demo 图表可交互 | M | ⬜ |
