@@ -9,7 +9,7 @@
 | T02 | backend 裁剪：仅保留 research 数据层库代码 | 瘦身 backend/ | T01 | research 模块可 import；无 FastAPI 胶水 | S | ✅ |
 | T03 | 归档 frontend/（新 main 不含） | - | T01 | 新 main 无 frontend 目录 | S | ✅ |
 | T04 | monorepo 脚手架：pnpm workspace + CI 双管线（TS/Python） | CI 配置 + 5 包骨架 | T02 | 空 build 过 CI | S | ✅ |
-| T05 | S1 spike：bundle 安装流程验证 | docs/spikes/s1.md | T04 | dump-config 见 hello bundle | S | ⬜ |
+| T05 | S1 spike：bundle 安装流程验证 | docs/spikes/s1.md | T04 | dump-config 见 hello bundle | S | ✅ |
 | T06 | S2 spike：自定义图表节点渲染 | docs/spikes/s2.md + demo | T05 | mock 折线出现在聊天流 | M | ⬜ |
 | T07 | S3 spike：MCP server 接入（transport 定论） | docs/spikes/s3.md | T05 | agent 调通 get_quote | M | ⬜ |
 | T08 | dsh-alphacopilot-research 包骨架 | server.py + tools/ 空壳 + pytest 骨架 | T07 | python -m 启动、工具清单可见 | S | ⬜ |
