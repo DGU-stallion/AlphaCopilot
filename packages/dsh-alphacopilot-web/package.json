@@ -3,17 +3,43 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "AlphaCopilot web surfaces — Daily Review panel injected into the dsh web UI, plus shared theme tokens",
-  "main": "src/index.ts",
-  "files": [
-    "src/",
-    "cordis.patch.yml"
-  ],
+  "description": "AlphaCopilot web surfaces — Daily Review first-class page with sidebar nav (archived design + dsh tokens)",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["lib/", "src/", "cordis.patch.yml"],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ],
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "react": "^18.2.0"
+  },
   "devDependencies": {
+    "@types/react": "~18.3.1",
+    "react": "^18.2.0",
     "tsdown": "^0.22.14",
     "typescript": "^7.0.2"
-  },
-  "scripts": {
-    "build": "tsdown src/index.ts --format esm --out-dir lib"
   }
 }
