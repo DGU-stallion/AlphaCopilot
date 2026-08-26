@@ -1,29 +1,43 @@
-"""FastMCP stdio server: AlphaCopilot research 数据层 → dsh 工具。
+"""注册所有 MCP 工具。
 
-运行方式：python -m alphacopilot_research.server（stdio transport）。
-dsh patch 层 loader entry 指向本模块，工具公开名为
-mcp__alphacopilot-research__<tool>。
+每工具对应一个 tools 子模块的顶层函数；MCP 层保持零业务逻辑。
 """
 
 import sys
 from pathlib import Path
 
-# TODO(T08): 正式引用方式 —— 发布期改为对本地数据层的常规依赖
-# （alphacopilot-research 包），移除 sys.path 注入；spike 从简，
-# 直接把 monorepo 的 backend/ 目录塞进 import 路径。
+# 开发期：直接把 monorepo 的 backend/ 目录塞进 import 路径；发布期改为正式依赖
 _BACKEND = Path(__file__).resolve().parents[4] / "backend"
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
 from mcp.server.fastmcp import FastMCP
 
-from alphacopilot_research.tools import quote
+from alphacopilot_research.tools import flows, fundamental, quote
 
 mcp = FastMCP("alphacopilot-research")
 
-get_quote = mcp.tool()(quote.get_quote)
-get_kline = mcp.tool()(quote.get_kline)
+# 行情（2）
+mcp.tool()(quote.get_quote)
+mcp.tool()(quote.get_kline)
+
+# 基本面（2）
+mcp.tool()(fundamental.get_valuation)
+mcp.tool()(fundamental.get_financials)
+
+# 资金面（4）
+mcp.tool()(fundamental.get_margin_trading)
+mcp.tool()(fundamental.get_fund_flow)
+mcp.tool()(flows.get_dragon_tiger)
+mcp.tool()(flows.get_block_trade)
+mcp.tool()(flows.get_holder_changes)
+mcp.tool()(flows.get_dividend_history)
+
+
+def main() -> None:
+    """入口点：供 [project.scripts] 使用，便于测试与调试。"""
+    mcp.run()
 
 
 if __name__ == "__main__":
-    mcp.run()
+    main()
