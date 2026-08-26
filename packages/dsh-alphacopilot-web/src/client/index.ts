@@ -19,11 +19,12 @@ export function apply(ctx: ClientContext): void {
     }
   }, 'acp theme vars')
 
-  // Sidebar replacement — adds first-class nav between New Session and Workspaces
+  // Sidebar replacement — shadow original at lower priority (lowest renders)
   ctx.slots.inject('sidebar', () => {
     return ctx.slots.register(
       {
         name: 'sidebar',
+        priority: -10,
         // Re-declare children so other plugins' injections still land
         children: {
           'sidebar.brand.mark': { kind: 'single', scope: 'root' as const },
