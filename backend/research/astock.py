@@ -1,4 +1,4 @@
-# pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportOptionalIterable=false, reportOptionalMemberAccess=false
+# pyright: reportMissingImports=false, reportArgumentType=false, reportAttributeAccessIssue=false, reportOptionalIterable=false, reportOptionalMemberAccess=false
 """A股全栈数据层 —— 移植自 a-stock-data 工具包（五层数据源，自包含）。
 
 分级依赖：

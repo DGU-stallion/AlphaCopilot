@@ -1,4 +1,4 @@
-# pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportOptionalIterable=false, reportOptionalMemberAccess=false
+# pyright: reportMissingImports=false, reportArgumentType=false, reportAttributeAccessIssue=false, reportOptionalIterable=false, reportOptionalMemberAccess=false
 """系统 AI 对话层 —— function calling 循环（OpenAI 兼容）。
 
 让网页内置 AI 在回答时自己调 astock 数据工具（查行情/估值/研报/新闻），
