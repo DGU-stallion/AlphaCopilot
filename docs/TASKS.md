@@ -20,8 +20,8 @@
 | T13 |
 | T14a | S4 spike：web 插件注入整页面板 | docs/spikes/s4.md | T05 | 静态每日复盘卡片可见 | M | ✅ |
 | T15 |
-| T16 |
-| T17 |
+| T16 | desk 合规 prompt 注册 | src/index.ts `ctx.systemPrompt.section` | T15 | compliance section order=110 可见 | S | ✅ |
+| T17 | skills 迁移 + preset stub | skills/*.md ×5 + presets/*.yaml | T16 | 5 skills + stub preset 到位 | S | ✅ |
 | T18a |
 | T19 |
 | T20 | v0.1.0 发布：README 四节 + pack 验证 + tag | git tag v0.1.0 | T19 |
