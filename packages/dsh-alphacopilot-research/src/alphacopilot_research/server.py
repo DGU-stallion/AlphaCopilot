@@ -33,7 +33,7 @@ mcp.tool()(flows.get_block_trade)
 mcp.tool()(flows.get_holder_changes)
 mcp.tool()(flows.get_dividend_history)
 
-# 资讯/事件（2）
+# 资讯/事件（3）
 mcp.tool()(events.get_news)
 mcp.tool()(events.get_announcements)
 mcp.tool()(events.get_radar)
