@@ -1,9 +1,0 @@
-# Investment Committee swarm preset — stub for T18
-# Full YAML from archive/pre-dsh: backend/quant/swarm/presets/investment_committee.yaml
-# Decision: port as-is once dsh subagent DAG API is confirmed (see s4 spike conclusion)
-name: investment_committee
-title: "Investment Committee"
-description: "Stub — full port pending dsh subagent DAG API confirmation"
-agents: []
-tasks: []
-variables: []

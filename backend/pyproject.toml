@@ -1,11 +1,14 @@
 [project]
-name = "alphacopilot-research"
-version = "0.1.0"
-description = "AlphaCopilot research data layer — 65 pure data functions (A-share/global/news/portfolio), consumed by the dsh-alphacopilot-research MCP server."
+name = "alphacopilot"
+version = "0.2.0"
+description = "AlphaCopilot — 对话驱动的量化投研工作台：research 数据层 + alpha 分析库 + api 会话编排 + agent(dsh 适配) + mcp 工具层。"
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.31",
     "pydantic>=2.0",
+    "fastapi>=0.110",
+    "jsonschema>=4.0",
+    "mcp>=1.9,<2",
 ]
 
 [project.optional-dependencies]
@@ -17,6 +20,9 @@ full = [
 ]
 dev = [
     "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+    "pandas>=2.0",
     "ruff>=0.6",
     "pyright>=1.1",
 ]
@@ -26,7 +32,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["research"]
+packages = ["research", "alpha", "api", "agent", "mcp"]
 
 [tool.ruff]
 line-length = 100
@@ -40,8 +46,9 @@ select = ["E", "F", "I", "UP", "B"]
 # 遗留库代码冻结区：中文注释/文档串超长行不重排；astock 闭包捕获模式维持原样。
 "research/**" = ["E501"]
 "research/astock.py" = ["E501", "B023"]
+"agent/persona.py" = ["E501"]
 
 [tool.pyright]
-include = ["research"]
+include = ["research", "alpha", "api", "agent", "mcp"]
 exclude = ["research/caches.py"]
 typeCheckingMode = "basic"
