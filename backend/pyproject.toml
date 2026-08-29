@@ -32,7 +32,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["research", "alpha", "api", "agent", "mcp"]
+packages = ["research", "alpha", "api", "agent", "mcpserver"]
 
 [tool.ruff]
 line-length = 100
@@ -49,6 +49,10 @@ select = ["E", "F", "I", "UP", "B"]
 "agent/persona.py" = ["E501"]
 
 [tool.pyright]
-include = ["research", "alpha", "api", "agent", "mcp"]
+include = ["research", "alpha", "api", "agent", "mcpserver"]
 exclude = ["research/caches.py"]
 typeCheckingMode = "basic"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
