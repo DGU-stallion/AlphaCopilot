@@ -8,8 +8,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageBubble, type BubbleMessage } from "@/components/chat/MessageBubble";
+import type { Artifact } from "@/components/blocks/ArtifactBlock";
 import { useSSE } from "@/hooks/useSSE";
-import { createSession, sendMessage, streamUrl } from "@/lib/api";
+import { createSession, listMessages, sendMessage, streamUrl } from "@/lib/api";
 import { extractChunkText } from "@/lib/chunk";
 
 export function ChatTimeline() {
@@ -82,6 +83,23 @@ export function ChatTimeline() {
         finalize();
       },
       "turn/error": () => finalize(),
+      "message/committed": async () => {
+        // turn 定稿：从后端拉取消息（含挂载的 artifacts）并挂到当前 assistant 气泡。
+        const sid = streamingIdRef.current;
+        if (!sid) return;
+        try {
+          const msgs = await listMessages(sessionId);
+          const last = [...msgs].reverse().find((m) => m.role === "assistant");
+          const arts = (last as { artifacts?: Artifact[] } | undefined)?.artifacts;
+          if (arts && arts.length) {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === sid ? { ...m, artifacts: arts } : m)),
+            );
+          }
+        } catch {
+          /* 忽略拉取失败，不影响文本已渲染 */
+        }
+      },
     });
 
     try {
