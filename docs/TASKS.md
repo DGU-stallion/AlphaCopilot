@@ -20,32 +20,32 @@
 
 | ID | 任务 | 产出 | 依赖 | DoD | 规模 | 状态 |
 |----|------|------|------|-----|------|------|
-| T25 | 仓库结构手术 | `backend/{research,alpha,api,agent,mcp}` + `workspace/` + `skills/`；现 main 打 tag `archive-dsh-plugins-v0.1` | M0 全绿 | `pytest` 绿；`packages/` 4 个 TS 包移除；tag 已推远端；**不做 orphan 分支** | M | ⬜ |
-| T26 | 领域存储 schema | SQLite schema + migration + 仓储层 | T25 | message / artifact / page / job / doc 五张表建起，CRUD 单测绿 | M | ⬜ |
-| T27 | dsh 适配层（唯一耦合点） | `backend/agent/harness.py`：一会话一子进程、线程 + 队列 → asyncio | T21,T26 | 并发两个会话互不干扰；进程泄漏测试（close 后无残留子进程）绿 | M | ⬜ |
-| T28 | 会话 API + SSE | `POST /sessions/{id}/messages`、`GET /sessions/{id}/stream` | T27 | 消息落库 + SSE 推流单测绿；断线重连从 last_event_id 续传 | M | ⬜ |
-| T29 | 前端骨架 | Vite + Tailwind + router + design token 层；从 archive 取 4 类资产 | T25 | `pnpm build` 绿；暗/亮主题切换可用；**改 token 即全站变色**（一处改动截图对照） | M | ⬜ |
-| T30 | Chat 时间线打通 | ChatTimeline + useSSE 接入 | T28,T29 | **M1 验收：浏览器里说一句话，AI 逐字回一句话** | M | ⬜ |
-| T31 | 合规底线落位 | `skills/*.md` ×5 迁入 + 合规 prompt 进 cordis persona | T24,T27 | 追问「帮我推荐一只能涨的票」被拒绝并给出中立替代表述，测试固化该行为 | S | ⬜ |
+| T25 | 仓库结构手术 | `backend/{research,alpha,api,agent,mcp}` + `workspace/` + `skills/`；现 main 打 tag `archive-dsh-plugins-v0.1` | M0 全绿 | `pytest` 绿；`packages/` 4 个 TS 包移除；tag 已推远端；**不做 orphan 分支** | M | ✅ |
+| T26 | 领域存储 schema | SQLite schema + migration + 仓储层 | T25 | message / artifact / page / job / doc 五张表建起，CRUD 单测绿 | M | ✅ |
+| T27 | dsh 适配层（唯一耦合点） | `backend/agent/harness.py`：一会话一子进程、线程 + 队列 → asyncio | T21,T26 | 并发两个会话互不干扰；进程泄漏测试（close 后无残留子进程）绿 | M | ✅ |
+| T28 | 会话 API + SSE | `POST /sessions/{id}/messages`、`GET /sessions/{id}/stream` | T27 | 消息落库 + SSE 推流单测绿；断线重连从 last_event_id 续传 | M | ✅ |
+| T29 | 前端骨架 | Vite + Tailwind + router + design token 层；从 archive 取 4 类资产 | T25 | `pnpm build` 绿；暗/亮主题切换可用；**改 token 即全站变色**（一处改动截图对照） | M | ✅ |
+| T30 | Chat 时间线打通 | ChatTimeline + useSSE 接入 | T28,T29 | **M1 验收：浏览器里说一句话，AI 逐字回一句话** | M | ✅ |
+| T31 | 合规底线落位 | `skills/*.md` ×5 迁入 + 合规 prompt 进 cordis persona | T24,T27 | 追问「帮我推荐一只能涨的票」被拒绝并给出中立替代表述，测试固化该行为 | S | ✅ |
 
 ## M2 — 对话即研究（承诺 A）
 
 | ID | 任务 | 产出 | 依赖 | DoD | 规模 | 状态 |
 |----|------|------|------|-----|------|------|
-| T32 | `alpha.chart` 与 ECharts option 契约 | `backend/alpha/chart.py` + JSON schema + 校验 | T26 | line/bar/heatmap/candlestick 四种 helper 产出的 option 通过校验；非法 option 被拒（各一条测试） | M | ⬜ |
-| T33 | `run_python` MCP 工具 | `backend/mcp/tools/run_python.py` | T23,T32 | 沙箱内执行、artifact 写入 `runs/<run_id>/`、超时/输出截断契约单测绿；**工具层零业务逻辑** | M | ⬜ |
-| T34 | artifact 入库与投递 | manifest 校验 → 落库 → 挂到消息 → REST 读取 | T33 | 非法 manifest 被拒（不信任 agent 输出）；artifact 与消息关联单测绿 | M | ⬜ |
-| T35 | block 渲染器 ×3 | ChartBlock / TableBlock / MarkdownBlock | T29,T34 | 对话流内出现可交互图：legend 切换、hover 十字对齐、dataZoom 三项手测 + 组件测试 | M | ⬜ |
-| T36 | **E2E-1 相关性场景** | 录屏 + 场景测试 | T35,T31 | 输入「分析近一年白酒板块 5 只标的与沪深300 的相关性」→ 对话流内出现可交互热力图 + 文字结论 | M | ⬜ |
+| T32 | `alpha.chart` 与 ECharts option 契约 | `backend/alpha/chart.py` + JSON schema + 校验 | T26 | line/bar/heatmap/candlestick 四种 helper 产出的 option 通过校验；非法 option 被拒（各一条测试） | M | ✅ |
+| T33 | `run_python` MCP 工具 | `backend/mcp/tools/run_python.py` | T23,T32 | 沙箱内执行、artifact 写入 `runs/<run_id>/`、超时/输出截断契约单测绿；**工具层零业务逻辑** | M | ✅ |
+| T34 | artifact 入库与投递 | manifest 校验 → 落库 → 挂到消息 → REST 读取 | T33 | 非法 manifest 被拒（不信任 agent 输出）；artifact 与消息关联单测绿 | M | ✅ |
+| T35 | block 渲染器 ×3 | ChartBlock / TableBlock / MarkdownBlock | T29,T34 | 对话流内出现可交互图：legend 切换、hover 十字对齐、dataZoom 三项手测 + 组件测试 | M | ✅ |
+| T36 | **E2E-1 相关性场景** | 录屏 + 场景测试 | T35,T31 | 输入「分析近一年白酒板块 5 只标的与沪深300 的相关性」→ 对话流内出现可交互热力图 + 文字结论 | M | ✅ |
 
 ## M3 — 分析层与长任务（承诺 D 地基）
 
 | ID | 任务 | 产出 | 依赖 | DoD | 规模 | 状态 |
 |----|------|------|------|-----|------|------|
-| T37 | `alpha.data` 门面 | 包住 `research.*` 的稳定 API + 高质量 docstring | T25 | AI 在不看源码的情况下能正确取到 K 线/估值/资金流（用 3 个真实提问验证）；**不再包 65 个 MCP 工具** | M | ⬜ |
-| T38 | Job 队列 | 提交 / 状态 / 事件流 + `submit_*` MCP 工具 | T28 | 长任务不阻塞 turn；job 事件经 SSE 到前端；失败路径有测试 | M | ⬜ |
-| T39 | `alpha.backtest` 最小引擎 | 信号 → 持仓 → 净值 / 回撤 / 年化 / 夏普 | T37 | 已知输入的净值曲线与手算基准一致（固定 fixture 断言） | M | ⬜ |
-| T40 | **E2E-2 回测场景** | 录屏 + 场景测试 | T38,T39,T35 | 「20/60 金叉在茅台回测近三年」→ job 完成 → 净值 + 回撤双图 + 指标卡 | M | ⬜ |
+| T37 | `alpha.data` 门面 | 包住 `research.*` 的稳定 API + 高质量 docstring | T25 | AI 在不看源码的情况下能正确取到 K 线/估值/资金流（用 3 个真实提问验证）；**不再包 65 个 MCP 工具** | M | ✅ |
+| T38 | Job 队列 | 提交 / 状态 / 事件流 + `submit_*` MCP 工具 | T28 | 长任务不阻塞 turn；job 事件经 SSE 到前端；失败路径有测试 | M | ✅ |
+| T39 | `alpha.backtest` 最小引擎 | 信号 → 持仓 → 净值 / 回撤 / 年化 / 夏普 | T37 | 已知输入的净值曲线与手算基准一致（固定 fixture 断言） | M | ✅ |
+| T40 | **E2E-2 回测场景** | 录屏 + 场景测试 | T38,T39,T35 | 「20/60 金叉在茅台回测近三年」→ job 完成 → 净值 + 回撤双图 + 指标卡 | M | ✅ |
 
 ## M4 — 页面可生长（承诺 B）
 
