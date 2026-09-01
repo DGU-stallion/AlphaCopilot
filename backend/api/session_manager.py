@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from agent.harness import HarnessSession, HarnessSettings, StreamEvent
@@ -31,9 +32,11 @@ class SessionRuntime:
     """一个会话的运行态：harness 子进程 + 事件 buffer + 订阅者。"""
 
     harness: HarnessSession
+    workspace: str = ""  # 该会话 sandbox 根（其下 runs/<run_id>/）
     events: list[BufferedEvent] = field(default_factory=list)
     _subscribers: list[asyncio.Queue] = field(default_factory=list)
     _next_id: int = 1
+    _ingested_runs: set[str] = field(default_factory=set)
 
     def _emit(self, ev_type: str, data: dict[str, Any]) -> BufferedEvent:
         be = BufferedEvent(id=self._next_id, type=ev_type, data=data)
@@ -78,7 +81,7 @@ class SessionManager:
         settings: HarnessSettings = self._settings_factory(session_id)
         harness = HarnessSession(settings)
         await asyncio.to_thread(harness.start)
-        rt = SessionRuntime(harness=harness)
+        rt = SessionRuntime(harness=harness, workspace=settings.workspace)
         self._runtimes[session_id] = rt
         return rt
 
@@ -115,7 +118,41 @@ class SessionManager:
                         assistant_text_parts.append(piece)
         text = final_text or "".join(assistant_text_parts)
         mid = self._store.add_message(session_id, "assistant", text)
+        # turn 结束：扫描 workspace/runs/ 里新出现的 manifest.json，校验后落库并挂到本条消息。
+        self._ingest_new_artifacts(rt, mid)
         rt._emit("message/committed", {"message_id": mid, "content": text})
+
+    def _ingest_new_artifacts(self, rt: SessionRuntime, message_id: str) -> None:
+        """扫描该会话 workspace 下未入库的 run 目录，校验 manifest 后落库并挂消息。
+
+        非法 manifest 被业务层拒绝（ManifestError），跳过该 run，不影响其余。
+        """
+        if not rt.workspace:
+            return
+        runs_dir = Path(rt.workspace) / "runs"
+        if not runs_dir.is_dir():
+            return
+        # 延迟导入，避免 api.artifacts <-> session_manager 循环。
+        from api.artifacts import ManifestError, ingest_run
+
+        for run_path in sorted(runs_dir.iterdir()):
+            if not run_path.is_dir() or run_path.name in rt._ingested_runs:
+                continue
+            if not (run_path / "manifest.json").exists():
+                continue
+            rt._ingested_runs.add(run_path.name)
+            try:
+                aids = ingest_run(self._store, run_path, message_id)
+            except ManifestError as e:
+                rt._emit("artifact/rejected", {"run": run_path.name, "error": str(e)})
+                continue
+            for aid in aids:
+                art = self._store.get_artifact(aid)
+                rt._emit("artifact/attached", {
+                    "artifact_id": aid,
+                    "kind": art["kind"] if art else None,
+                    "title": art["title"] if art else "",
+                })
 
     def close_session(self, session_id: str) -> None:
         rt = self._runtimes.pop(session_id, None)

@@ -86,7 +86,18 @@ def create_app(
     def list_messages(sid: str) -> list:
         if store.get_session(sid) is None:
             raise HTTPException(404, "session not found")
-        return store.list_messages(sid)
+        msgs = store.list_messages(sid)
+        # 附上每条消息挂载的 artifact（前端 block 渲染器据此渲染图/表/markdown）。
+        for m in msgs:
+            m["artifacts"] = store.list_artifacts_for_message(m["id"])
+        return msgs
+
+    @router.get("/artifacts/{aid}")
+    def get_artifact(aid: str) -> dict:
+        art = store.get_artifact(aid)
+        if art is None:
+            raise HTTPException(404, "artifact not found")
+        return art
 
     @router.post("/sessions/{sid}/messages")
     async def post_message(sid: str, body: MessageIn) -> dict:
