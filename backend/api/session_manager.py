@@ -66,9 +66,10 @@ class SessionRuntime:
 class SessionManager:
     """管理所有会话运行态。业务层唯一持有 harness 的地方。"""
 
-    def __init__(self, store: Store, settings_factory) -> None:
+    def __init__(self, store: Store, settings_factory, jobs=None) -> None:
         self._store = store
         self._settings_factory = settings_factory  # (session_id) -> HarnessSettings
+        self._jobs = jobs  # JobQueue（可选；agent submit_backtest 请求在 turn 末入队）
         self._runtimes: dict[str, SessionRuntime] = {}
 
     def create_session(self, title: str = "") -> str:
@@ -120,7 +121,33 @@ class SessionManager:
         mid = self._store.add_message(session_id, "assistant", text)
         # turn 结束：扫描 workspace/runs/ 里新出现的 manifest.json，校验后落库并挂到本条消息。
         self._ingest_new_artifacts(rt, mid)
+        # turn 结束：扫描 agent 写的 job 请求文件（workspace/jobs/），入队异步执行；
+        # job 完成后把其产出 artifact 摄取并挂到本条 assistant 消息。
+        if self._jobs is not None and rt.workspace:
+            jids = self._jobs.ingest_job_requests(rt.workspace, session_id=session_id)
+            for jid in jids:
+                rt._emit("job/submitted", {"job_id": jid})
+                self._jobs.on_complete(
+                    jid, lambda run_dir, m=mid: self._ingest_job_artifacts(rt, run_dir, m)
+                )
         rt._emit("message/committed", {"message_id": mid, "content": text})
+
+    def _ingest_job_artifacts(self, rt: SessionRuntime, run_dir: str, message_id: str) -> None:
+        """job 成功后：把其 run_dir 的 manifest 摄取为 artifact 挂到消息，并发事件。"""
+        from api.artifacts import ManifestError, ingest_run
+
+        try:
+            aids = ingest_run(self._store, run_dir, message_id)
+        except ManifestError as e:
+            rt._emit("artifact/rejected", {"run": str(run_dir), "error": str(e)})
+            return
+        for aid in aids:
+            art = self._store.get_artifact(aid)
+            rt._emit("artifact/attached", {
+                "artifact_id": aid,
+                "kind": art["kind"] if art else None,
+                "title": art["title"] if art else "",
+            })
 
     def _ingest_new_artifacts(self, rt: SessionRuntime, message_id: str) -> None:
         """扫描该会话 workspace 下未入库的 run 目录，校验 manifest 后落库并挂消息。

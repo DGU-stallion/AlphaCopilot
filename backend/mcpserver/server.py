@@ -22,6 +22,7 @@ if str(_BACKEND) not in sys.path:
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from mcpserver.tools.run_python import run_python as _run_python  # noqa: E402
+from mcpserver.tools.submit_backtest import submit_backtest as _submit_backtest  # noqa: E402
 from research import astock  # noqa: E402
 
 mcp = FastMCP("alphacopilot")
@@ -56,6 +57,19 @@ def get_quote(codes: list[str]) -> dict:
 
 mcp.tool()(run_python)
 mcp.tool()(get_quote)
+
+
+def submit_backtest(closes: list[float], fast: int = 20, slow: int = 60,
+                    symbol: str = "", dates: list[str] | None = None) -> dict:
+    """提交双均线金叉回测 job（长任务，异步，不阻塞本轮）。返回 {job_id, status}。
+
+    closes 收盘价序列（用 alpha.data.closes 取）；fast/slow 均线窗口（默认 20/60）；
+    symbol 标的名；dates 可选日期。完成后净值+回撤图与指标作为 artifact 挂到会话。
+    """
+    return _submit_backtest(closes, fast=fast, slow=slow, symbol=symbol, dates=dates)
+
+
+mcp.tool()(submit_backtest)
 
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from agent.harness import HarnessSettings
+from api.jobs import JobQueue
 from api.session_manager import SessionManager
 from api.store import Store
 
@@ -56,8 +57,10 @@ def create_app(
 ) -> FastAPI:
     store = Store(db_path)
     ws_root = workspace_root or Path(tempfile.mkdtemp(prefix="alphacopilot-ws-"))
+    jobs = JobQueue(store, ws_root)
     manager = SessionManager(
-        store, _default_settings_factory(ws_root, base_url=base_url, api_key=api_key)
+        store, _default_settings_factory(ws_root, base_url=base_url, api_key=api_key),
+        jobs=jobs,
     )
 
     @asynccontextmanager
@@ -69,6 +72,7 @@ def create_app(
     app = FastAPI(title="AlphaCopilot API", version="0.2.0", lifespan=lifespan)
     app.state.store = store
     app.state.manager = manager
+    app.state.jobs = jobs
 
     # 所有会话接口挂在 /api 下（前端 vite 代理转发 /api/* 到本服务）。
     router = APIRouter(prefix="/api")
@@ -98,6 +102,50 @@ def create_app(
         if art is None:
             raise HTTPException(404, "artifact not found")
         return art
+
+    class BacktestIn(BaseModel):
+        closes: list[float]
+        fast: int = 20
+        slow: int = 60
+        symbol: str = ""
+        dates: list[str] | None = None
+
+    @router.post("/jobs/backtest")
+    async def submit_backtest_job(body: BacktestIn) -> dict:
+        jid = jobs.submit_backtest(body.model_dump())
+        return {"job_id": jid, "status": "queued"}
+
+    @router.get("/jobs/{jid}")
+    def get_job(jid: str) -> dict:
+        job = store.get_job(jid)
+        if job is None:
+            raise HTTPException(404, "job not found")
+        return job
+
+    @router.get("/jobs/{jid}/stream")
+    async def job_stream(
+        jid: str,
+        last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
+    ) -> StreamingResponse:
+        start_id = int(last_event_id) if last_event_id and last_event_id.isdigit() else None
+
+        async def gen():
+            q = jobs.subscribe(jid, last_id=start_id)
+            try:
+                while True:
+                    try:
+                        ev = await asyncio.wait_for(q.get(), timeout=15.0)
+                    except asyncio.TimeoutError:
+                        yield ": keepalive\n\n"
+                        continue
+                    payload = json.dumps(ev.data, ensure_ascii=False)
+                    yield f"id: {ev.id}\nevent: {ev.type}\ndata: {payload}\n\n"
+                    if ev.type in ("succeeded", "failed"):
+                        break
+            finally:
+                jobs.unsubscribe(jid, q)
+
+        return StreamingResponse(gen(), media_type="text/event-stream")
 
     @router.post("/sessions/{sid}/messages")
     async def post_message(sid: str, body: MessageIn) -> dict:
