@@ -37,14 +37,20 @@ for _p in _SDK_PATHS:
         sys.path.insert(0, _p)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-# 默认复用 G1 spike 的 cordis 组合（已验证可挂 MCP + JSONL 持久化）。
-_DEFAULT_CORDIS = _REPO_ROOT / "docs" / "spikes" / "g1" / "cordis.yml"
+# 生产 cordis 组合（合规 persona + skills + MCP）。定义在 agent 层内。
+_DEFAULT_CORDIS = Path(__file__).resolve().parent / "cordis.yml"
+# T33 前 MCP server 仍用 g1 最小 server（get_quote）；T33 替换为正式 run_python server。
 _DEFAULT_MCP_SERVER = _REPO_ROOT / "docs" / "spikes" / "g1" / "mcp_server_min.py"
+_SKILLS_DIR = _REPO_ROOT / "skills"
 
 
 @dataclass
 class HarnessSettings:
-    """一会话子进程的运行参数。keyless 测试可传 base_url/api_key 指向 mock 端点。"""
+    """一会话子进程的运行参数。keyless 测试可传 base_url/api_key 指向 mock 端点。
+
+    system_prompt 默认 None → start() 时填入合规 persona（persona.system_prompt()），
+    确保「不荐股/不预测/不给买卖时机」的合规底线对模型可见（T31）。
+    """
 
     workspace: str
     session_root: str
@@ -52,6 +58,7 @@ class HarnessSettings:
     cordis: str = str(_DEFAULT_CORDIS)
     mcp_python: str = sys.executable
     mcp_server: str = str(_DEFAULT_MCP_SERVER)
+    skills_dir: str = str(_SKILLS_DIR)
     system_prompt: str | None = None
     base_url: str | None = None
     api_key: str | None = None
@@ -90,10 +97,18 @@ class HarnessSession:
 
         s = self._settings
         # cordis.yml 的 !!js process.env.* 需要这些环境变量。
+        os.environ["ALPHACOPILOT_MCP_PY"] = s.mcp_python
+        os.environ["ALPHACOPILOT_MCP_SERVER"] = s.mcp_server
+        os.environ["ALPHACOPILOT_SKILLS_DIR"] = s.skills_dir
+        # 兼容 g1/g4 spike cordis 仍用的旧变量名（保持 spike 可跑）。
         os.environ.setdefault("G1_MCP_PY", s.mcp_python)
         os.environ.setdefault("G1_MCP_SERVER", s.mcp_server)
-        if s.system_prompt:
-            os.environ["DSH_SYSTEM_PROMPT"] = s.system_prompt
+        # 合规底线：system_prompt 未显式给出时，注入合规 persona（T31）。
+        system_prompt = s.system_prompt
+        if system_prompt is None:
+            from agent.persona import system_prompt as _persona
+            system_prompt = _persona()
+        os.environ["DSH_SYSTEM_PROMPT"] = system_prompt
 
         cfg = DeepSeekHarnessConfig(
             model=s.model,
