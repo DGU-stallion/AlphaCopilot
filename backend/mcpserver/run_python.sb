@@ -1,0 +1,41 @@
+;; AlphaCopilot run_python Seatbelt profile — G3 spike (v2)
+;;
+;; 设计取舍（诚实记录，写进 ADR-0006 残余风险）：
+;;   dsh 的 workspace-write 语义是「限写不限读」，Python 解释器启动本身也需要
+;;   广泛的系统读权限。因此本 profile 采用「基于 bsd.sb 基座 + 允许读 + 拒绝写
+;;   （workspace 除外）+ 拒绝网络 + 显式 deny 敏感路径读」的分层策略：
+;;     - 读：默认放开（否则 Python 起不来），但对已知密钥/凭证目录显式 deny
+;;     - 写：默认拒绝，仅 workspace 白名单
+;;     - 网络：全禁
+;;   这不是容器级隔离；敏感路径 deny 是黑名单，不能穷举所有敏感文件。
+;;   真正的强隔离需容器/microVM，此 profile 是纵深防御的一层。
+;;
+;; 参数（-D 传入）：
+;;   WORKSPACE  唯一可写根
+;;   SECRET_DIR 需显式拒绝读取的敏感目录（spike 用；生产用真实 ~/.ssh ~/.aws 等）
+
+(version 1)
+(import "bsd.sb")
+
+;; ---- 读：默认放开（Python 启动 / import 所需） ----
+(allow file-read*)
+
+;; ---- 但对敏感目录的读显式拒绝（黑名单，纵深防御） ----
+(deny file-read* (subpath (param "SECRET_DIR")))
+
+;; ---- 写：默认拒绝，仅 workspace ----
+(deny file-write*)
+(allow file-write*
+  (subpath (param "WORKSPACE")))
+(allow file-write-data
+  (literal "/dev/null"))
+
+;; ---- 进程 / IPC：Python 运行所需 ----
+(allow process-fork)
+(allow process-exec)
+(allow mach-lookup)
+(allow sysctl-read)
+(allow signal (target self))
+
+;; ---- 网络：全禁（LLM 代码不得外传数据） ----
+(deny network*)

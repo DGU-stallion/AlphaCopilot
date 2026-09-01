@@ -39,8 +39,8 @@ for _p in _SDK_PATHS:
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 # 生产 cordis 组合（合规 persona + skills + MCP）。定义在 agent 层内。
 _DEFAULT_CORDIS = Path(__file__).resolve().parent / "cordis.yml"
-# T33 前 MCP server 仍用 g1 最小 server（get_quote）；T33 替换为正式 run_python server。
-_DEFAULT_MCP_SERVER = _REPO_ROOT / "docs" / "spikes" / "g1" / "mcp_server_min.py"
+# 生产 MCP server（run_python + get_quote）。T33 起用它替换 g1 最小 server。
+_DEFAULT_MCP_SERVER = _REPO_ROOT / "backend" / "mcpserver" / "server.py"
 _SKILLS_DIR = _REPO_ROOT / "skills"
 
 
