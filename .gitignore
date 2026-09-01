@@ -27,3 +27,7 @@ sessions/
 .vscode/
 .idea/
 .kiro/
+
+# agent 运行产出（run dirs 不入库；.gitkeep 保留目录）
+workspace/runs/*/
+workspace/*.db
