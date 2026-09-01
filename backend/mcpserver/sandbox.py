@@ -76,7 +76,7 @@ def run_python(
     workspace: 沙箱唯一可写根（默认 <repo>/workspace）。timeout: wall-clock 秒。
     返回 RunResult（含 run_id / run_dir / stdout / stderr / timed_out / artifacts）。
     """
-    ws = Path(workspace or (_REPO_ROOT / "workspace")).resolve()
+    ws = Path(workspace or Path.cwd()).resolve()
     (ws / "runs").mkdir(parents=True, exist_ok=True)
     run_id = f"r-{uuid.uuid4().hex[:12]}"
     run_dir = (ws / "runs" / run_id)
