@@ -1,7 +1,6 @@
-# ── Node / TS（packages/*）─────────────────────────────
+# ── Node / TS ──────────────────────────────────────────
 node_modules/
 dist/
-lib/
 *.tsbuildinfo
 
 # ── Python（backend / dsh-alphacopilot-research）───────

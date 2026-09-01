@@ -1,5 +1,12 @@
 packages:
   - "frontend"
 
+allowBuilds:
+  esbuild: set this to true or false
+
 # 插件路线的 4 个 TS 包已随 T25 移除（归档于 tag archive-dsh-plugins-v0.1）。
 # 前端在 frontend/（T29 起）；dsh 作为 SDK 内嵌，不再是 pnpm 成员。
+
+# 允许 esbuild 运行安装脚本（vite/vitest 依赖其平台二进制）。
+onlyBuiltDependencies:
+  - esbuild
