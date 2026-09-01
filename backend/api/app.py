@@ -17,7 +17,7 @@ from pathlib import Path
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import APIRouter, FastAPI, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -70,29 +70,32 @@ def create_app(
     app.state.store = store
     app.state.manager = manager
 
-    @app.post("/sessions")
+    # 所有会话接口挂在 /api 下（前端 vite 代理转发 /api/* 到本服务）。
+    router = APIRouter(prefix="/api")
+
+    @router.post("/sessions")
     def create_session(title: str = "") -> dict:
         sid = manager.create_session(title)
         return {"session_id": sid}
 
-    @app.get("/sessions")
+    @router.get("/sessions")
     def list_sessions() -> list:
         return store.list_sessions()
 
-    @app.get("/sessions/{sid}/messages")
+    @router.get("/sessions/{sid}/messages")
     def list_messages(sid: str) -> list:
         if store.get_session(sid) is None:
             raise HTTPException(404, "session not found")
         return store.list_messages(sid)
 
-    @app.post("/sessions/{sid}/messages")
+    @router.post("/sessions/{sid}/messages")
     async def post_message(sid: str, body: MessageIn) -> dict:
         if store.get_session(sid) is None:
             raise HTTPException(404, "session not found")
         await manager.send_message(sid, body.content)
         return {"ok": True}
 
-    @app.get("/sessions/{sid}/stream")
+    @router.get("/sessions/{sid}/stream")
     async def stream(
         sid: str,
         last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
@@ -125,4 +128,5 @@ def create_app(
 
         return StreamingResponse(gen(), media_type="text/event-stream")
 
+    app.include_router(router)
     return app

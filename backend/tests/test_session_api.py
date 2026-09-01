@@ -145,14 +145,14 @@ async def test_message_persistence_and_sse_stream():
                              base_url=base, api_key="sk-mock")
             async with _RunningApp(app) as running:
                 async with running.client() as client:
-                    sid = (await client.post("/sessions")).json()["session_id"]
-                    r = await client.post(f"/sessions/{sid}/messages",
+                    sid = (await client.post("/api/sessions")).json()["session_id"]
+                    r = await client.post(f"/api/sessions/{sid}/messages",
                                           json={"content": "白酒板块怎么样？"})
                     assert r.status_code == 200
 
                     async def read_stream():
                         events = []
-                        async with client.stream("GET", f"/sessions/{sid}/stream") as resp:
+                        async with client.stream("GET", f"/api/sessions/{sid}/stream") as resp:
                             assert resp.status_code == 200
                             async for line in resp.aiter_lines():
                                 if line.startswith("event:"):
@@ -165,7 +165,7 @@ async def test_message_persistence_and_sse_stream():
                     assert any("chunk" in e for e in events)
                     assert "turn/final" in events
 
-                    msgs = (await client.get(f"/sessions/{sid}/messages")).json()
+                    msgs = (await client.get(f"/api/sessions/{sid}/messages")).json()
                     roles = [m["role"] for m in msgs]
                     assert "user" in roles and "assistant" in roles
                     assistant = [m for m in msgs if m["role"] == "assistant"][-1]
@@ -182,8 +182,8 @@ async def test_stream_reconnect_from_last_event_id():
                              base_url=base, api_key="sk-mock")
             async with _RunningApp(app) as running:
                 async with running.client() as client:
-                    sid = (await client.post("/sessions")).json()["session_id"]
-                    await client.post(f"/sessions/{sid}/messages",
+                    sid = (await client.post("/api/sessions")).json()["session_id"]
+                    await client.post(f"/api/sessions/{sid}/messages",
                                       json={"content": "问一句"})
                     await _wait_turn(app, sid)
                     rt = app.state.manager.get_runtime(sid)
@@ -194,7 +194,7 @@ async def test_stream_reconnect_from_last_event_id():
                     async def read_after():
                         ids = []
                         async with client.stream(
-                            "GET", f"/sessions/{sid}/stream",
+                            "GET", f"/api/sessions/{sid}/stream",
                             headers={"Last-Event-ID": str(mid_id)},
                         ) as resp:
                             async for line in resp.aiter_lines():

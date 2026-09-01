@@ -128,16 +128,16 @@ class SessionManager:
 
 
 def _extract_chunk_text(payload: dict[str, Any]) -> str:
-    """从 dsh assistant/chunk event 里取增量文本（结构随 dsh 版本，容错取值）。"""
-    for key in ("text", "content", "delta"):
-        v = payload.get(key)
-        if isinstance(v, str):
-            return v
-    # 有时嵌在 data/message 下
+    """从 dsh assistant/chunk event 取增量文本。
+
+    实测 dsh 形状：payload['data']['chunk'] = {'type':'text-delta','text':...}。
+    只在 text-delta 时取 text；block-start/end/finish 无文本。
+    """
     data = payload.get("data")
     if isinstance(data, dict):
-        for key in ("text", "content", "delta"):
-            v = data.get(key)
-            if isinstance(v, str):
-                return v
+        chunk = data.get("chunk")
+        if isinstance(chunk, dict) and chunk.get("type") == "text-delta":
+            t = chunk.get("text")
+            if isinstance(t, str):
+                return t
     return ""
