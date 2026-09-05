@@ -2,7 +2,7 @@
 
 DoD：
 - 消息落库：POST 用户消息后，turn 结束时 GET messages 里有 user + assistant。
-- SSE 推流：GET /stream 收到 assistant/chunk 增量 + turn/final。
+- SSE 推流：GET /stream 收到 text_delta 增量 + turn_end。
 - 断线重连：带 Last-Event-ID，从该 id 之后补发（不重复、不丢）。
 
 说明：SSE 流用**真实 uvicorn 服务器**测（httpx.ASGITransport 会缓冲流式响应到生成器
@@ -98,12 +98,10 @@ class _RunningApp:
 # ---------- 纯单元：SessionRuntime buffer / reconnect（不起子进程，快）----------
 
 def test_runtime_buffer_and_reconnect():
-    from agent.harness import HarnessSession
-
-    rt = SessionRuntime(harness=HarnessSession.__new__(HarnessSession))
-    rt._emit("assistant/chunk", {"text": "a"})
-    rt._emit("assistant/chunk", {"text": "b"})
-    rt._emit("turn/final", {"final_response": "ab"})
+    rt = SessionRuntime(provider=object())  # buffer 逻辑不触及 provider
+    rt._emit("text_delta", {"text": "a"})
+    rt._emit("text_delta", {"text": "b"})
+    rt._emit("turn_end", {"final_text": "ab"})
     assert [e.id for e in rt.events] == [1, 2, 3]
 
     # 重连从 id=1 之后 → 收到 2,3
@@ -131,7 +129,7 @@ async def _wait_turn(app, sid, timeout=40):
     async def _w():
         while True:
             rt = app.state.manager.get_runtime(sid)
-            if rt and any(e.type == "turn/final" for e in rt.events):
+            if rt and any(e.type == "turn_end" for e in rt.events):
                 return
             await asyncio.sleep(0.25)
     await asyncio.wait_for(_w(), timeout=timeout)
@@ -157,13 +155,13 @@ async def test_message_persistence_and_sse_stream():
                             async for line in resp.aiter_lines():
                                 if line.startswith("event:"):
                                     events.append(line.split("event:", 1)[1].strip())
-                                    if events[-1] == "turn/final":
+                                    if events[-1] == "turn_end":
                                         break
                         return events
 
                     events = await asyncio.wait_for(read_stream(), timeout=40)
-                    assert any("chunk" in e for e in events)
-                    assert "turn/final" in events
+                    assert "text_delta" in events
+                    assert "turn_end" in events
 
                     msgs = (await client.get(f"/api/sessions/{sid}/messages")).json()
                     roles = [m["role"] for m in msgs]

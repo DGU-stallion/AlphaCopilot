@@ -259,11 +259,63 @@ def _mootdx_client():
         raise DependencyMissing("mootdx 未安装：pip install mootdx") from e
 
 
+def _tencent_kline(code: str, category: int = 4, offset: int = 60) -> list[dict]:
+    """腾讯 gtimg 日/周/月 K 线（纯 HTTP，作为 mootdx 不可达时的回退源）。
+
+    返回记录列表，字段名与 mootdx 对齐：datetime/open/close/high/low/vol。
+    category: 4=日 5=周 6=月（gtimg 无 60 分钟，60分钟仍走 mootdx）。
+    """
+    import json
+    import urllib.request
+
+    scale = {4: "day", 5: "week", 6: "month"}.get(category, "day")
+    prefix = get_prefix(code)  # 'sh'/'sz'
+    sym = f"{prefix}{code}"
+    url = (
+        f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+        f"?param={sym},{scale},,,{offset},qfq"
+    )
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    raw = urllib.request.urlopen(req, timeout=12).read().decode("utf-8")  # noqa: S310
+    node = json.loads(raw)["data"][sym]
+    rows = node.get(f"qfq{scale}") or node.get(scale) or []
+    out: list[dict] = []
+    for r in rows:
+        # gtimg 行：[date, open, close, high, low, volume, ...]
+        if len(r) < 6:
+            continue
+        out.append({
+            "datetime": r[0],
+            "open": float(r[1]),
+            "close": float(r[2]),
+            "high": float(r[3]),
+            "low": float(r[4]),
+            "vol": float(r[5]),
+        })
+    return out
+
+
 def kline(code: str, category: int = 4, offset: int = 60) -> list[dict]:
-    """K线：category 4=日 5=周 6=月 11=60分钟。"""
-    client = _mootdx_client()
-    df = client.bars(symbol=code, category=category, offset=offset)
-    return df.to_dict("records") if df is not None and not df.empty else []
+    """K线：category 4=日 5=周 6=月 11=60分钟。
+
+    优先 mootdx（本地 TDX 协议，含分钟线）；mootdx 不可达时回退腾讯 gtimg HTTP 源
+    （仅日/周/月）。两者都失败返回空列表（调用方按空处理，不崩）。
+    """
+    try:
+        client = _mootdx_client()
+        df = client.bars(symbol=code, category=category, offset=offset)
+        rows = df.to_dict("records") if df is not None and not df.empty else []
+        if rows:
+            return rows
+    except Exception:  # noqa: BLE001  mootdx 不可达/依赖缺失 → 回退
+        pass
+    # 回退：分钟线 gtimg 不支持，返回空；日/周/月走 gtimg。
+    if category == 11:
+        return []
+    try:
+        return _tencent_kline(code, category=category, offset=offset)
+    except Exception:  # noqa: BLE001  回退源也失败 → 空
+        return []
 
 
 def finance(code: str) -> dict:

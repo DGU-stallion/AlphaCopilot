@@ -7,7 +7,7 @@ M2 capstone。链路（全程无真实 key）：
    → dsh 真实执行我们的 run_python（Seatbelt 沙箱）→ 产出落 workspace/runs/<run_id>/
    → tool 结果回流，mock 第二轮返回文字结论
    → turn 结束：session_manager 扫描 runs/ 摄取 manifest → artifact 落库 + 挂消息 + 事件
-  验收：SSE 见 assistant/chunk（结论）+ artifact/attached；GET messages 里 assistant 消息
+  验收：SSE 见 text_delta（结论）+ artifact/attached；GET messages 里 assistant 消息
         挂着一个 kind=chart 的 artifact，payload 是 heatmap option（series[0].type=heatmap）。
 
 用真实 uvicorn（SSE 长驻流不能用 ASGITransport）。
@@ -158,11 +158,11 @@ async def test_e2e1_correlation_heatmap_in_chat_stream():
                             if line.startswith("event:"):
                                 cur = line.split("event:", 1)[1].strip()
                                 seen_types.add(cur)
-                            elif line.startswith("data:") and cur == "assistant/chunk":
+                            elif line.startswith("data:") and cur == "text_delta":
                                 d = json.loads(line[5:].strip())
-                                ch = d.get("data", {}).get("chunk", {})
-                                if ch.get("type") == "text-delta":
-                                    deltas.append(ch["text"])
+                                t = d.get("text")
+                                if isinstance(t, str):
+                                    deltas.append(t)
                             if cur == "message/committed":
                                 break
 

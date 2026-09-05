@@ -19,20 +19,42 @@ from pathlib import Path
 
 import uvicorn
 
+from agent.credentials import read_api_key
 from api.app import create_app
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
+
+# agnes 端点（openai-completions）。settings.yaml 里 baseURL 开头有字面 \t，此处已 strip。
+_AGNES_BASE_URL = "https://apihub.agnes-ai.com/v1"
+_AGNES_MODEL = "agnes-2.5-flash"
+
+
+def _resolve_model_config() -> tuple[str | None, str | None, str | None]:
+    """决定 (base_url, api_key, model)。
+
+    优先级：显式 DEEPSEEK_* env（keyless mock / 官方）> agnes（AGNES_API_KEY 可用时）> 无。
+    """
+    ds_base = os.environ.get("DEEPSEEK_BASE_URL")
+    ds_key = os.environ.get("DEEPSEEK_API_KEY")
+    if ds_base or ds_key:
+        return ds_base, ds_key, os.environ.get("DEEPSEEK_MODEL")
+    agnes_key = read_api_key("AGNES_API_KEY")
+    if agnes_key:
+        return _AGNES_BASE_URL, agnes_key, _AGNES_MODEL
+    return None, None, None
 
 
 def build_app():
     db = os.environ.get("ALPHACOPILOT_DB", str(_REPO_ROOT / "workspace" / "alphacopilot.db"))
     ws = Path(os.environ.get("ALPHACOPILOT_WORKSPACE", str(_REPO_ROOT / "workspace")))
     ws.mkdir(parents=True, exist_ok=True)
+    base_url, api_key, model = _resolve_model_config()
     return create_app(
         db_path=db,
         workspace_root=ws,
-        base_url=os.environ.get("DEEPSEEK_BASE_URL"),
-        api_key=os.environ.get("DEEPSEEK_API_KEY"),
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
     )
 
 

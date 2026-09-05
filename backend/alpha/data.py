@@ -88,3 +88,24 @@ def closes(code: str, period: int = DAY, count: int = 250) -> list[float]:
         if v is not None:
             out.append(float(v))
     return out
+
+
+def closes_with_dates(code: str, period: int = DAY, count: int = 250) -> list[tuple[str, float]]:
+    """带日期的收盘价序列（相关性/对齐用）。基于 kline，抽 (date, close)。
+
+    参数：code 6 位代码；period 周期（DAY/WEEK/MONTH/MIN60）；count 根数（默认 250）。
+    返回：(日期字符串, 收盘价) 元组列表，时间升序。日期取 kline 记录的 'datetime'
+    字段（mootdx bars 约定；兼容 'date'），截断到日粒度 'YYYY-MM-DD'。缺日期或 close
+    的记录跳过；数据源缺失时返回空列表。
+
+    用途：跨标的按日期对齐取交集（停牌/跨市场日历不齐时必需），再算相关性。
+    """
+    rows = kline(code, period=period, count=count)
+    out: list[tuple[str, float]] = []
+    for r in rows:
+        close = r.get("close")
+        raw = r.get("datetime", r.get("date"))
+        if close is None or raw is None:
+            continue
+        out.append((str(raw)[:10], float(close)))
+    return out

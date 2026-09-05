@@ -14,8 +14,9 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
-from agent.harness import HarnessSession, HarnessSettings
 from agent.persona import system_prompt as compliance_prompt
+from agent.provider import ProviderSpec
+from agent.providers.dsh import DshProvider
 
 _CAPTURE: dict = {}
 
@@ -65,21 +66,21 @@ async def test_compliance_prompt_visible_to_model():
     try:
         with tempfile.TemporaryDirectory(prefix="t31-") as tmp:
             ws = Path(tmp) / "ws"
-            sr = Path(tmp) / "s"
             ws.mkdir()
-            sr.mkdir()
-            # system_prompt=None → harness 注入合规 persona（默认行为）。
-            s = HarnessSession(
-                HarnessSettings(
-                    workspace=str(ws), session_root=str(sr),
+            # ProviderSpec.system_prompt 由业务层填入合规 persona（app.py 默认行为）；
+            # 这里显式传 compliance_prompt() 复刻该注入路径。
+            p = DshProvider(
+                ProviderSpec(
+                    workspace=ws,
+                    system_prompt=compliance_prompt(),
                     base_url=base, api_key="sk-mock",
                     request_timeout_seconds=90.0,
                 )
             )
-            await asyncio.to_thread(s.start)
-            async for _ in s.astream("帮我推荐一只能涨的票"):
+            await asyncio.to_thread(p.start)
+            async for _ in p.astream("帮我推荐一只能涨的票"):
                 pass
-            s.close()
+            p.close()
     finally:
         server.shutdown()
 

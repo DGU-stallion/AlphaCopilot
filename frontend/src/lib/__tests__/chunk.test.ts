@@ -1,19 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { extractChunkText } from "@/lib/chunk";
+import { extractDeltaText } from "@/lib/chunk";
 
-describe("extractChunkText", () => {
-  it("提取 text-delta 的文本", () => {
-    const ev = { type: "assistant/chunk", data: { chunk: { type: "text-delta", text: "茅" } } };
-    expect(extractChunkText(ev)).toBe("茅");
+describe("extractDeltaText", () => {
+  it("提取 text_delta 的文本", () => {
+    expect(extractDeltaText({ text: "茅" })).toBe("茅");
   });
 
-  it("block-start/end 无文本返回空", () => {
-    expect(extractChunkText({ data: { chunk: { type: "block-start" } } })).toBe("");
-    expect(extractChunkText({ data: { chunk: { type: "block-end", block: { text: "茅台" } } } })).toBe("");
-  });
-
-  it("形状缺失返回空", () => {
-    expect(extractChunkText({})).toBe("");
-    expect(extractChunkText({ data: {} })).toBe("");
+  it("无 text 字段返回空", () => {
+    expect(extractDeltaText({})).toBe("");
+    expect(extractDeltaText({ text: 123 })).toBe("");
   });
 });

@@ -1,9 +1,10 @@
 /**
  * useSSE — 订阅后端 GET /api/sessions/{id}/stream 的 SSE。
  *
- * 契约（见 backend/api/app.py）：每条 SSE 形如
- *   id: <n>\nevent: <type>\ndata: <json>\n\n
- * type ∈ { assistant/chunk, assistant/message, turn/final, message/committed, ... }。
+ * 契约（见 backend/agent/provider.py）：每条 SSE 形如
+ *   id: <n>\nevent: <kind>\ndata: <json>\n\n
+ * kind ∈ { text_delta, tool_started, tool_result, turn_end, error,
+ *          message/committed, ... }（provider 归一化后的中立事件 + 编排层元事件）。
  * EventSource 会把 id 作为 lastEventId，浏览器原生在重连时带上 Last-Event-ID。
  *
  * 只做一件事：连上、把每条事件按 type 分发给 handler、断开时自动重连（EventSource 原生）。
@@ -34,12 +35,13 @@ export function useSSE() {
       handler?.(parsed, raw.lastEventId);
     };
 
-    // 后端会发的事件类型（session.event 归一化后 + 适配层元事件）。
+    // 后端会发的事件类型（provider 归一化后的中立 kind + 编排层元事件）。
     const types = [
-      "assistant/chunk",
-      "assistant/message",
-      "turn/final",
-      "turn/error",
+      "text_delta",
+      "tool_started",
+      "tool_result",
+      "turn_end",
+      "error",
       "message/committed",
     ];
     for (const t of types) {

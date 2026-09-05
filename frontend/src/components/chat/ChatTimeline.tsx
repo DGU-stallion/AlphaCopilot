@@ -2,30 +2,24 @@
  * ChatTimeline — 对话主时间线（M1 打通）。
  *
  * 流程：挂载时建会话 → 用户发消息（乐观插入 user 气泡 + 空 assistant 气泡）→
- * 订阅 SSE → assistant/chunk 逐字累加到 assistant 气泡（逐字出字）→
+ * 订阅 SSE → text_delta 逐字累加到 assistant 气泡（逐字出字）→
  * message/committed 定稿。SSE 由 useSSE 管理（EventSource 原生重连）。
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MessageBubble, type BubbleMessage } from "@/components/chat/MessageBubble";
+import { MessageBubble } from "@/components/chat/MessageBubble";
 import type { Artifact } from "@/components/blocks/ArtifactBlock";
-import { useSSE } from "@/hooks/useSSE";
-import { createSession, listMessages, sendMessage, streamUrl } from "@/lib/api";
-import { extractChunkText } from "@/lib/chunk";
+import { listMessages, sendMessage, streamUrl } from "@/lib/api";
+import { useSession } from "@/session-context";
+import { extractDeltaText } from "@/lib/chunk";
 
 export function ChatTimeline() {
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<BubbleMessage[]>([]);
+  // 会话状态来自 AppShell 层的 SessionContext（单一真源，panel 开关不丢、不重复建会话）。
+  const { sessionId, messages, setMessages, connect } = useSession();
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const { connect, disconnect } = useSSE();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const streamingIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    createSession().then(setSessionId).catch(() => setSessionId(null));
-    return () => disconnect();
-  }, [disconnect]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -40,7 +34,7 @@ export function ChatTimeline() {
     setMessages((prev) =>
       prev.map((m) => (m.id === sid ? { ...m, content: m.content + delta } : m)),
     );
-  }, []);
+  }, [setMessages]);
 
   const finalize = useCallback(() => {
     const sid = streamingIdRef.current;
@@ -50,7 +44,7 @@ export function ChatTimeline() {
     );
     streamingIdRef.current = null;
     setBusy(false);
-  }, []);
+  }, [setMessages]);
 
   const onSend = useCallback(async () => {
     if (!sessionId || !input.trim() || busy) return;
@@ -68,10 +62,9 @@ export function ChatTimeline() {
 
     // 先订阅 SSE，再发消息（发消息会触发后台 turn；全量补发保证不漏早期事件）。
     connect(streamUrl(sessionId), {
-      "assistant/chunk": (data) => appendToStreaming(extractChunkText(data)),
-      "turn/final": (data) => {
-        const finalText = (data.final_response as string) || "";
-        // 若逐字累加为空（极端情况），用 final 兜底填充。
+      text_delta: (data) => appendToStreaming(extractDeltaText(data)),
+      turn_end: (data) => {
+        const finalText = (data.final_text as string) || "";
         const sid = streamingIdRef.current;
         if (sid && finalText) {
           setMessages((prev) =>
@@ -82,9 +75,8 @@ export function ChatTimeline() {
         }
         finalize();
       },
-      "turn/error": () => finalize(),
+      error: () => finalize(),
       "message/committed": async () => {
-        // turn 定稿：从后端拉取消息（含挂载的 artifacts）并挂到当前 assistant 气泡。
         const sid = streamingIdRef.current;
         if (!sid) return;
         try {
@@ -107,7 +99,7 @@ export function ChatTimeline() {
     } catch {
       finalize();
     }
-  }, [sessionId, input, busy, connect, appendToStreaming, finalize]);
+  }, [sessionId, input, busy, connect, appendToStreaming, finalize, setMessages]);
 
   return (
     <div className="glass flex h-full flex-col rounded-lg">

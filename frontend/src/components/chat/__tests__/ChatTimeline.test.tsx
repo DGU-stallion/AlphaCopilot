@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ChatTimeline } from "@/components/chat/ChatTimeline";
+import { SessionProvider } from "@/session-context";
 
 /**
  * 用假的 EventSource 驱动逐字流，验证 M1 行为：发一句话 → assistant 气泡逐字累加。
@@ -27,7 +28,7 @@ class FakeEventSource {
 }
 
 function deltaEvent(text: string) {
-  return { type: "assistant/chunk", data: { chunk: { type: "text-delta", text } } };
+  return { text };
 }
 
 describe("ChatTimeline (M1 逐字流)", () => {
@@ -47,7 +48,11 @@ describe("ChatTimeline (M1 逐字流)", () => {
   });
 
   it("发一句话，assistant 气泡逐字累加并定稿", async () => {
-    render(<ChatTimeline />);
+    render(
+      <SessionProvider>
+        <ChatTimeline />
+      </SessionProvider>,
+    );
 
     // 等会话建立（输入框从「连接中」变为可用）
     const input = (await screen.findByPlaceholderText("输入消息…")) as HTMLInputElement;
@@ -65,12 +70,12 @@ describe("ChatTimeline (M1 逐字流)", () => {
 
     // 逐字推："茅"、"台"、"是"、"龙"、"头"
     for (const ch of ["茅", "台", "是", "龙", "头"]) {
-      es.emit("assistant/chunk", deltaEvent(ch));
+      es.emit("text_delta", deltaEvent(ch));
     }
     await screen.findByText("茅台是龙头");
 
     // 定稿
-    es.emit("turn/final", { final_response: "茅台是龙头" });
+    es.emit("turn_end", { final_text: "茅台是龙头" });
     await waitFor(() => {
       const bubbles = screen.getAllByText("茅台是龙头");
       expect(bubbles.length).toBeGreaterThan(0);

@@ -91,6 +91,27 @@ spike 类任务（T21–T24）允许无测试，但**必须产出结论文档**�
 
 每完成一个 M，回到 `docs/PLAN.md` 第一节核对四项能力承诺，防跑偏。
 
+## ADR-0007 迭代（T41–T50）：页面驱动 + dsh 解耦 + 参数化 page spec + 真实 agnes
+
+依据 ADR-0007。三波并行推进，波间以测试全绿为门禁。
+
+| ID | 任务 | DoD | 状态 |
+|----|------|-----|------|
+| T41 | dsh 解耦：AgentProvider/AgentEvent 中立契约 + DshProvider 下沉 + 前端换中立事件名 | grep 无 dsh 词汇泄漏；86 passed | ✅ |
+| T42 | 真实 agnes 接通（strip \t baseURL + max_tokens cap 65536 + 去 thinking） | live 实测真实回复非空 | ✅ |
+| T43 | alpha.factor.correlation：日期对齐(交集)/归一化叠加/收益率相关矩阵/滚动相关 | 手算 fixture；收益率相关≠价格相关 | ✅ |
+| T44 | alpha.registry 白名单注册表 + ParamSpec.coerce | 未注册 fn 拒收；越界拒收 | ✅ |
+| T45 | store 按聚合拆仓储 + page 表加 kind + validate_spec（fn 白名单） | 91 passed；fn=os.system 被拒 | ✅ |
+| T46 | AppShell 页面驱动布局：可收展 tab + 右下浮标 + 右侧 chat panel + 会话状态提层 | 收展持久化；panel 开关不丢会话；69 passed | ✅ |
+| T47 | 通用 PageRenderer：据 params 自动生成控件 + 改参重算 | 三种控件断言；改参触发 render；73 passed | ✅ |
+| T48 | page render 端点 + 两条内置 spec（correlation/daily-review） | 97 passed；render 三 block 非空 series | ✅ |
+| T49 | live E2E：真实 agnes 调 run_python 产图 | 实测：agnes 自主调 run_python → 产出合法 chart.json | ✅ |
+| T50 | 承诺 B 验收：curl 插 page spec | 实测：curl POST → GET 立即多一页，零前端改动零重启 | ✅ |
+
+已知环境阻塞（非代码缺陷）：A 股行情源 mootdx 在本环境不可达（`Quotes.factory` 即时失败），
+故 correlation 页 render 真实行情返回 503（已做优雅降级，非 500）；T49 用 run_python 内合成
+数据验证「模型写并执行分析代码产图」的能力链。真实行情接通留待数据源可达环境。
+
 ## 归档说明：T01–T20
 
 T01–T20 属 ADR-0004/0005 的 dsh 插件化路线，已于 2026-08-29 由 ADR-0006 取代。

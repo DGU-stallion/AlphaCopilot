@@ -134,3 +134,33 @@ def test_foreign_key_cascade_message(store):
     store.conn.execute("DELETE FROM session WHERE id=?", (sid,))
     store.conn.commit()
     assert store.list_messages(sid) == []
+
+
+def test_page_kind_migration_idempotent_on_legacy_db():
+    """老库（page 表无 kind 列）迁移应补列且旧行默认 'user'；跑两次不报错（幂等）。"""
+    from api.store import _migrate_page_kind
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    # 模拟 T26 老 schema：page 表没有 kind 列。
+    conn.execute(
+        "CREATE TABLE page ("
+        " id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, title TEXT NOT NULL,"
+        " status TEXT NOT NULL DEFAULT 'draft', spec TEXT NOT NULL,"
+        " created_at REAL NOT NULL, updated_at REAL NOT NULL)"
+    )
+    conn.execute(
+        "INSERT INTO page (id, slug, title, status, spec, created_at, updated_at) "
+        "VALUES ('p-old','legacy','旧页','draft','{}',0,0)"
+    )
+    conn.commit()
+
+    # 迁移两次：均不报错（幂等）。
+    _migrate_page_kind(conn)
+    _migrate_page_kind(conn)
+
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(page)").fetchall()}
+    assert "kind" in cols
+    row = conn.execute("SELECT kind FROM page WHERE id='p-old'").fetchone()
+    assert row["kind"] == "user"  # 旧行默认 user
+    conn.close()

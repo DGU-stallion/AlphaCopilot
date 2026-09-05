@@ -130,4 +130,19 @@
 
   /* 暖橙光文字 */
   .text-glow { text-shadow: 0 0 18px hsl(var(--primary) / 0.45); }
+
+  /* 右侧 slide-in 对话面板（仅布局，主题色沿用 .glass token） */
+  .chat-panel {
+    position: fixed;
+    top: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    z-index: 30;
+    width: min(28rem, 92vw);
+    animation: chat-panel-in 180ms ease-out;
+  }
+  @keyframes chat-panel-in {
+    from { transform: translateX(16px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
 }

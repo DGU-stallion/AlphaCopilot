@@ -1,12 +1,13 @@
-"""会话编排 —— 把 HarnessSession 的事件流桥到 SSE，并把消息落库（T28）。
+"""会话编排 —— 把 provider 的事件流桥到 SSE，并把消息落库（T28）。
 
 职责：
-- 每个产品会话映射一个存活的 HarnessSession（一会话一子进程，见 T27）。
+- 每个产品会话映射一个存活的 AgentProvider 实例（一会话一运行时，见 ADR-0006 决策 5）。
 - 用户发消息 → 落库 user message → 触发 agent turn → 流事件写入 per-session ring
   buffer（带单调递增 event_id）→ 订阅者（SSE）实时收到 → turn 结束落库 assistant message。
 - SSE 断线重连：客户端带 Last-Event-ID，从 buffer 里补发之后的事件。
 
-零 dsh 细节泄漏：只依赖 agent.harness 的 HarnessSession / StreamEvent 抽象。
+零 provider 细节泄漏：只依赖 agent.provider 的 AgentProvider / AgentEvent 中立契约，
+不 import 任何具体 provider 实现，不出现 dsh 私有词汇。
 """
 
 from __future__ import annotations
@@ -16,7 +17,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from agent.harness import HarnessSession, HarnessSettings, StreamEvent
+from agent.provider import (
+    EVENT_TEXT_DELTA,
+    EVENT_TURN_END,
+    AgentProvider,
+)
 from api.store import Store
 
 
@@ -29,9 +34,9 @@ class BufferedEvent:
 
 @dataclass
 class SessionRuntime:
-    """一个会话的运行态：harness 子进程 + 事件 buffer + 订阅者。"""
+    """一个会话的运行态：provider 运行时 + 事件 buffer + 订阅者。"""
 
-    harness: HarnessSession
+    provider: AgentProvider
     workspace: str = ""  # 该会话 sandbox 根（其下 runs/<run_id>/）
     events: list[BufferedEvent] = field(default_factory=list)
     _subscribers: list[asyncio.Queue] = field(default_factory=list)
@@ -64,11 +69,11 @@ class SessionRuntime:
 
 
 class SessionManager:
-    """管理所有会话运行态。业务层唯一持有 harness 的地方。"""
+    """管理所有会话运行态。业务层唯一持有 provider 的地方。"""
 
-    def __init__(self, store: Store, settings_factory, jobs=None) -> None:
+    def __init__(self, store: Store, provider_factory, jobs=None) -> None:
         self._store = store
-        self._settings_factory = settings_factory  # (session_id) -> HarnessSettings
+        self._provider_factory = provider_factory  # (session_id) -> AgentProvider
         self._jobs = jobs  # JobQueue（可选；agent submit_backtest 请求在 turn 末入队）
         self._runtimes: dict[str, SessionRuntime] = {}
 
@@ -77,12 +82,11 @@ class SessionManager:
 
     async def _ensure_runtime(self, session_id: str) -> SessionRuntime:
         rt = self._runtimes.get(session_id)
-        if rt is not None and rt.harness.is_process_alive():
+        if rt is not None and rt.provider.is_alive():
             return rt
-        settings: HarnessSettings = self._settings_factory(session_id)
-        harness = HarnessSession(settings)
-        await asyncio.to_thread(harness.start)
-        rt = SessionRuntime(harness=harness, workspace=settings.workspace)
+        provider, workspace = self._provider_factory(session_id)
+        await asyncio.to_thread(provider.start)
+        rt = SessionRuntime(provider=provider, workspace=str(workspace))
         self._runtimes[session_id] = rt
         return rt
 
@@ -90,7 +94,7 @@ class SessionManager:
         return self._runtimes.get(session_id)
 
     async def send_message(self, session_id: str, content: str) -> str:
-        """落库 user message，触发 agent turn（后台流事件），返回 user message id。
+        """落库 user message，触发 agent turn（后台流事件），返回 session id。
 
         turn 在后台任务里跑；事件实时进 buffer；assistant 消息在 turn 结束时落库。
         """
@@ -104,19 +108,14 @@ class SessionManager:
     ) -> None:
         assistant_text_parts: list[str] = []
         final_text = ""
-        async for ev in rt.harness.astream(prompt):
-            if ev.type == "turn/final":
-                final_text = ev.payload.get("final_response", "")
-                rt._emit("turn/final", ev.payload)
-            elif ev.type == "turn/error":
-                rt._emit("turn/error", ev.payload)
-            else:
-                # assistant/chunk 等：透传给 SSE。
-                rt._emit(ev.type, ev.payload)
-                if ev.type == "assistant/chunk":
-                    piece = _extract_chunk_text(ev.payload)
-                    if piece:
-                        assistant_text_parts.append(piece)
+        async for ev in rt.provider.astream(prompt):
+            rt._emit(ev.kind, ev.payload)
+            if ev.kind == EVENT_TEXT_DELTA:
+                piece = ev.payload.get("text", "")
+                if piece:
+                    assistant_text_parts.append(piece)
+            elif ev.kind == EVENT_TURN_END:
+                final_text = ev.payload.get("final_text", "")
         text = final_text or "".join(assistant_text_parts)
         mid = self._store.add_message(session_id, "assistant", text)
         # turn 结束：扫描 workspace/runs/ 里新出现的 manifest.json，校验后落库并挂到本条消息。
@@ -184,24 +183,8 @@ class SessionManager:
     def close_session(self, session_id: str) -> None:
         rt = self._runtimes.pop(session_id, None)
         if rt is not None:
-            rt.harness.close()
+            rt.provider.close()
 
     def close_all(self) -> None:
         for sid in list(self._runtimes):
             self.close_session(sid)
-
-
-def _extract_chunk_text(payload: dict[str, Any]) -> str:
-    """从 dsh assistant/chunk event 取增量文本。
-
-    实测 dsh 形状：payload['data']['chunk'] = {'type':'text-delta','text':...}。
-    只在 text-delta 时取 text；block-start/end/finish 无文本。
-    """
-    data = payload.get("data")
-    if isinstance(data, dict):
-        chunk = data.get("chunk")
-        if isinstance(chunk, dict) and chunk.get("type") == "text-delta":
-            t = chunk.get("text")
-            if isinstance(t, str):
-                return t
-    return ""
