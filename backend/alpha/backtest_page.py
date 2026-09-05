@@ -15,6 +15,25 @@ from alpha.registry import ParamSpec, register
 _RANGE_COUNT = {"3m": 63, "6m": 126, "1y": 250}
 
 
+# ── 策略注册表（可插拔）─────────────────────────────────────────────
+# 每个策略是 {label, desc, signal_fn}，signal_fn(closes, fast, slow) -> signals（持仓序列）。
+# 现只有「双均线金叉」一个确定性实现；新增策略只需在此登记一个条目。
+#
+# 🔌 扩展位（后续 vnpy 等外部回测引擎）：
+#    未来接 vnpy 时，可把外部引擎包装成一个 signal_fn 适配器（喂 closes、
+#    返回逐 bar 持仓序列），登记为新的 STRATEGIES 条目即可复用本页的取数/gate/
+#    净值/回撤/指标全链路，无需改动 render 契约。若外部引擎自带完整回测（不止信号），
+#    则在此按策略名分发到独立的 _run 分支。本轮只做骨架，不接 vnpy 本身。
+STRATEGIES: dict[str, dict] = {
+    "dual_ma": {
+        "label": "双均线金叉",
+        "desc": "快线上穿慢线买入、下穿卖出",
+        "signal_fn": be.golden_cross_signal,  # (closes, fast, slow) -> signals
+    },
+}
+_DEFAULT_STRATEGY = "dual_ma"
+
+
 def _load(symbol: str, range: str) -> tuple[list[str], list[float]]:
     """取带日期收盘价。数据源不可用时返回 ([], [])。"""
     count = _RANGE_COUNT.get(range, 250)
@@ -24,12 +43,18 @@ def _load(symbol: str, range: str) -> tuple[list[str], list[float]]:
     return dates, closes
 
 
-def _run(symbol: str, fast: int, slow: int, range: str):
-    """公共：取数 + gate + 回测。返回 (result, dates) 或 (None, reason)。"""
+def _run(symbol: str, fast: int, slow: int, range: str, strategy: str = _DEFAULT_STRATEGY):
+    """公共：取数 + gate + 回测。返回 (result, dates) 或 (None, reason)。
+
+    按 strategy 名分发到对应 signal_fn；未知策略名降级为「不支持的策略」提示。
+    """
+    strat = STRATEGIES.get(strategy)
+    if strat is None:
+        return None, f"不支持的策略：{strategy}"
     dates, closes = _load(symbol, range)
     if len(closes) < 2:
         return None, "数据源暂不可用或历史不足"
-    signal = be.golden_cross_signal(closes, fast, slow)
+    signal = strat["signal_fn"](closes, fast, slow)
     reason = be.gate(closes, signal, dates)
     if reason:
         return None, reason
@@ -41,17 +66,20 @@ _PARAMS = [
     ParamSpec("fast", "int", default=20, min=2, max=120, label="快线"),
     ParamSpec("slow", "int", default=60, min=3, max=250, label="慢线"),
     ParamSpec("range", "date_range", default="1y", label="区间"),
+    ParamSpec("strategy", "enum", default=_DEFAULT_STRATEGY,
+              choices=list(STRATEGIES), label="策略"),
 ]
 
 
 @register("backtest.equity", params=_PARAMS)
-def backtest_equity(symbol: str, fast: int, slow: int, range: str) -> dict:
-    """双均线金叉策略净值 vs 买入持有基准，返回 ECharts line option。
+def backtest_equity(symbol: str, fast: int, slow: int, range: str,
+                    strategy: str = _DEFAULT_STRATEGY) -> dict:
+    """所选策略净值 vs 买入持有基准，返回 ECharts line option。
 
     净值扣 A 股费用（佣金/印花/过户）；无未来函数（信号次日成交、涨跌停按前收）。
     数据源不可用时返回空图 + 标题提示。
     """
-    res, reason = _run(symbol, fast, slow, range)
+    res, reason = _run(symbol, fast, slow, range, strategy)
     if res is None:
         return chart.line([], {"净值": []}, title=f"回测净值（{reason}）")
     # 买入持有基准（归一化）
@@ -59,17 +87,19 @@ def backtest_equity(symbol: str, fast: int, slow: int, range: str) -> dict:
     base0 = closes[0]
     benchmark = [round(c / base0, 6) for c in closes]
     name = data.names([symbol])[symbol]
+    label = STRATEGIES.get(strategy, {}).get("label", strategy)
     return chart.line(
         res.dates,
-        {f"{fast}/{slow}金叉策略": res.equity, "买入持有": benchmark},
+        {f"{label}({fast}/{slow})": res.equity, "买入持有": benchmark},
         title=f"{name} 回测净值（{range}）",
     )
 
 
 @register("backtest.drawdown", params=_PARAMS)
-def backtest_drawdown(symbol: str, fast: int, slow: int, range: str) -> dict:
+def backtest_drawdown(symbol: str, fast: int, slow: int, range: str,
+                      strategy: str = _DEFAULT_STRATEGY) -> dict:
     """策略回撤曲线，返回 ECharts line option。数据源不可用时空图 + 提示。"""
-    res, reason = _run(symbol, fast, slow, range)
+    res, reason = _run(symbol, fast, slow, range, strategy)
     if res is None:
         return chart.line([], {"回撤": []}, title=f"回撤（{reason}）")
     dd_pct = [round(d * 100, 4) for d in res.drawdown]
@@ -78,9 +108,10 @@ def backtest_drawdown(symbol: str, fast: int, slow: int, range: str) -> dict:
 
 
 @register("backtest.metrics", params=_PARAMS)
-def backtest_metrics(symbol: str, fast: int, slow: int, range: str) -> dict:
+def backtest_metrics(symbol: str, fast: int, slow: int, range: str,
+                     strategy: str = _DEFAULT_STRATEGY) -> dict:
     """回测指标卡：总收益/年化/最大回撤/夏普/交易次数。返回 metric block payload。"""
-    res, reason = _run(symbol, fast, slow, range)
+    res, reason = _run(symbol, fast, slow, range, strategy)
     if res is None:
         return {"items": [{"label": "数据状态", "value": "暂不可用", "hint": reason,
                            "tone": "muted"}]}

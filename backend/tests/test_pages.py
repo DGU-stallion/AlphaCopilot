@@ -1,7 +1,7 @@
 """T45 展示页 REST + 渲染端点测试 —— 不联网（monkeypatch 假数据源）。
 
 覆盖：
-  · GET /api/pages          内置页已 upsert（correlation + daily-review）
+  · GET /api/pages          内置页已 upsert（correlation + backtest）
   · GET /api/pages/{slug}    命中/404
   · POST /api/pages          合法 spec 落库；非法 fn 的 spec 转 400
   · POST /api/pages/{slug}/render
@@ -47,7 +47,7 @@ def client(monkeypatch, tmp_path):
 def test_list_pages_has_builtins(client):
     pages = client.get("/api/pages").json()
     slugs = {p["slug"] for p in pages}
-    assert {"correlation", "daily-review"} <= slugs
+    assert {"correlation", "backtest"} <= slugs
 
 
 def test_get_page_by_slug_and_404(client):
@@ -102,69 +102,6 @@ def test_render_rejects_out_of_range_param(client):
     assert r.status_code == 400
 
 
-# ---- S2 盘面数据 + 涨停样本统计（内置页注册 + 渲染 + 优雅降级）----
-
-def test_s2_builtin_pages_registered(client):
-    slugs = {p["slug"] for p in client.get("/api/pages").json()}
-    assert {"market", "limit-up-stats"} <= slugs
-
-
-def test_render_market_blocks_shape(client, monkeypatch):
-    # mock 涨停板中心 + 大盘 + 成交额榜，验证 metric/table 三 block 形状。
-    from alpha import market
-
-    def fake_pool(endpoint, date, **k):
-        return {
-            "getTopicZTPool": [{"lbc": 1, "hybk": "半导体"}, {"lbc": 2, "hybk": "白酒"}],
-            "getTopicZBPool": [{"lbc": 1}],
-            "getTopicDTPool": [],
-        }.get(endpoint, [])
-
-    monkeypatch.setattr(market.astock, "em_zt_topic_pool", fake_pool)
-    monkeypatch.setattr(market.astock, "index_quote",
-                        lambda: [{"name": "上证", "price": 3000, "change_pct": 1.2}])
-    monkeypatch.setattr(market.astock, "market_turnover_rank",
-                        lambda n=20: [{"code": "600519", "name": "茅台", "amount": 5e9,
-                                       "pct": 2.1, "industry": "白酒"}])
-    blocks = client.post("/api/pages/market/render", json={}).json()["blocks"]
-    kinds = [b["kind"] for b in blocks]
-    assert kinds == ["metric", "table", "table"]
-    metric_labels = [it["label"] for it in blocks[0]["metric"]["items"]]
-    assert "涨停" in metric_labels
-    assert blocks[1]["table"]["rows"][0][0] == "上证"
-
-
-def test_render_market_degrades_gracefully(client, monkeypatch):
-    # 数据源全不可用：不 500，metric 标「暂不可用」，table 标「暂不可用」。
-    from alpha import market
-
-    monkeypatch.setattr(market.astock, "em_zt_topic_pool", lambda *a, **k: [])
-    monkeypatch.setattr(market.astock, "index_quote", lambda: [])
-    monkeypatch.setattr(market.astock, "market_turnover_rank", lambda n=20: [])
-    r = client.post("/api/pages/market/render", json={})
-    assert r.status_code == 200
-    blocks = r.json()["blocks"]
-    assert blocks[0]["metric"]["items"][0]["value"] == "暂不可用"
-    assert blocks[1]["table"]["rows"][0][0] == "暂不可用"
-
-
-def test_render_limit_up_stats(client, monkeypatch):
-    from alpha import market
-
-    monkeypatch.setattr(
-        market.astock, "em_zt_topic_pool",
-        lambda *a, **k: [{"lbc": 1, "hybk": "半导体"}, {"lbc": 1, "hybk": "半导体"},
-                         {"lbc": 3, "hybk": "白酒"}],
-    )
-    blocks = client.post("/api/pages/limit-up-stats/render", json={}).json()["blocks"]
-    kinds = [b["kind"] for b in blocks]
-    assert kinds == ["metric", "chart", "table"]
-    # 连板梯队柱状图：1板2家、3板1家
-    assert blocks[1]["option"]["series"][0]["data"] == [2, 1]
-    # 行业表半导体在前
-    assert blocks[2]["table"]["rows"][0] == ["半导体", 2]
-
-
 # ---- S4 回测页（引擎接线 + 渲染 + 降级）----
 
 def test_backtest_page_registered(client):
@@ -192,3 +129,40 @@ def test_render_backtest_degrades_when_no_data(client, monkeypatch):
     blocks = client.post("/api/pages/backtest/render", json={"symbol": "600519"}).json()["blocks"]
     # 不 500；指标卡标不可用
     assert blocks[0]["metric"]["items"][0]["value"] == "暂不可用"
+
+
+# ---- 回测多策略可插拔骨架 ----
+
+def test_strategies_registry_has_dual_ma():
+    """STRATEGIES 注册表含默认双均线金叉，且每条含 label/desc/signal_fn。"""
+    from alpha import backtest_page as bp
+
+    assert "dual_ma" in bp.STRATEGIES
+    entry = bp.STRATEGIES["dual_ma"]
+    assert entry["label"] == "双均线金叉"
+    assert callable(entry["signal_fn"])
+
+
+def test_run_dispatches_by_strategy_name(monkeypatch):
+    """_run 按 strategy 名分发到对应 signal_fn；未知策略名降级为不支持提示。"""
+    from alpha import backtest_page as bp
+
+    called = {}
+
+    def fake_signal(closes, fast, slow):
+        called["hit"] = (fast, slow)
+        return [0] * len(closes)
+
+    monkeypatch.setitem(bp.STRATEGIES, "dual_ma",
+                        {"label": "双均线金叉", "desc": "", "signal_fn": fake_signal})
+    monkeypatch.setattr(bp, "_load", lambda symbol, range: (["d1", "d2", "d3"], [10.0, 11.0, 12.0]))
+    monkeypatch.setattr(bp.be, "gate", lambda *a, **k: None)
+    monkeypatch.setattr(bp.be, "run", lambda *a, **k: object())
+
+    _res, reason = bp._run("600519", 5, 10, "1y", "dual_ma")
+    assert reason is None
+    assert called["hit"] == (5, 10)  # 分发到了 dual_ma 的 signal_fn
+
+    # 未知策略名：不取数、直接降级
+    res2, reason2 = bp._run("600519", 5, 10, "1y", "not_a_strategy")
+    assert res2 is None and "不支持" in reason2

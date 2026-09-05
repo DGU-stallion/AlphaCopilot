@@ -20,13 +20,18 @@ import { renderPage, type RenderResult, type MetricItem } from "@/lib/research";
 const toneCls = (t?: MetricItem["tone"]) =>
   t === "up" ? pctColor(1) : t === "down" ? pctColor(-1) : "text-foreground";
 
+// 可选策略（与后端 alpha/backtest_page.py 的 STRATEGIES 对应）。
+// 现只有双均线金叉一个；将来后端登记新策略（含 vnpy 适配器）后在此加选项即可。
+const STRATEGY_OPTIONS = [{ value: "dual_ma", label: "双均线金叉" }];
+
 export function Backtest() {
   const [symbol, setSymbol] = useState("600519");
   const [fast, setFast] = useState("20");
   const [slow, setSlow] = useState("60");
   const [range, setRange] = useState("1y");
+  const [strategy, setStrategy] = useState("dual_ma");
   const [inputErr, setInputErr] = useState("");
-  const [params, setParams] = useState({ symbol: "600519", fast: 20, slow: 60, range: "1y" });
+  const [params, setParams] = useState({ symbol: "600519", fast: 20, slow: 60, range: "1y", strategy: "dual_ma" });
 
   // 当前输入代码对应的名称，仅为展示更直观。api.quote 拿不到时静默降级（不显示）。
   const [symbolName, setSymbolName] = useState("");
@@ -40,7 +45,7 @@ export function Backtest() {
     return () => { alive = false; };
   }, [symbol]);
 
-  const key = `bt:${params.symbol}:${params.fast}:${params.slow}:${params.range}`;
+  const key = `bt:${params.symbol}:${params.fast}:${params.slow}:${params.range}:${params.strategy}`;
   const res = useCachedResource<RenderResult>(key, () => renderPage("backtest", params));
 
   const run = () => {
@@ -52,7 +57,7 @@ export function Backtest() {
     if (!(s >= 3 && s <= 250)) { setInputErr("慢线须在 3~250"); return; }
     if (f >= s) { setInputErr("快线须小于慢线"); return; }
     setInputErr("");
-    setParams({ symbol: code, fast: f, slow: s, range });
+    setParams({ symbol: code, fast: f, slow: s, range, strategy });
   };
 
   const blocks = res.data?.blocks ?? [];
@@ -74,6 +79,15 @@ export function Backtest() {
           <Caliber text={"双均线金叉：快线上穿慢线买入、下穿卖出。净值扣佣金/印花/过户；信号次日成交、涨跌停按前收，无未来函数。"} />
         </div>
         <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">策略</label>
+            <select value={strategy} onChange={(e) => setStrategy(e.target.value)}
+              className="rounded-lg border border-border bg-card px-3 py-2 text-sm">
+              {STRATEGY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="mb-1 block text-xs text-muted-foreground">标的</label>
             <input value={symbol} onChange={(e) => setSymbol(e.target.value.replace(/[^\d]/g, ""))} maxLength={6}

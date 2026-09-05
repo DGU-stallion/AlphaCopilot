@@ -20,7 +20,8 @@ AI 只解释、固定业务页面）。历史决策 ADR-0002/0004/0005/0006/0007
 3. **agent 不直接写数据库**：只写 workspace 文件 + 调副作用 MCP 工具，业务层校验后落库
 4. **重活不进 agent 的 turn**：长任务走 job 队列，agent 只「写代码 → 提交 job → 读结果」
 5. MCP 工具层零业务逻辑：校验 → 调 `alpha.*` → JSON 化 → 截断 ≤6000 字符
-6. **页面数据驱动**：新增展示页 = 插一条 page spec 记录，禁止为单个页面写组件
+6. **固定业务页**：前端为缝合的固定页组件（非旧 page-spec 动态渲染）；
+   回测/相关性仍走 `/api/pages/{slug}/render`，新增市场类页直连专用 REST 端点
 7. 颜色/主题只写在 `frontend/src/index.css` 的 token 与 `lib/chart-theme.ts` 两处
 8. 图表默认产 ECharts option JSON（可交互）；PNG 仅用于 helper 表达不了的图形
 9. **不给 agent bash**（SDK 闭包无 `bash-sandbox`，`bash-local` 不隔离）；

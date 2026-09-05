@@ -112,7 +112,27 @@ spike 类任务（T21–T24）允许无测试，但**必须产出结论文档**�
 故 correlation 页 render 真实行情返回 503（已做优雅降级，非 500）；T49 用 run_python 内合成
 数据验证「模型写并执行分析代码产图」的能力链。真实行情接通留待数据源可达环境。
 
-## 归档说明：T01–T20
+## S1–S5 前端整体替换 + 产品化迭代（feat/T25-repo-surgery）
+
+前端由旧 page-spec 动态渲染**整体替换**为缝合 vibe-astock/Vibe-Research 的固定业务页，
+按 AlphaCopilot 定位（确定性为主、AI 只解释、固定 IA）改造。
+
+| 事项 | 内容 | 状态 |
+|------|------|------|
+| 前端基座替换 | 玻璃暖橙设计系统 + lib(api/base/colors/cache/research) + ui 组件 + Layout；旧 page-spec 集群移除 | ✅ |
+| 10 页缝合 | 宏观看板/复盘看板(含涨停样本)/股票池/我的研报/回测/相关性/模拟组合/交易日志/接入AI(占位) | ✅ |
+| 后端端点逆向 | api/market.py（indices/quote/market.*/overseas/session/live-emotion/backtest/macro.*）+ duanxian + limit_up_sample | ✅ |
+| 宏观看板 | 5 类分组（股市/大宗商品/债市/汇率/加密），多数据源降级；商品/汇率走 gtimg、美债走财政部 CSV、BTC 暂不可用不伪造 | ✅ |
+| 复盘看板合并 | 涨停样本统计并入；删关注股票（自选归股票池）；大盘指数/隔夜外围牵移至宏观看板 | ✅ |
+| 回测多策略 | STRATEGIES 注册表（现 dual_ma，预留 vnpy 扩展位）；前端策略下拉 | ✅ |
+| AI 面板 | 右下角全局浮标 chat UI（AiDockFab）+ useAiPage 页面感知快照；对话逻辑占位待 S5 | ✅ UI 就绪 |
+| 死代码清理 | 移除死 page-spec（daily-review/market/limit-up-stats）+ alpha/market.py、alpha/review.py | ✅ |
+
+数据源可达性（本机实测）：大宗商品/汇率/美债 available；BTC 降级（无靠谱免费现货源）。
+mac 无 mootdx，按原降级路径，数据源不可用显示「暂不可用」不伪造 0。
+验证：前端 tsc 0 + build ✓；后端 pytest 153 passed / 8 skipped。
+
+
 
 T01–T20 属 ADR-0004/0005 的 dsh 插件化路线，已于 2026-08-29 由 ADR-0006 取代。
 其中 T01–T18a 已完成，代码在 tag `archive-dsh-plugins-v0.1`。

@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import {
   Moon, Sun, ChevronsLeft, ChevronsRight, CandlestickChart, Cog,
-  Activity, Flame, Star, FileText, TrendingDown, GitCompare, Briefcase,
+  Activity, Globe, Star, FileText, TrendingDown, GitCompare, Briefcase,
   NotebookPen } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDarkMode } from "@/hooks/useDarkMode";
+import { AiPageProvider } from "@/lib/ai-page";
+import { AiDockFab } from "@/components/ui/AiDockFab";
 
 // AlphaCopilot 导航（见 CONTEXT.md「导航分组（第一版）」）。
 // 定位：确定性计算为主、AI 只解释。全局 Agent 浮标独立于分组，覆盖在所有页面之上。
@@ -14,8 +16,8 @@ import { useDarkMode } from "@/hooks/useDarkMode";
 // 市场复盘：以人工阅读判断为主，数据确定性产出。
 // 复盘看板 = 盘面数据（指数/外围/情绪/连板梯队/成交额/板块资金一屏看全）。
 const REVIEW_NAV = [
+  { to: "/macro", icon: Globe, label: "宏观看板" },
   { to: "/daily-review", icon: Activity, label: "复盘看板" },
-  { to: "/backtest", icon: Flame, label: "涨停样本统计" },
 ];
 
 // 研究管理：本机状态型业务页。
@@ -134,11 +136,15 @@ export function Layout() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-6xl px-6 py-6">
-          <Outlet />
-        </div>
-      </main>
+      <AiPageProvider>
+        <main className="flex-1 overflow-auto">
+          <div className="mx-auto max-w-6xl px-6 py-6">
+            <Outlet />
+          </div>
+        </main>
+        {/* 全局 AI 浮标：覆盖所有页面，页面感知见 lib/ai-page */}
+        <AiDockFab />
+      </AiPageProvider>
     </div>
   );
 }

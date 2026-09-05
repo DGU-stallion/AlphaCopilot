@@ -197,6 +197,13 @@ export interface TurnoverStock {
 }
 export interface TurnoverTop { stocks: TurnoverStock[]; updated: string }
 
+// 宏观看板：大宗商品 / 汇率快照（可用时 items 有值，否则 available=false + reason）
+export interface MacroRow { name: string; price: number | null; change_pct: number | null }
+export interface MacroSnapshot { available: boolean; items?: MacroRow[]; reason?: string }
+// 美债收益率曲线：期限 → 收益率百分数（非涨跌）
+export interface RateRow { name: string; yield_pct: number }
+export interface MacroRates { available: boolean; date?: string; items?: RateRow[]; reason?: string }
+
 export interface RadarItem {
   title: string; url: string; time: string; source: string; summary?: string; zh?: string;
 }
@@ -365,6 +372,11 @@ export const api = {
   firstBoard: () => get<FirstBoardData>("/market/first-board"),
   turnoverTop: () => get<TurnoverTop>("/market/turnover-top"),
   globalIndices: () => get<GlobalIndex[]>("/global/indices"),
+  // 宏观看板：每类自洽降级，取不到返回 { available:false, reason }
+  macroCommodities: () => get<MacroSnapshot>("/macro/commodities"),
+  macroForex: () => get<MacroSnapshot>("/macro/forex"),
+  macroRates: () => get<MacroRates>("/macro/rates"),
+  macroCrypto: () => get<MacroSnapshot>("/macro/crypto"),
   globalStock: (symbol: string) => get<GlobalStock>(`/global/stock?symbol=${encodeURIComponent(symbol)}`),
   radar: () => get<RadarData>("/radar"),
   radarRefresh: () => request<RadarData>("/radar/refresh", "POST"),

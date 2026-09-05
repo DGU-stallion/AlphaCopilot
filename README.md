@@ -5,10 +5,11 @@
 > [ADR-0008](docs/adr/0008-deterministic-first-fixed-pages.md)。
 > 历史决策 ADR-0002/0004/0005/0006/0007 保留作轨迹。
 
-**个人本地 A 股低频量化投研工作台**：以确定性数据和后端计算为主体——市场复盘、
-盘面数据、涨停样本统计、相关性分析、回测、雪球式模拟组合、交易日志、研报管理。
-全局页面感知 Agent 作为「分析副驾」：解释当前页面数据、回答研究问题、提供观点，
-**不生成计算结果、不下单、不盯盘、不做多智能体辩论**。
+**个人本地 A 股低频量化投研工作台**：以确定性数据和后端计算为主体——宏观看板、
+复盘看板（含涨停样本统计）、相关性分析、回测（多策略可插拔）、雪球式模拟组合、
+交易日志、研报管理。全局页面感知 Agent 作为「分析副驾」：解释当前页面数据、回答
+研究问题、提供观点，**不生成计算结果、不下单、不盯盘、不做多智能体辩论**。
+（Agent 浮标 UI 已就绪，对话逻辑待 S5 接后端。）
 
 第一版策略：以 `AlphaTrading/` 下 vibe-astock、Vibe-Research 的现成能力为供体缝合，
 能复用就不重写；平台先搭起来，后续在使用中迭代。
@@ -23,11 +24,14 @@
 ## 架构分层
 
 ```
-展示层  React SPA        Chat 时间线 + 动态页面渲染器 + 4 类 block 渲染器
-业务层  FastAPI + alpha  会话编排 / job 队列 / 领域存储 / 分析库
-AI 层   dsh runtime      agent loop / skills / subagent（经 Python SDK 内嵌）
-数据层  research + docs  A股·全球·资讯·持仓纯函数 + 文档库
+展示层  React SPA        固定业务页（缝合 vibe-astock/Vibe-Research）+ 全局 AI 浮标
+业务层  FastAPI + alpha  REST 端点 / 页面渲染 / 领域存储 / 分析库
+AI 层   dsh runtime      agent loop / skills / subagent（S5 接入，当前占位）
+数据层  research + docs  A股·全球·宏观·资讯·持仓纯函数 + 文档库
 ```
+
+> 前端已由旧 page-spec 动态渲染整体替换为固定业务页（10 页缝合完成）；
+> 回测/相关性仍走 `/api/pages/{slug}/render`，其余页直连专用 REST 端点。
 
 ## 项目结构（目标形态）
 

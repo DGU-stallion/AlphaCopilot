@@ -18,7 +18,7 @@ from fastapi import APIRouter, HTTPException, Query
 from alpha import limit_up_sample
 from duanxian import live_emotion, overseas, trade_calendar
 from duanxian.util import china_now, china_today, is_a_share_closed, is_weekend
-from research import astock, market
+from research import astock, macro, market
 
 
 def build_market_router() -> APIRouter:
@@ -148,5 +148,28 @@ def build_market_router() -> APIRouter:
             return {"data": limit_up_sample.run_backtest(days=days)}
         except Exception as e:  # noqa: BLE001
             raise HTTPException(502, f"涨停样本统计异常：{e}") from e
+
+    # ---- 宏观看板：大宗商品 / 汇率（腾讯 gtimg）/ 美债收益率（财政部 CSV）/ 加密 ----
+    # 每类自洽降级：取不到返回 {available:False, reason}，前端如实显示「暂不可用」不伪造。
+
+    @router.get("/macro/commodities")
+    def macro_commodities() -> dict:
+        """大宗商品：原油 / 布伦特 / 黄金 / 伦敦金 / 白银。"""
+        return {"data": macro.commodities()}
+
+    @router.get("/macro/forex")
+    def macro_forex() -> dict:
+        """汇率：USDCNY / EURUSD / USDJPY / GBPUSD / USDHKD。"""
+        return {"data": macro.forex()}
+
+    @router.get("/macro/rates")
+    def macro_rates() -> dict:
+        """美债收益率曲线关键期限：2Y / 5Y / 10Y / 30Y。"""
+        return {"data": macro.rates()}
+
+    @router.get("/macro/crypto")
+    def macro_crypto() -> dict:
+        """加密货币（BTC）：暂无靠谱免费现货源，降级占位。"""
+        return {"data": macro.crypto()}
 
     return router

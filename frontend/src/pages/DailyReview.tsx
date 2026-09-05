@@ -1,17 +1,18 @@
 import { useState, useEffect, Fragment } from "react";
 import { pctColor } from "@/lib/colors";
-import { Sparkles, Loader2, RefreshCw, Gauge, ArrowDownUp, TrendingUp, TrendingDown, Plus, X, Flame, BarChart3, Globe } from "lucide-react";
+import { Sparkles, Loader2, RefreshCw, Gauge, ArrowDownUp, TrendingUp, TrendingDown, X, Flame, BarChart3 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Caliber } from "@/components/ui/Caliber";
 import { AskAiButton } from "@/components/ui/AskAiButton";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { finite } from "@/lib/agent";
-import { api, type IndexQuote, type Quote, type MarketOverview, type ShortTermEmotion, type LianbanStock, type TurnoverTop, type GlobalIndex, type MarketSession, type OverseasSnapshot, type OverseasRow, type LiveEmotion } from "@/lib/api";
+import { api, type Quote, type MarketOverview, type ShortTermEmotion, type LianbanStock, type TurnoverTop, type MarketSession, type LiveEmotion } from "@/lib/api";
 import { useDeepDive, DeepDivePanel, RunAllButton, type DiveItem } from "@/components/ui/DeepDive";
-import { loadWatch, saveWatch, addCodes } from "@/lib/watchlist";
 import { cn } from "@/lib/utils";
 import { getCache, setCache, hasCache } from "@/lib/cache";
+import { LimitUpStats } from "./LimitUpStats";
+import { useAiPage } from "@/lib/ai-page";
 
 // A股红涨绿跌。全球市场（美股/港股指数）**也沿用红涨**——与整个看板及东财等中国平台一致，
 // A 股惯例：红涨绿跌。与国际绿涨惯例相反，是有意选择，全站必须一致，勿改。
@@ -24,17 +25,11 @@ const fmt = (v: number) => v.toLocaleString("zh-CN", { maximumFractionDigits: 2 
 const yi = (v: number | null) => (v == null ? "—" : `${fmt(v / 1e8)} 亿`); // 元 → 亿
 
 export function DailyReview() {
-  const [indices, setIndices] = useState<IndexQuote[]>(() => getCache<IndexQuote[]>("dr:indices") ?? []);
-  const [idxErr, setIdxErr] = useState(false);
   const [overview, setOverview] = useState<MarketOverview | null>(() => getCache<MarketOverview>("dr:overview") ?? null);
   const [emotion, setEmotion] = useState<ShortTermEmotion | null>(() => getCache<ShortTermEmotion>("dr:emotion") ?? null);
   const [turnover, setTurnover] = useState<TurnoverTop | null>(() => getCache<TurnoverTop>("dr:turnover") ?? null);
-  const [globalIdx, setGlobalIdx] = useState<GlobalIndex[]>(() => getCache<GlobalIndex[]>("dr:globalIdx") ?? []);
   // 实时行情属于哪一场：盘前接口返回的是上一场收盘，不标出来会被当成今天的
   const [session, setSession] = useState<MarketSession | null>(() => getCache<MarketSession>("dr:session") ?? null);
-  // 隔夜外围：指数 + 七姐妹。走自己的接口是为了拿到**行情所属交易日**
-  // （vr 的 /api/global/indices 不回时间，界面就只能按本机今天贴日期）
-  const [oversea, setOversea] = useState<OverseasSnapshot | null>(() => getCache<OverseasSnapshot>("dr:oversea") ?? null);
   // 今日实时打板情绪。与下面那块「昨日短线情绪」是两回事：
   // 这块随盘变，那块是已收盘那一场的定稿。
   const [liveEmo, setLiveEmo] = useState<LiveEmotion | null>(() => getCache<LiveEmotion>("dr:liveEmo") ?? null);
@@ -44,11 +39,6 @@ export function DailyReview() {
   // 自动刷新开关：**默认关**（别替用户决定要不要一直打请求），选择记在本地
   const [autoRefresh, setAutoRefresh] = useState<boolean>(
     () => localStorage.getItem(AUTO_KEY) === "1");
-  // 关注股票（自选，存本地）
-  const [watchCodes, setWatchCodes] = useState<string[]>(loadWatch);
-  const [watchQuotes, setWatchQuotes] = useState<Record<string, Quote>>({});
-  const [watchInput, setWatchInput] = useState("");
-  const [watchLoading, setWatchLoading] = useState(false);
 
   // 各数据块请求是否已结束：区分「加载中」与「数据源暂不可用」（非交易时段/被限流时后端返回空）
   const [ovDone, setOvDone] = useState(() => hasCache("dr:overview"));
@@ -65,8 +55,6 @@ export function DailyReview() {
 
   // 轻量实时组：全是腾讯批量行情，一次一个请求，5 秒一刷不吃力
   const loadLive = () => {
-    api.indices().then((d) => { setCache("dr:indices", d); setIndices(d); }).catch(() => setIdxErr(true));
-    api.overseas().then((d) => { setCache("dr:oversea", d); setOversea(d); }).catch(() => {});
     api.marketSession().then((d) => { setCache("dr:session", d); setSession(d); }).catch(() => {});
     api.liveEmotion().then((d) => { setCache("dr:liveEmo", d); setLiveEmo(d); }).catch(() => {});
     // 连板股名单来自「昨日」那份，这里只刷它们的实时价
@@ -76,7 +64,6 @@ export function DailyReview() {
   // 重量组：板块资金走 akshare + JS 引擎（90 个行业）、成交额榜走东财 clist。
   // **不能跟着 5 秒刷** —— 会撞限流，而且这两样本身变化慢。
   const loadHeavy = () => {
-    api.globalIndices().then((d) => { setCache("dr:globalIdx", d); setGlobalIdx(d); }).catch(() => {});
     api.marketOverview().then((d) => { setCache("dr:overview", d); setOverview(d); }).catch(() => {}).finally(() => setOvDone(true));
     api.turnoverTop().then((d) => { setCache("dr:turnover", d); setTurnover(d); }).catch(() => {}).finally(() => setToDone(true));
   };
@@ -95,16 +82,9 @@ export function DailyReview() {
     </p>
   );
 
-  const refreshWatch = (codes: string[]) => {
-    if (!codes.length) { setWatchQuotes({}); return; }
-    setWatchLoading(true);
-    api.quote(codes.join(",")).then(setWatchQuotes).catch(() => {}).finally(() => setWatchLoading(false));
-  };
-
   useEffect(() => {
     // 切页回来不重取：已缓存过就直接用内存里的，只有手动点刷新（loadIndices）才重拉。
-    if (!hasCache("dr:indices")) loadIndices();
-    refreshWatch(loadWatch());
+    if (!hasCache("dr:overview")) loadIndices();
   }, []);
 
   // 连板股名单是异步来的，首次 loadLive 时它还没回来 —— 名单一到补拉一次
@@ -124,11 +104,10 @@ export function DailyReview() {
 
     const liveTimer = setInterval(() => {
       loadLive();
-      if (watchCodes.length) refreshWatch(watchCodes);
     }, LIVE_MS);
     const heavyTimer = setInterval(loadHeavy, HEAVY_MS);
     return () => { clearInterval(liveTimer); clearInterval(heavyTimer); };
-  }, [autoRefresh, session?.phase, watchCodes]);
+  }, [autoRefresh, session?.phase]);
 
   const toggleAuto = () => {
     const next = !autoRefresh;
@@ -136,26 +115,14 @@ export function DailyReview() {
     localStorage.setItem(AUTO_KEY, next ? "1" : "0");
   };
 
-  const addWatch = () => {
-    // 支持一次粘贴多只（逗号 / 空格分隔）；全部无效或重复则清空输入、无副作用。
-    const { next, added } = addCodes(watchCodes, watchInput);
-    setWatchInput("");
-    if (!added) return;
-    setWatchCodes(next); saveWatch(next); refreshWatch(next);
-  };
-
-  const removeWatch = (c: string) => {
-    const next = watchCodes.filter((x) => x !== c);
-    setWatchCodes(next); saveWatch(next); refreshWatch(next);
-  };
-
   const today = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
   // 是否处在会动的时段（后端判定，避免本机时区坑）
   const liveNow = session?.phase === "盘中" || session?.phase === "集合竞价";
 
-  const dataSummary = indices.length
-    ? indices.map((i) => `${i.name} ${i.price}（${i.change_pct > 0 ? "+" : ""}${i.change_pct}%）`).join("；")
-    : "（指数数据未取到）";
+  const dataSummary = overview?.sentiment?.breadth
+    ? `大盘宽度「${overview.sentiment.breadth}」、题材投机「${overview.sentiment.speculation}」；` +
+      `涨停 ${overview.sentiment.zt ?? "—"}、跌停 ${overview.sentiment.dt ?? "—"}`
+    : "（盘面数据未取到）";
 
   // 连板股「AI 深入分析」（与首板分析页共用 DeepDive 单元；结果本地存档，跨加载复用）
   const dd = useDeepDive("lianban", emotion?.date || "");
@@ -194,6 +161,20 @@ export function DailyReview() {
     { k: "活跃度", v: sentiment.active, up: null },
   ] : [];
 
+  // 向全局 AI 浮标登记本页确定性数据快照（S5 接后端后用作对话上下文；现仅展示）
+  useAiPage({
+    key: `daily-review:${session?.label ?? today}`,
+    title: "复盘看板",
+    context:
+      `日期：${session?.label ?? today}\n盘面概览：${dataSummary}\n` +
+      (sentiment?.breadth
+        ? `市场情绪：大盘宽度「${sentiment.breadth}」、题材投机「${sentiment.speculation}」；` +
+          `涨停 ${sentiment.zt ?? "—"}（真实 ${sentiment.zt_real ?? "—"}）、跌停 ${sentiment.dt ?? "—"}`
+        : "市场情绪：暂未取到") +
+      (emotion?.max_boards != null ? `\n昨日连板：最高 ${emotion.max_boards} 板、连板 ${emotion.lianban_count} 家` : ""),
+    suggestions: ["今天大盘怎么走", "哪些板块资金在流入", "连板梯队说明什么"],
+  });
+
   return (
     <div>
       <PageHeader
@@ -225,159 +206,6 @@ export function DailyReview() {
           </div>
         }
       />
-
-      {/* 1. 大盘指数（实时） */}
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-baseline gap-2">
-          <h3 className="text-sm font-semibold text-muted-foreground">大盘指数</h3>
-          <Caliber text={
-            "涨跌幅对比前一交易日收盘。\n" +
-        "「实时」是延时行情，页面上没标截至几点。"
-          } />
-          {session && (
-            <span className={cn("text-[11px]", session.is_today ? "text-muted-foreground/50" : "text-warning")}>
-              {session.label}
-            </span>
-          )}
-          {/* 集合竞价（09:15-09:25）还没成交，指数等于昨收、涨跌幅是 0 */}
-          {session?.phase === "集合竞价" && (
-            <span className="text-[11px] text-muted-foreground/50">还没成交，涨跌幅为 0 是正常的</span>
-          )}
-        </div>
-        <button onClick={loadIndices} className="text-muted-foreground hover:text-primary" title="刷新"><RefreshCw className="h-3.5 w-3.5" /></button>
-      </div>
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {indices.length === 0
-          ? [1, 2, 3, 4].map((i) => (
-              <GlassCard key={i} className="p-3">
-                <p className="text-xs text-muted-foreground">{idxErr ? "行情未接通" : "加载中…"}</p>
-                <p className="mt-1 font-mono text-lg font-bold text-muted-foreground/40">—</p>
-              </GlassCard>
-            ))
-          : indices.map((i) => (
-              <GlassCard key={i.name} className="p-3">
-                <p className="truncate text-xs text-muted-foreground">{i.name}</p>
-                <p className={cn("mt-1 font-mono text-lg font-bold", pctColor(i.change_pct))}>{i.price}</p>
-                <p className={cn("text-xs", pctColor(i.change_pct))}>{i.change_pct > 0 ? "+" : ""}{i.change_pct}%</p>
-              </GlassCard>
-            ))}
-      </div>
-
-      {/* 1b. 隔夜外围：美股 / 港股指数 + 美股七姐妹 */}
-      {(oversea?.available || globalIdx.length > 0) && (() => {
-        // 优先用带交易日的新接口；它挂了才退回 vr 那份（没有日期，只能不标）
-        const rows: OverseasRow[] = oversea?.available && oversea.indices?.length
-          ? oversea.indices
-          : globalIdx.map((g) => ({ name: g.name, price: g.price ?? 0, change_pct: g.change_pct ?? 0,
-                                    session: null, region: g.region }));
-        const us = rows.filter((r) => r.region === "美股");
-        const hk = rows.filter((r) => r.region !== "美股");
-        const mag7 = oversea?.available ? (oversea.mag7 ?? []) : [];
-        const cell = (r: OverseasRow, sub?: string) => (
-          <GlassCard key={r.name} className="p-3">
-            <p className="truncate text-xs text-muted-foreground">
-              {r.name}{sub && <span className="ml-1 font-mono text-[10px] text-muted-foreground/40">{sub}</span>}
-            </p>
-            <p className={cn("mt-1 font-mono text-lg font-bold", pctColor(r.change_pct))}>{r.price}</p>
-            <p className={cn("text-xs", pctColor(r.change_pct))}>
-              {r.change_pct > 0 ? "+" : ""}{r.change_pct}%
-            </p>
-          </GlassCard>
-        );
-        return (
-          <>
-            <div className="mb-3 flex flex-wrap items-baseline gap-2">
-              <h3 className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground"><Globe className="h-4 w-4" /> 隔夜外围</h3>
-              <Caliber text={
-                "美股港股的涨跌幅都是对比它们各自的前一交易日收盘。\n" +
-            "港股在北京时间白天可能正在交易，所以会标「盘中」——那是抓取那一刻的延时行情，没标具体几点。"
-              } />
-              <span className="text-[11px] text-muted-foreground/50">A 股常看美股 / 港股脸色</span>
-              {/* 标签由后端给（含盘前/盘中/收盘）—— 前端别自己拼"收盘"，
-                  港股在北京白天可能正在交易，那时候标"收盘"就是错的 */}
-              {oversea?.us_label && <span className="text-[11px] text-warning">{oversea.us_label}</span>}
-              {oversea?.hk_label && <span className="text-[11px] text-warning">{oversea.hk_label}</span>}
-            </div>
-
-            {us.length > 0 && (
-              <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3">{us.map((r) => cell(r))}</div>
-            )}
-
-            {mag7.length > 0 && (
-              <>
-                <p className="mb-2 text-[11px] text-muted-foreground/60">
-                  美股七姐妹 · 权重股带指数走，看它们比看指数细
-                </p>
-                <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-                  {mag7.map((r) => cell(r, r.ticker))}
-                </div>
-              </>
-            )}
-
-            {hk.length > 0 && (
-              <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">{hk.map((r) => cell(r))}</div>
-            )}
-          </>
-        );
-      })()}
-
-      {/* 2. 关注股票（自选） */}
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-muted-foreground">关注股票</h3>
-        {watchCodes.length > 0 && (
-          <button onClick={() => refreshWatch(watchCodes)} className="text-muted-foreground hover:text-primary" title="刷新价格">
-            {watchLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          </button>
-        )}
-      </div>
-      <GlassCard className="mb-6">
-        <div className="mb-3 flex gap-2">
-          <input
-            value={watchInput}
-            onChange={(e) => setWatchInput(e.target.value.replace(/[^\d,\s]/g, "").slice(0, 80))}
-            onKeyDown={(e) => e.key === "Enter" && addWatch()}
-            placeholder="加自选：可批量，如 600519 000858"
-            className="w-60 rounded-lg border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:border-primary/50"
-          />
-          <button onClick={addWatch}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-4 py-2 text-sm font-medium text-primary shadow-glow hover:bg-primary/25">
-            <Plus className="h-4 w-4" /> 增加
-          </button>
-        </div>
-        {watchCodes.length === 0 ? (
-          <p className="text-sm text-muted-foreground/60">加上你关注的股票，随时看它们的实时价格与涨跌。数据存本地，不上传。</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {watchCodes.map((c) => {
-              const q = watchQuotes[c];
-              return (
-                <div key={c} className="group relative rounded-lg bg-muted/25 p-3">
-                  <button onClick={() => removeWatch(c)} title="移除"
-                    className="absolute right-1.5 top-1.5 text-muted-foreground/40 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                  {}
-                  {(() => {
-                    const ok = q != null && Number.isFinite(q.price) && q.price > 0;
-                    return (
-                      <>
-                        <p className="truncate text-xs text-muted-foreground">{q?.name || c}</p>
-                        <p className={cn("mt-1 font-mono text-lg font-bold",
-                          ok ? pctColor(q!.change_pct) : "text-muted-foreground/40")}>
-                          {ok ? q!.price : "—"}
-                        </p>
-                        <p className={cn("text-xs", ok ? pctColor(q!.change_pct) : "text-muted-foreground/40")}>
-                          {ok ? `${q!.change_pct > 0 ? "+" : ""}${q!.change_pct}%` : "行情不可用"}
-                        </p>
-                      </>
-                    );
-                  })()}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </GlassCard>
 
       {/* 4. 市场情绪 */}
       <div className="mb-3 flex items-center gap-2">
@@ -751,6 +579,11 @@ export function DailyReview() {
             )}
           </GlassCard>
         ))}
+      </div>
+
+      {/* 7. 涨停样本统计（原独立页并入：确定性市场现象统计，非策略回测） */}
+      <div className="mt-8 border-t border-border/50 pt-6">
+        <LimitUpStats />
       </div>
 
       <Disclaimer />

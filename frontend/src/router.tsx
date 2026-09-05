@@ -1,11 +1,11 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { DailyReview } from "@/pages/DailyReview";
+import { MacroDashboard } from "@/pages/MacroDashboard";
 import { Backtest } from "@/pages/Backtest";
 import { Correlation } from "@/pages/Correlation";
 import { Portfolios } from "@/pages/Portfolios";
 import { MyReports } from "@/pages/MyReports";
-import { LimitUpStats } from "@/pages/LimitUpStats";
 import { Watchlist } from "@/pages/Watchlist";
 import { Journal } from "@/pages/Journal";
 import { Placeholder } from "@/pages/Placeholder";
@@ -17,8 +17,8 @@ export const router = createBrowserRouter([
     children: [
       { path: "/", element: <Navigate to="/daily-review" replace /> },
       // 市场复盘
+      { path: "/macro", element: <MacroDashboard /> },
       { path: "/daily-review", element: <DailyReview /> },
-      { path: "/backtest", element: <LimitUpStats /> },
       // 研究管理
       { path: "/watchlist", element: <Watchlist /> },
       { path: "/reports", element: <MyReports /> },
