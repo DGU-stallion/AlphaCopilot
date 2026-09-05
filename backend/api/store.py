@@ -91,6 +91,29 @@ CREATE TABLE IF NOT EXISTS doc (
     text        TEXT NOT NULL DEFAULT '',
     created_at  REAL NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS stock_pool (
+    id          TEXT PRIMARY KEY,
+    code        TEXT NOT NULL UNIQUE,
+    name        TEXT NOT NULL DEFAULT '',
+    note        TEXT NOT NULL DEFAULT '',
+    tags        TEXT NOT NULL DEFAULT '',
+    created_at  REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS journal (
+    id          TEXT PRIMARY KEY,
+    code        TEXT NOT NULL DEFAULT '',
+    name        TEXT NOT NULL DEFAULT '',
+    side        TEXT NOT NULL CHECK (side IN ('buy','sell')),
+    price       REAL NOT NULL,
+    shares      INTEGER NOT NULL,
+    fee         REAL NOT NULL DEFAULT 0,
+    traded_at   TEXT NOT NULL DEFAULT '',
+    note        TEXT NOT NULL DEFAULT '',
+    created_at  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_journal_traded ON journal(traded_at);
 """
 
 
@@ -408,6 +431,80 @@ class DocRepo:
         return [dict(r) for r in rows]
 
 
+class StockPoolRepo:
+    """股票池聚合：stock_pool（研究池——代码/名称/备注/标签）。"""
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self.conn = conn
+
+    def add(self, code: str, name: str = "", note: str = "", tags: str = "") -> str:
+        """加入股票池。code 唯一——重复 code 按 upsert 更新 name/note/tags。"""
+        existing = self.conn.execute(
+            "SELECT id FROM stock_pool WHERE code=?", (code,)
+        ).fetchone()
+        if existing:
+            self.conn.execute(
+                "UPDATE stock_pool SET name=?, note=?, tags=? WHERE code=?",
+                (name, note, tags, code),
+            )
+            self.conn.commit()
+            return existing["id"]
+        pid = _new_id("sp")
+        self.conn.execute(
+            "INSERT INTO stock_pool (id, code, name, note, tags, created_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (pid, code, name, note, tags, time.time()),
+        )
+        self.conn.commit()
+        return pid
+
+    def remove(self, code: str) -> bool:
+        cur = self.conn.execute("DELETE FROM stock_pool WHERE code=?", (code,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def list(self) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM stock_pool ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+class JournalRepo:
+    """交易日志聚合：journal（真实成交记录 + 复盘备注）。"""
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self.conn = conn
+
+    def add(
+        self, *, code: str, name: str, side: str, price: float, shares: int,
+        fee: float = 0.0, traded_at: str = "", note: str = "",
+    ) -> str:
+        if side not in ("buy", "sell"):
+            raise ValueError(f"side 必须是 buy/sell，得到 {side!r}")
+        jid = _new_id("jn")
+        self.conn.execute(
+            "INSERT INTO journal "
+            "(id, code, name, side, price, shares, fee, traded_at, note, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (jid, code, name, side, float(price), int(shares), float(fee),
+             traded_at, note, time.time()),
+        )
+        self.conn.commit()
+        return jid
+
+    def remove(self, jid: str) -> bool:
+        cur = self.conn.execute("DELETE FROM journal WHERE id=?", (jid,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def list(self) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM journal ORDER BY traded_at DESC, created_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 class Store:
     """SQLite 仓储聚合面候（facade）。持有连接与四个 repo，方法委派保持向后兼容。
 
@@ -425,6 +522,8 @@ class Store:
         self.pages = PageRepo(self.conn)
         self.jobs = JobRepo(self.conn)
         self.docs = DocRepo(self.conn)
+        self.stock_pool = StockPoolRepo(self.conn)
+        self.journal = JournalRepo(self.conn)
 
     def migrate(self) -> None:
         """建表 + 增量迁移（幂等）。这是唯一的迁移入口。"""

@@ -44,6 +44,9 @@ describe("Sidebar 收展", () => {
     expect(screen.getByText("复盘看板")).toBeTruthy();
     expect(screen.getByText("盘面数据")).toBeTruthy();
     expect(screen.getByText("涨停样本统计")).toBeTruthy();
+    expect(screen.getByText("股票池")).toBeTruthy();
     expect(screen.getByText("相关性分析")).toBeTruthy();
+    expect(screen.getByText("交易日志")).toBeTruthy();
+    expect(screen.getByText("我的研报")).toBeTruthy();
   });
 });

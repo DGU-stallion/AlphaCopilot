@@ -117,3 +117,96 @@ export async function renderPage(
   if (!r.ok) throw new Error(`renderPage ${r.status}`);
   return (await r.json()).blocks;
 }
+
+// ── 业务页 CRUD（S3：股票池 / 交易日志 / 我的研报）──────────────────────────
+
+export interface PoolItem {
+  id: string;
+  code: string;
+  name: string;
+  note: string;
+  tags: string;
+}
+
+export async function listPool(): Promise<PoolItem[]> {
+  const r = await fetch("/api/stock-pool");
+  if (!r.ok) throw new Error(`listPool ${r.status}`);
+  return r.json();
+}
+
+export async function addPool(item: {
+  code: string;
+  name?: string;
+  note?: string;
+  tags?: string;
+}): Promise<void> {
+  const r = await fetch("/api/stock-pool", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(item),
+  });
+  if (!r.ok) throw new Error((await r.json()).detail ?? `addPool ${r.status}`);
+}
+
+export async function removePool(code: string): Promise<void> {
+  const r = await fetch(`/api/stock-pool/${code}`, { method: "DELETE" });
+  if (!r.ok) throw new Error(`removePool ${r.status}`);
+}
+
+export interface JournalEntry {
+  id: string;
+  code: string;
+  name: string;
+  side: "buy" | "sell";
+  price: number;
+  shares: number;
+  fee: number;
+  traded_at: string;
+  note: string;
+}
+
+export async function listJournal(): Promise<JournalEntry[]> {
+  const r = await fetch("/api/journal");
+  if (!r.ok) throw new Error(`listJournal ${r.status}`);
+  return r.json();
+}
+
+export async function addJournal(entry: Omit<JournalEntry, "id">): Promise<void> {
+  const r = await fetch("/api/journal", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(entry),
+  });
+  if (!r.ok) throw new Error((await r.json()).detail ?? `addJournal ${r.status}`);
+}
+
+export async function removeJournal(id: string): Promise<void> {
+  const r = await fetch(`/api/journal/${id}`, { method: "DELETE" });
+  if (!r.ok) throw new Error(`removeJournal ${r.status}`);
+}
+
+export interface ReportItem {
+  id: string;
+  title: string;
+  source_path: string;
+  created_at: number;
+}
+
+export async function listReports(): Promise<ReportItem[]> {
+  const r = await fetch("/api/reports");
+  if (!r.ok) throw new Error(`listReports ${r.status}`);
+  return r.json();
+}
+
+export async function addReport(item: {
+  title: string;
+  text?: string;
+  source_path?: string;
+}): Promise<void> {
+  const r = await fetch("/api/reports", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(item),
+  });
+  if (!r.ok) throw new Error((await r.json()).detail ?? `addReport ${r.status}`);
+}

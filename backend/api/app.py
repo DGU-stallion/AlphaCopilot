@@ -24,6 +24,7 @@ from agent.persona import system_prompt as _compliance_prompt
 from agent.provider import ProviderSpec
 from agent.providers.dsh import DshProvider
 from api.builtin_pages import register_builtin_pages
+from api.business import build_business_router
 from api.jobs import JobQueue
 from api.pages import build_pages_router
 from api.session_manager import SessionManager
@@ -202,4 +203,5 @@ def create_app(
 
     app.include_router(router)
     app.include_router(build_pages_router(store))
+    app.include_router(build_business_router(store))
     return app

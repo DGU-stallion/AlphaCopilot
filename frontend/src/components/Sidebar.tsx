@@ -14,27 +14,38 @@ import { usePages } from "@/hooks/usePages";
 export interface PageTab {
   slug: string;
   label: string;
+  /** 专用业务页用绝对路径（如 /stock-pool）；page-spec 页省略，走 /pages/{slug}。 */
+  path?: string;
 }
 
-/** 静态占位（ADR-0008 第一版页面）；固定排在动态页之前。 */
+/** 第一版固定 tab（ADR-0008）。分析页走 /pages/{slug}；业务页走专用 path。 */
 export const DEFAULT_TABS: PageTab[] = [
   { slug: "daily-review", label: "复盘看板" },
   { slug: "market", label: "盘面数据" },
   { slug: "limit-up-stats", label: "涨停样本统计" },
+  { slug: "stock-pool", label: "股票池", path: "/stock-pool" },
   { slug: "correlation", label: "相关性分析" },
+  { slug: "journal", label: "交易日志", path: "/journal" },
+  { slug: "reports", label: "我的研报", path: "/reports" },
 ];
+
+const BUSINESS_SLUGS = new Set(["stock-pool", "journal", "reports"]);
 
 const STORAGE_KEY = "alphacopilot-sidebar-collapsed";
 
 export function Sidebar({ pages }: { pages?: PageTab[] }) {
   const dynamic = usePages();
-  // builtin 固定在前；动态页去重后追加（数据驱动，AGENTS 硬规则 6）。
+  // builtin/业务页固定在前；动态页去重后追加（数据驱动，AGENTS 硬规则 6）。
+  // 动态页里若与固定 tab 或业务 slug 重名则跳过（避免 market/limit-up-stats 重复出现）。
   const tabs: PageTab[] =
     pages ??
     [
       ...DEFAULT_TABS,
       ...dynamic
-        .filter((d) => !DEFAULT_TABS.some((b) => b.slug === d.slug))
+        .filter(
+          (d) =>
+            !DEFAULT_TABS.some((b) => b.slug === d.slug) && !BUSINESS_SLUGS.has(d.slug),
+        )
         .map((d) => ({ slug: d.slug, label: d.title })),
     ];
 
@@ -73,7 +84,7 @@ export function Sidebar({ pages }: { pages?: PageTab[] }) {
         {tabs.map((p) => (
           <NavLink
             key={p.slug}
-            to={`/pages/${p.slug}`}
+            to={p.path ?? `/pages/${p.slug}`}
             title={p.label}
             className={({ isActive }) =>
               cn(
