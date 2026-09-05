@@ -271,3 +271,85 @@ docstring 即 LLM schema——**`alpha.*` 的 docstring 质量直接决定 AI �
 
 **Git**：trunk-based；`feat/T<nn>-<slug>` 短命分支；一任务一 PR，squash merge；
 Conventional Commits，PR 标题带任务号；任务号从 T21 续编。
+
+---
+
+## 九、下一步开发计划（第一版缝合）
+
+> 原则：**复用 > 适配 > 参考 > 新写**。供体在 `AlphaTrading/`。每个阶段迁完即验证，
+> 验证通过再进下一阶段；旧代码在替代能力验证通过后才删。
+
+### 来源映射总表（10 页 + Agent）
+
+| 目标页面 | 来源 | 方式 | 供体模块 |
+|---|---|---|---|
+| 复盘看板 | vibe-astock | 适配 | `duanxian/emotion_metrics.py`(money_effect/promotion_rates/consec_premium/ladder_gap/cycle_position/build_metrics)、`breadth.py`、`market_facts.py` |
+| 盘面数据 | vibe-astock | 适配 | `duanxian/market_facts.py`、`fetchers.py` |
+| 涨停样本统计 | vibe-astock | 适配 | `duanxian/stats_context.py`、`backtest.py`(样本统计口径) |
+| 交易日志 | vibe-astock | 适配 | `duanxian/journal.py`（+ 新增 `journal` 表） |
+| 股票池 | vibe-astock | 适配 | `duanxian/positions.py`（自选/watchlist 部分，+ 新增 `stock_pool` 表） |
+| 我的研报 | Vibe-Research + 现有 | 复用 | 现有 `doc` 表 + `DocRepo`；参考 Vibe-Research 研报页交互 |
+| 回测 | Vibe-Research | 参考→适配 | `backtest/engines/*`、`gate.py`、`run.py`、`metrics.py`、`loader.py`（替换现 `alpha/backtest.py` 玩具引擎，保留 JobQueue/artifact 外壳） |
+| 相关性分析 | 现有 | 复用 | `alpha/factor.py`（口径已正确，直接用） |
+| 模拟组合 | 全新 | 新写 | 雪球式调仓事件模型（+ 新增 `portfolio`/`rebalance` 表） |
+| 接入 AI/设置 | 现有 | 复用 | 现有 `agent/provider` + `main.py` 凭据读取 |
+| 全局 Agent 页面感知 | Vibe-Research | 参考→新写 | 参考 `AiPageProvider/useAiPage`；本项目新写页面上下文接缝 |
+
+### 数据层供体（共享，先迁）
+
+| 供体 | 方式 | 说明 |
+|---|---|---|
+| vibe-astock `duanxian/fetchers.py`、`data.py` | 适配 | A股涨停池/龙虎榜/资金流取数；接入本项目 `research/`/`alpha.data` 门面 |
+| vibe-astock `duanxian/trade_calendar.py` | 复用 | 交易日历（相关性对齐/回测/组合净值都要） |
+| 现有 `research/astock.py` 等 | 复用 | live 数据层保留 |
+
+### 缝合顺序（最小可用，逐步含验收）
+
+**阶段 S1 — 接缝准备（不迁业务页）**
+- 内容：新增业务页专用路由（现仅 `pages/:slug`）；建立页面上下文 Provider（参考 useAiPage）；
+  修 pnpm `allowBuilds` 门禁使 `pnpm test` 可跑。
+- 验收：① 新增一条专用路由可渲染占位页；② 页面能向 Agent 注册 `{key,title,context}`；
+  ③ `pnpm test` 与 `pnpm build` 均绿；④ 现有 88 非 dsh 后端测试仍绿。
+- 不做：不动 dsh provider（其 SDK 不匹配问题另案）。
+
+**阶段 S2 — 迁只读确定性页（低风险优先）**
+- 顺序：盘面数据 → 涨停样本统计 → 复盘看板（确定性部分，**不含五分析师/复盘裁判**）。
+- 方式：适配 vibe-astock 计算模块进 `alpha/`，走 page spec 或专用只读页。
+- 验收（每页）：① 首屏渲染 **0 次 LLM 调用**（断言无 provider 调用）；② 关键指标数值
+  与 vibe-astock 同输入下一致（固定 fixture 断言）；③ 数据源不可用时显式标「不可用」，
+  不显示为 0；④ 有针对性单测。
+
+**阶段 S3 — 迁状态型业务页（含 CRUD）**
+- 顺序：股票池 → 交易日志 → 我的研报。
+- 方式：新增 `stock_pool` / `journal` 表（SQLite Repo）；研报复用现有 `doc` 表。
+  专用 React 页，**不塞 page spec**。
+- 验收（每页）：① CRUD 落 SQLite 真源，重启后不丢；② 交易日志可导入现有 vibe-astock
+  JSON 或标准 CSV（导入前预览校验）；③ 股票池选中可跳相关性/回测/组合；④ 单测覆盖增删改查。
+
+**阶段 S4 — 量化能力**
+- 顺序：相关性（复用，仅接线）→ 回测引擎替换 → 模拟组合。
+- 相关性验收：叠加图归一化到 100；相关矩阵为日收益率 Pearson；样本不足显式提示不出精确系数。
+- 回测验收：迁 Vibe-Research **引擎+gate+run 三件套**（非只搬引擎）；先用固定数据写回归测试
+  对齐 upstream 结果，再接 JobQueue；保留 NOTICE 归属；A股 T+1/涨跌停/整手规则生效。
+- 模拟组合验收：雪球式调仓事件（生效日期+调权历史不可覆盖）；净值 vs 沪深300 归一化；
+  权重不足 100% 视为现金；页面显式声明手续费假设。
+
+**阶段 S5 — Agent 页面感知与草案写**
+- 内容：每页提供确定性数据快照给 Agent（含 as_of/来源/样本数）；只读解释先行；
+  再加白名单草案动作 `stock_pool.add/remove`、`portfolio.create/rebalance`（草案→确认→确定性写接口）。
+- 验收：① Agent 回答基于页面快照、不另起取数；② 换页不串上下文；③ 写操作必须经用户确认，
+  Agent 不直接写库；④ 合规底线（不荐股/不预测/不给买卖时机）测试固化。
+
+**阶段 S6 — 清理遗留**
+- 内容：新能力验证通过后，退役旧占位页与不再符合定位的实现；处理 dsh provider SDK 不匹配
+  （独立任务：对齐 `DeepSeekHarnessConfig` 签名或锁定 SDK 版本）。
+- 验收：全后端测试（含 dsh）绿；无死引用。
+
+### 风险与依赖
+
+- **回测引擎迁移是最大不确定项**：Vibe-Research 引擎依赖其数据 `loader`，迁移时数据源要接到
+  本项目取数层；先写回归测试对齐，避免「看着正常其实算错」。列为 S4 高风险子任务。
+- **dsh provider SDK 不匹配**：当前 8 个测试因 `DeepSeekHarnessConfig.session_root` 失败，
+  是既有问题，不阻塞 S1–S4（确定性页不经 dsh），但 S5 Agent 功能前必须解决。
+- **技术栈**：Vibe-Research 回测是 Python（与本项目一致，可直接迁）；其 orchestrator 是 TS，
+  **不迁**（本项目单 FastAPI 后端，避免双后端）。
