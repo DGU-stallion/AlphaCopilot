@@ -1,7 +1,8 @@
 # AGENTS.md — AlphaCopilot
 
-架构决策见 `docs/adr/0006-app-owns-ui-dsh-as-sdk.md`（取代 0004/0005）。
-插件化产物在 tag `archive-dsh-plugins-v0.1`；旧单体在 `archive/pre-dsh`。
+产品定位见 `docs/adr/0008-deterministic-first-fixed-pages.md`（确定性计算为主、
+AI 只解释、固定业务页面）。历史决策 ADR-0002/0004/0005/0006/0007 保留作轨迹。
+第一版策略：缝合 `AlphaTrading/` 下 vibe-astock、Vibe-Research 现成能力，能复用就不重写。
 
 ## 结构速记
 
