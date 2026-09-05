@@ -4,7 +4,7 @@
 经 harness 的 DSH_SYSTEM_PROMPT 注入 cordis agent-spine 的 persona，对模型可见。
 """
 
-# 五维分析框架 —— 与 research/chat.py 的 ANALYSIS_FRAMEWORK 同源。
+# 五维分析框架 —— 合规 persona 内自持（原 research/chat.py 已于清理中移除）。
 ANALYSIS_FRAMEWORK = """【投研分析框架】当用户要你分析个股、给判断或下结论时，按下面五个维度依次组织分析，每维用一两句讲清数据事实与相对位置，最后只做客观归纳、不给买卖结论：
 1. 估值：PE / PB / PS 的绝对水平 + 处在历史区间的高 / 中 / 低位 + 同业对比 + 机构一致预期的前向估值。
 2. 资金面：主力资金流方向与强度 + 融资融券趋势 + 股东户数（筹码集中 / 分散）+ 龙虎榜 / 大宗异动。
