@@ -70,10 +70,20 @@ export interface PageListItem {
 }
 
 export interface PageBlock {
-  kind: "chart" | "markdown" | string;
+  kind: "chart" | "markdown" | "table" | "metric" | string;
   span?: number;
+  title?: string;
   option?: Record<string, unknown>;
   text?: string;
+  table?: { columns?: string[]; rows?: (string | number)[][] };
+  metric?: {
+    items?: {
+      label: string;
+      value: string | number;
+      hint?: string;
+      tone?: "up" | "down" | "flat" | "muted";
+    }[];
+  };
 }
 
 export async function listPages(): Promise<PageListItem[]> {

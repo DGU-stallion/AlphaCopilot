@@ -11,7 +11,7 @@ import { MessageCircle, Moon, Sun } from "lucide-react";
 import { Outlet } from "react-router-dom";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { Sidebar } from "@/components/Sidebar";
-import { SessionProvider } from "@/session-context";
+import { AiPageProvider } from "@/lib/ai-page-context";
 import { useTheme } from "@/theme";
 
 function ThemeToggle() {
@@ -32,7 +32,7 @@ export function AppShell() {
   const [chatOpen, setChatOpen] = useState(false);
 
   return (
-    <SessionProvider>
+    <AiPageProvider>
       <div className="flex h-screen w-screen overflow-hidden">
         <Sidebar />
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden p-2">
@@ -54,9 +54,9 @@ export function AppShell() {
           <MessageCircle size={22} />
         </button>
 
-        {/* panel 只在开时挂载；会话状态在 SessionProvider，卸载不丢 */}
+        {/* panel 只在开时挂载；S1 为占位，不接 provider */}
         {chatOpen && <ChatPanel onClose={() => setChatOpen(false)} />}
       </div>
-    </SessionProvider>
+    </AiPageProvider>
   );
 }

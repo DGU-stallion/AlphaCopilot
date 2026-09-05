@@ -9,6 +9,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChartBlock } from "@/components/blocks/ChartBlock";
 import { MarkdownBlock } from "@/components/blocks/MarkdownBlock";
+import { MetricBlock } from "@/components/blocks/MetricBlock";
+import { TableBlock } from "@/components/blocks/TableBlock";
 import {
   getPage,
   renderPage,
@@ -167,6 +169,20 @@ function BlockGridItem({ block }: { block: PageBlock }) {
     return (
       <div style={style}>
         <MarkdownBlock payload={{ text: block.text ?? "" }} />
+      </div>
+    );
+  }
+  if (block.kind === "table") {
+    return (
+      <div style={style}>
+        <TableBlock payload={block.table ?? {}} title={block.title} />
+      </div>
+    );
+  }
+  if (block.kind === "metric") {
+    return (
+      <div style={style}>
+        <MetricBlock payload={block.metric ?? {}} title={block.title} />
       </div>
     );
   }

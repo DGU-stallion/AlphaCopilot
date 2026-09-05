@@ -48,11 +48,19 @@ def _render_block(block: dict[str, Any], values: dict[str, Any]) -> dict[str, An
         except ValueError as e:
             raise HTTPException(400, str(e)) from e
     result = reg.fn(**kwargs)
-    # markdown block 的分析结果是 {text}；chart/其它是 ECharts option。
-    if block["kind"] == "markdown" and isinstance(result, dict) and "text" in result:
+    # 按 block.kind 映射分析结果的形状：
+    #   markdown -> {text}；table -> {columns, rows}；metric -> {items}；其它 -> ECharts option。
+    kind = block["kind"]
+    if kind == "markdown" and isinstance(result, dict) and "text" in result:
         out["text"] = result["text"]
+    elif kind == "table" and isinstance(result, dict):
+        out["table"] = result
+    elif kind == "metric" and isinstance(result, dict):
+        out["metric"] = result
     else:
         out["option"] = result
+    if isinstance(result, dict) and "title" in result and kind != "markdown":
+        out.setdefault("title", result["title"])
     return out
 
 
