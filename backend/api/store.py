@@ -114,6 +114,23 @@ CREATE TABLE IF NOT EXISTS journal (
     created_at  REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_journal_traded ON journal(traded_at);
+
+CREATE TABLE IF NOT EXISTS portfolio (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    benchmark   TEXT NOT NULL DEFAULT '000300',
+    created_at  REAL NOT NULL,
+    created_on  TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS rebalance_event (
+    id           TEXT PRIMARY KEY,
+    portfolio_id TEXT NOT NULL REFERENCES portfolio(id) ON DELETE CASCADE,
+    effective_on TEXT NOT NULL,
+    weights      TEXT NOT NULL,
+    created_at   REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rebalance_portfolio ON rebalance_event(portfolio_id, effective_on);
 """
 
 
@@ -505,6 +522,62 @@ class JournalRepo:
         return [dict(r) for r in rows]
 
 
+class PortfolioRepo:
+    """模拟组合聚合：portfolio + rebalance_event（雪球式调仓事件，权重历史不可覆盖）。"""
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self.conn = conn
+
+    def create(self, name: str, benchmark: str = "000300", created_on: str = "") -> str:
+        pid = _new_id("pf")
+        self.conn.execute(
+            "INSERT INTO portfolio (id, name, benchmark, created_at, created_on) "
+            "VALUES (?,?,?,?,?)",
+            (pid, name, benchmark, time.time(), created_on),
+        )
+        self.conn.commit()
+        return pid
+
+    def get(self, pid: str) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM portfolio WHERE id=?", (pid,)).fetchone()
+        return dict(row) if row else None
+
+    def list(self) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM portfolio ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def delete(self, pid: str) -> bool:
+        cur = self.conn.execute("DELETE FROM portfolio WHERE id=?", (pid,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def add_rebalance(self, portfolio_id: str, effective_on: str, weights: dict[str, float]) -> str:
+        """新增一次调仓事件（生效日期 + {code: weight}）。历史事件保留不覆盖。"""
+        rid = _new_id("rb")
+        self.conn.execute(
+            "INSERT INTO rebalance_event (id, portfolio_id, effective_on, weights, created_at) "
+            "VALUES (?,?,?,?,?)",
+            (rid, portfolio_id, effective_on,
+             json.dumps(weights, ensure_ascii=False), time.time()),
+        )
+        self.conn.commit()
+        return rid
+
+    def list_rebalances(self, portfolio_id: str) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM rebalance_event WHERE portfolio_id=? ORDER BY effective_on",
+            (portfolio_id,),
+        ).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["weights"] = json.loads(d["weights"])
+            out.append(d)
+        return out
+
+
 class Store:
     """SQLite 仓储聚合面候（facade）。持有连接与四个 repo，方法委派保持向后兼容。
 
@@ -524,6 +597,7 @@ class Store:
         self.docs = DocRepo(self.conn)
         self.stock_pool = StockPoolRepo(self.conn)
         self.journal = JournalRepo(self.conn)
+        self.portfolio = PortfolioRepo(self.conn)
 
     def migrate(self) -> None:
         """建表 + 增量迁移（幂等）。这是唯一的迁移入口。"""

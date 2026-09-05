@@ -55,6 +55,17 @@ class ReportIn(BaseModel):
     source_path: str = ""
 
 
+class PortfolioIn(BaseModel):
+    name: str
+    benchmark: str = "000300"
+    created_on: str = ""
+
+
+class RebalanceIn(BaseModel):
+    effective_on: str
+    weights: dict[str, float]
+
+
 def build_business_router(store: Store) -> APIRouter:
     router = APIRouter(prefix="/api")
 
@@ -136,5 +147,75 @@ def build_business_router(store: Store) -> APIRouter:
             raise HTTPException(400, "标题不能为空")
         did = store.docs.add_doc(body.title, body.source_path or "manual", body.text)
         return {"id": did}
+
+    # ---------- 模拟组合（雪球式调仓事件）----------
+    @router.get("/portfolios")
+    def list_portfolios() -> list:
+        out = []
+        for pf in store.portfolio.list():
+            pf["rebalances"] = store.portfolio.list_rebalances(pf["id"])
+            out.append(pf)
+        return out
+
+    @router.post("/portfolios")
+    def create_portfolio(body: PortfolioIn) -> dict:
+        if not body.name.strip():
+            raise HTTPException(400, "组合名不能为空")
+        pid = store.portfolio.create(body.name, body.benchmark, body.created_on)
+        return {"id": pid}
+
+    @router.delete("/portfolios/{pid}")
+    def delete_portfolio(pid: str) -> dict:
+        if not store.portfolio.delete(pid):
+            raise HTTPException(404, "组合不存在")
+        return {"ok": True}
+
+    @router.post("/portfolios/{pid}/rebalance")
+    def add_rebalance(pid: str, body: RebalanceIn) -> dict:
+        if store.portfolio.get(pid) is None:
+            raise HTTPException(404, "组合不存在")
+        for code, w in body.weights.items():
+            if not (len(code) == 6 and code.isdigit()):
+                raise HTTPException(400, f"非法标的 {code!r}")
+            if w < 0 or w > 1:
+                raise HTTPException(400, f"{code} 权重 {w} 越界 [0,1]")
+        total = sum(body.weights.values())
+        if total > 1.0 + 1e-9:
+            raise HTTPException(400, f"权重和 {total:.3f} > 1（超出部分应为现金）")
+        rid = store.portfolio.add_rebalance(pid, body.effective_on, body.weights)
+        return {"id": rid}
+
+    @router.get("/portfolios/{pid}/nav")
+    def portfolio_nav(pid: str) -> dict:
+        """组合净值曲线 vs 基准（ECharts line option）。数据源不可用时优雅降级。"""
+        from alpha import chart, data, portfolio as pf_calc
+
+        pf = store.portfolio.get(pid)
+        if pf is None:
+            raise HTTPException(404, "组合不存在")
+        events = store.portfolio.list_rebalances(pid)
+        if not events:
+            return {"option": chart.line([], {"组合净值": []}, title="尚无调仓事件")}
+        codes = sorted({c for e in events for c in e["weights"]})
+        price_map: dict[str, dict[str, float]] = {}
+        for code in codes:
+            try:
+                rows = data.closes_with_dates(code, count=250)
+            except Exception:  # noqa: BLE001
+                rows = []
+            price_map[code] = {d: c for d, c in rows}
+        dates, nav = pf_calc.compute_nav(events, price_map)
+        if not dates:
+            return {"option": chart.line([], {"组合净值": []},
+                                         title="行情数据源暂不可用，净值待计算")}
+        series = {"组合净值": nav}
+        try:
+            brows = data.closes_with_dates(pf["benchmark"], count=250)
+            bench = pf_calc.compute_benchmark_nav(dates, {d: c for d, c in brows})
+            if bench:
+                series[f"基准({pf['benchmark']})"] = bench
+        except Exception:  # noqa: BLE001
+            pass
+        return {"option": chart.line(dates, series, title=f"{pf['name']} 净值")}
 
     return router

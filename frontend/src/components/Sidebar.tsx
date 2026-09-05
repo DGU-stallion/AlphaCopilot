@@ -25,11 +25,13 @@ export const DEFAULT_TABS: PageTab[] = [
   { slug: "limit-up-stats", label: "涨停样本统计" },
   { slug: "stock-pool", label: "股票池", path: "/stock-pool" },
   { slug: "correlation", label: "相关性分析" },
+  { slug: "backtest", label: "回测" },
+  { slug: "portfolios", label: "模拟组合", path: "/portfolios" },
   { slug: "journal", label: "交易日志", path: "/journal" },
   { slug: "reports", label: "我的研报", path: "/reports" },
 ];
 
-const BUSINESS_SLUGS = new Set(["stock-pool", "journal", "reports"]);
+const BUSINESS_SLUGS = new Set(["stock-pool", "journal", "reports", "portfolios"]);
 
 const STORAGE_KEY = "alphacopilot-sidebar-collapsed";
 

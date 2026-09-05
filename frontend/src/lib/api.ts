@@ -210,3 +210,62 @@ export async function addReport(item: {
   });
   if (!r.ok) throw new Error((await r.json()).detail ?? `addReport ${r.status}`);
 }
+
+// ── 模拟组合（S4：雪球式调仓事件）─────────────────────────────────────────
+
+export interface RebalanceEvent {
+  id: string;
+  effective_on: string;
+  weights: Record<string, number>;
+}
+
+export interface Portfolio {
+  id: string;
+  name: string;
+  benchmark: string;
+  created_on: string;
+  rebalances: RebalanceEvent[];
+}
+
+export async function listPortfolios(): Promise<Portfolio[]> {
+  const r = await fetch("/api/portfolios");
+  if (!r.ok) throw new Error(`listPortfolios ${r.status}`);
+  return r.json();
+}
+
+export async function createPortfolio(item: {
+  name: string;
+  benchmark?: string;
+  created_on?: string;
+}): Promise<string> {
+  const r = await fetch("/api/portfolios", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(item),
+  });
+  if (!r.ok) throw new Error((await r.json()).detail ?? `createPortfolio ${r.status}`);
+  return (await r.json()).id;
+}
+
+export async function deletePortfolio(id: string): Promise<void> {
+  const r = await fetch(`/api/portfolios/${id}`, { method: "DELETE" });
+  if (!r.ok) throw new Error(`deletePortfolio ${r.status}`);
+}
+
+export async function addRebalance(
+  id: string,
+  event: { effective_on: string; weights: Record<string, number> },
+): Promise<void> {
+  const r = await fetch(`/api/portfolios/${id}/rebalance`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(event),
+  });
+  if (!r.ok) throw new Error((await r.json()).detail ?? `addRebalance ${r.status}`);
+}
+
+export async function portfolioNav(id: string): Promise<Record<string, unknown>> {
+  const r = await fetch(`/api/portfolios/${id}/nav`);
+  if (!r.ok) throw new Error(`portfolioNav ${r.status}`);
+  return (await r.json()).option;
+}

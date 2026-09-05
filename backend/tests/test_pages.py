@@ -161,3 +161,32 @@ def test_render_limit_up_stats(client, monkeypatch):
     assert blocks[1]["option"]["series"][0]["data"] == [2, 1]
     # 行业表半导体在前
     assert blocks[2]["table"]["rows"][0] == ["半导体", 2]
+
+
+# ---- S4 回测页（引擎接线 + 渲染 + 降级）----
+
+def test_backtest_page_registered(client):
+    slugs = {p["slug"] for p in client.get("/api/pages").json()}
+    assert "backtest" in slugs
+
+
+def test_render_backtest_blocks(client):
+    # client fixture 已 patch data.closes_with_dates 为确定性假数据（价格递增）。
+    blocks = client.post("/api/pages/backtest/render",
+                         json={"symbol": "600519", "fast": 5, "slow": 10, "range": "1y"}).json()["blocks"]
+    kinds = [b["kind"] for b in blocks]
+    assert kinds == ["metric", "chart", "chart"]
+    # 指标卡含总收益/夏普
+    labels = [it["label"] for it in blocks[0]["metric"]["items"]]
+    assert "总收益" in labels and "夏普" in labels
+    # 净值图有策略 + 买入持有两条线
+    assert len(blocks[1]["option"]["series"]) == 2
+
+
+def test_render_backtest_degrades_when_no_data(client, monkeypatch):
+    from alpha import data
+
+    monkeypatch.setattr(data, "closes_with_dates", lambda *a, **k: [])
+    blocks = client.post("/api/pages/backtest/render", json={"symbol": "600519"}).json()["blocks"]
+    # 不 500；指标卡标不可用
+    assert blocks[0]["metric"]["items"][0]["value"] == "暂不可用"

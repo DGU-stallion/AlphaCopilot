@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import alpha.backtest_page  # noqa: F401 —— 触发 backtest.* 注册
 import alpha.factor  # noqa: F401 —— 触发 correlation.* 注册
 import alpha.market  # noqa: F401 —— 触发 market.* / limit_up.* 注册
 import alpha.review  # noqa: F401 —— 触发 daily_review.summary 注册
@@ -82,11 +83,32 @@ LIMIT_UP_STATS_SPEC: dict[str, Any] = {
     "refresh": {"mode": "on_open"},
 }
 
+BACKTEST_SPEC: dict[str, Any] = {
+    "slug": "backtest",
+    "title": "回测",
+    "kind": "builtin",
+    "status": "published",
+    "layout": "grid",
+    "params": [
+        {"name": "symbol", "type": "str", "label": "标的", "default": "600519"},
+        {"name": "fast", "type": "int", "label": "快线", "default": 20, "min": 2, "max": 120},
+        {"name": "slow", "type": "int", "label": "慢线", "default": 60, "min": 3, "max": 250},
+        {"name": "range", "type": "date_range", "label": "区间", "default": "1y"},
+    ],
+    "blocks": [
+        {"kind": "metric", "span": 3, "analysis_ref": {"fn": "backtest.metrics"}},
+        {"kind": "chart", "span": 2, "analysis_ref": {"fn": "backtest.equity"}},
+        {"kind": "chart", "span": 1, "analysis_ref": {"fn": "backtest.drawdown"}},
+    ],
+    "refresh": {"mode": "manual"},
+}
+
 _BUILTIN_SPECS = (
     CORRELATION_SPEC,
     DAILY_REVIEW_SPEC,
     MARKET_SPEC,
     LIMIT_UP_STATS_SPEC,
+    BACKTEST_SPEC,
 )
 
 
