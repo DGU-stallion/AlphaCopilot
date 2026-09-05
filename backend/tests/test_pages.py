@@ -37,6 +37,8 @@ def _fake_closes_with_dates(code, period=data.DAY, count=250):
 def client(monkeypatch, tmp_path):
     # factor._fetch 调 data.closes_with_dates；patch 到假数据，全程不触网。
     monkeypatch.setattr(data, "closes_with_dates", _fake_closes_with_dates)
+    # names 走 tencent_quote（网络）；测试内回退代码，保持离线确定性。
+    monkeypatch.setattr(data, "names", lambda codes: {c: c for c in codes})
     app = create_app(db_path=":memory:", workspace_root=tmp_path)
     with TestClient(app) as c:
         yield c

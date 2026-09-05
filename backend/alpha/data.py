@@ -45,6 +45,26 @@ def quote(codes: list[str]) -> dict[str, dict[str, Any]]:
     return astock.tencent_quote(codes)
 
 
+def names(codes: list[str]) -> dict[str, str]:
+    """批量取标的显示名称（代码 → 名称），供图表 series/轴标签用中文名而非代码。
+
+    参数：codes 为 6 位代码列表（如 ['600519','000858']）。
+    返回：{code: name}。复用 astock.tencent_quote 的 name 字段；某 code 取不到 name
+    或整体请求异常时，该 code 回退为代码本身（不报错、不伪造名称）。
+    """
+    result: dict[str, str] = {c: c for c in codes}
+    try:
+        quotes = astock.tencent_quote(codes)
+    except Exception:
+        return result
+    for code in codes:
+        q = quotes.get(code)
+        name = q.get("name") if q else None
+        if name:
+            result[code] = name
+    return result
+
+
 def valuation(code: str) -> dict[str, Any]:
     """取个股全量估值快照（PE/PB/PS 及其历史分位、同业对比、前向估值等）。
 

@@ -90,6 +90,23 @@ def _fetch(symbols: list[str], range: str) -> list[list[tuple[str, float]]]:
     return [data.closes_with_dates(code, count=count) for code in symbols]
 
 
+def _display_labels(symbols: list[str]) -> list[str]:
+    """code 列表 → 显示名列表（与 symbols 顺序/位置一一对应，不错位）。
+
+    名称经 data.names 取（取不到回退代码）。同名重复时给全部同名者附代码区分
+    （如 '贵州茅台(600519)'），保证 legend/轴标签唯一可辨。
+    """
+    name_map = data.names(symbols)
+    labels = [name_map[code] for code in symbols]
+    seen: dict[str, int] = {}
+    for label in labels:
+        seen[label] = seen.get(label, 0) + 1
+    return [
+        f"{label}({code})" if seen[label] > 1 else label
+        for label, code in zip(labels, symbols, strict=True)
+    ]
+
+
 # ---------------------------------------------------------------------------
 # 注册的分析函数
 # ---------------------------------------------------------------------------
@@ -107,7 +124,8 @@ def correlation_overlay(symbols: list[str], range: str) -> dict:
     对齐日期交集后各标的除以自身首值×100，同图叠加看相对强弱。
     """
     dates, cols = _align(_fetch(symbols, range))
-    series = {code: _normalize_100(col) for code, col in zip(symbols, cols, strict=True)}
+    labels = _display_labels(symbols)
+    series = {label: _normalize_100(col) for label, col in zip(labels, cols, strict=True)}
     return chart.line(dates, series, title="归一化叠加走势（起点=100）")
 
 
@@ -129,7 +147,7 @@ def correlation_matrix(symbols: list[str], range: str) -> dict:
     matrix = [[_pearson(rets[i], rets[j]) for j in _seq(n)] for i in _seq(n)]
     _corr_matrix_values.clear()
     _corr_matrix_values.extend([row[:] for row in matrix])
-    return chart.heatmap(list(symbols), matrix, title="日收益率相关矩阵")
+    return chart.heatmap(_display_labels(symbols), matrix, title="日收益率相关矩阵")
 
 
 @register(
@@ -159,7 +177,8 @@ def correlation_rolling(symbols: list[str], window: int, range: str) -> dict:
         seg_b = rb[end - window:end]
         rolling.append(round(_pearson(seg_a, seg_b), 4))
         x.append(ret_dates[end - 1])
-    label = f"{symbols[0]}~{symbols[1]} 滚动{window}日相关"
+    name_a, name_b = _display_labels(symbols[:2])
+    label = f"{name_a}~{name_b} 滚动{window}日相关"
     return chart.line(x, {label: rolling}, title=f"滚动 {window} 日收益率相关")
 
 

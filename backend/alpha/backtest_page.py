@@ -58,10 +58,11 @@ def backtest_equity(symbol: str, fast: int, slow: int, range: str) -> dict:
     _dates, closes = _load(symbol, range)
     base0 = closes[0]
     benchmark = [round(c / base0, 6) for c in closes]
+    name = data.names([symbol])[symbol]
     return chart.line(
         res.dates,
         {f"{fast}/{slow}金叉策略": res.equity, "买入持有": benchmark},
-        title=f"{symbol} 回测净值（{range}）",
+        title=f"{name} 回测净值（{range}）",
     )
 
 
@@ -72,7 +73,8 @@ def backtest_drawdown(symbol: str, fast: int, slow: int, range: str) -> dict:
     if res is None:
         return chart.line([], {"回撤": []}, title=f"回撤（{reason}）")
     dd_pct = [round(d * 100, 4) for d in res.drawdown]
-    return chart.line(res.dates, {"回撤(%)": dd_pct}, title=f"{symbol} 回撤")
+    name = data.names([symbol])[symbol]
+    return chart.line(res.dates, {"回撤(%)": dd_pct}, title=f"{name} 回撤")
 
 
 @register("backtest.metrics", params=_PARAMS)

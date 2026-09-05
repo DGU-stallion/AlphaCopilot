@@ -4,7 +4,7 @@
 
 @layer base {
   /* ============================================================
-     Vibe-Research · 科技玻璃暖橙主题
+     Vibe-Astock · 科技玻璃暖橙主题
      默认呈现 = 暗色暖橙（数据密集、长时间看，暗底最护眼；橙红＝A股红盘气质，避开近绿的青色）。
      .light 提供亮色备选。HSL 变量沿用 4 级 surface 架构。
      ============================================================ */
@@ -130,19 +130,25 @@
 
   /* 暖橙光文字 */
   .text-glow { text-shadow: 0 0 18px hsl(var(--primary) / 0.45); }
+}
 
-  /* 右侧 slide-in 对话面板（仅布局，主题色沿用 .glass token） */
-  .chat-panel {
-    position: fixed;
-    top: 0.5rem;
-    right: 0.5rem;
-    bottom: 0.5rem;
-    z-index: 30;
-    width: min(28rem, 92vw);
-    animation: chat-panel-in 180ms ease-out;
-  }
-  @keyframes chat-panel-in {
-    from { transform: translateX(16px); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-  }
+/* prose 跟随主题。
+ * @tailwindcss/typography 默认是浅色配色（bold 用 gray-900），暗色下加粗文字会
+ * 黑底黑字隐形。把插件变量接到主题 token，亮/暗都对，一处覆盖全部用 prose 的页面。*/
+.prose {
+  --tw-prose-body: hsl(var(--foreground) / 0.88);
+  --tw-prose-headings: hsl(var(--foreground));
+  --tw-prose-bold: hsl(var(--foreground));
+  --tw-prose-links: hsl(var(--primary));
+  --tw-prose-counters: hsl(var(--muted-foreground));
+  --tw-prose-bullets: hsl(var(--border));
+  --tw-prose-hr: hsl(var(--border));
+  --tw-prose-quotes: hsl(var(--foreground) / 0.9);
+  --tw-prose-quote-borders: hsl(var(--border));
+  --tw-prose-captions: hsl(var(--muted-foreground));
+  --tw-prose-code: hsl(var(--foreground));
+  --tw-prose-pre-code: hsl(var(--foreground) / 0.9);
+  --tw-prose-pre-bg: hsl(var(--muted) / 0.5);
+  --tw-prose-th-borders: hsl(var(--border));
+  --tw-prose-td-borders: hsl(var(--border));
 }

@@ -31,6 +31,21 @@ def get_prefix(code: str) -> str:
     return "sz"
 
 
+# A股主要指数 → 交易所前缀（指数代码与个股代码数字段重叠：如 000300 沪深300 在 sh，
+# 但 get_prefix('000300') 会按个股规则判成 sz、取不到指数日K）。指数取数须走此显式映射。
+_INDEX_PREFIX = {
+    "000001": "sh",  # 上证综指
+    "000016": "sh",  # 上证50
+    "000300": "sh",  # 沪深300
+    "000688": "sh",  # 科创50
+    "000905": "sh",  # 中证500
+    "000852": "sh",  # 中证1000
+    "399001": "sz",  # 深证成指
+    "399006": "sz",  # 创业板指
+    "399005": "sz",  # 中小板指
+}
+
+
 class DependencyMissing(RuntimeError):
     """惰性依赖未安装时抛出，前端据此提示 pip install。"""
 
@@ -269,7 +284,7 @@ def _tencent_kline(code: str, category: int = 4, offset: int = 60) -> list[dict]
     import urllib.request
 
     scale = {4: "day", 5: "week", 6: "month"}.get(category, "day")
-    prefix = get_prefix(code)  # 'sh'/'sz'
+    prefix = _INDEX_PREFIX.get(code, get_prefix(code))  # 指数走显式映射，否则按个股前缀规则
     sym = f"{prefix}{code}"
     url = (
         f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"

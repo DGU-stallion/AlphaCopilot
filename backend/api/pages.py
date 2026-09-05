@@ -60,7 +60,10 @@ def _render_block(block: dict[str, Any], values: dict[str, Any]) -> dict[str, An
     else:
         out["option"] = result
     if isinstance(result, dict) and "title" in result and kind != "markdown":
-        out.setdefault("title", result["title"])
+        # block.title 是给前端 <h3> 的展示字符串；chart helper 里 title 是 ECharts
+        # 结构 {"text": ...}，这里取其 text，避免把对象塞进 title 让 React 渲染时崩溃。
+        t = result["title"]
+        out.setdefault("title", t.get("text", "") if isinstance(t, dict) else t)
     return out
 
 

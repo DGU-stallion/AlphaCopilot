@@ -447,6 +447,11 @@ class DocRepo:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def delete_doc(self, did: str) -> bool:
+        cur = self.conn.execute("DELETE FROM doc WHERE id=?", (did,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
 
 class StockPoolRepo:
     """股票池聚合：stock_pool（研究池——代码/名称/备注/标签）。"""

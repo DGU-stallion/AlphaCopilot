@@ -38,6 +38,62 @@ def _num(v) -> int:
         return 0
 
 
+# 涨停原因（题材串）—— 东财涨停池(push2ex)不含原因字段，唯一可靠来源是同花顺问财。
+# 需环境变量 IWENCAI_API_KEY（不入库）；缺 key / 查询失败时返回 {}，reason 留空不伪造。
+def _clean_reason(text: str, max_tags: int = 4, max_len: int = 40) -> str:
+    """题材串清洗：统一分隔符、限标签数与总长（问财多用 '+' 分隔）。"""
+    text = text.replace("，", "+").replace(",", "+").strip()
+    tags = [t.strip() for t in text.split("+") if t.strip()]
+    return "+".join(tags[:max_tags])[:max_len]
+
+
+def _fetch_zt_reasons(date: str) -> dict:
+    """问财拉指定交易日全部涨停股的涨停原因，返回 {6位代码: 题材串}。
+
+    查询必须带日期（写"今日"常返 0 行、且可能与回退到的池子不同日）。缺 key / 失败 → {}。
+    """
+    import os
+
+    key = os.environ.get("IWENCAI_API_KEY", "").strip()
+    if not key:
+        return {}
+    import secrets
+
+    import requests
+
+    base = os.environ.get("IWENCAI_BASE_URL", "https://openapi.iwencai.com").rstrip("/")
+    headers = {
+        "Authorization": f"Bearer {key}", "Content-Type": "application/json",
+        "X-Claw-Call-Type": "normal", "X-Claw-Skill-Id": "report-search",
+        "X-Claw-Skill-Version": "2.0.0", "X-Claw-Plugin-Id": "none",
+        "X-Claw-Plugin-Version": "none", "X-Claw-Trace-Id": secrets.token_hex(32),
+    }
+    reasons: dict[str, str] = {}
+    try:
+        for page in range(1, 4):  # 单页 50，涨停一般 1~3 页
+            payload = {"query": f"{date}涨停的股票 涨停原因", "page": str(page),
+                       "limit": "50", "is_cache": "1", "expand_index": "true"}
+            r = requests.post(f"{base}/v1/query2data", json=payload, headers=headers, timeout=30)
+            rows = (r.json() or {}).get("datas") or []
+            if not rows:
+                break
+            code_cols = [c for c in rows[0] if "代码" in c]
+            reason_cols = [c for c in rows[0] if "涨停原因" in c]
+            if not code_cols or not reason_cols:
+                break
+            cc, rc = code_cols[0], reason_cols[0]
+            for row in rows:
+                code6 = str(row.get(cc, ""))[:6]
+                reason = str(row.get(rc, "")).strip()
+                if code6 and reason and reason.lower() != "nan" and code6 not in reasons:
+                    reasons[code6] = _clean_reason(reason)
+            if len(rows) < 50:
+                break
+    except Exception:  # noqa: BLE001  问财不可达/异常 → 已取到的照常返回，其余留空
+        return reasons
+    return reasons
+
+
 def _sentiment() -> dict:
     """市场情绪：涨跌家数/涨停跌停/活跃度 + 大盘宽度、题材投机（客观数据机械分档）。"""
     try:
@@ -131,6 +187,7 @@ def _emotion() -> dict:
 
     # 连板股清单（2 板+，客观公开榜单数据；按连板数、成交额降序）。
     # 产品定位调整（2026-07-05）：从「零标的」→「展示客观榜单但不推荐/不预测/不评分」。
+    reasons = _fetch_zt_reasons(resolved)  # 涨停原因题材串（问财；缺 key/失败 → {}，reason 留 None）
     lianban_stocks = sorted(
         ({
             "code": str(p.get("c", "")), "name": p.get("n", ""),
@@ -140,6 +197,7 @@ def _emotion() -> dict:
             "amount": astock._numf(p.get("amount")),      # 成交额,元（'-' 占位归一为 None，防排序对 str 取负崩溃）
             "float_cap": astock._numf(p.get("ltsz")),     # 流通市值,元
             "industry": p.get("hybk", ""),  # 概念/行业
+            "reason": reasons.get(str(p.get("c", ""))) or None,  # 涨停原因题材串（无则 None，前端显示 —）
         } for p in zt if (_num(p.get("lbc")) or 1) >= 2),
         key=lambda x: (-x["boards"], -(x["amount"] or 0)),
     )

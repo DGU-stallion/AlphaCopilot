@@ -101,6 +101,16 @@ def test_reports_rejects_empty_title(client):
     assert client.post("/api/reports", json={"title": "  "}).status_code == 400
 
 
+def test_reports_delete(client):
+    did = client.post("/api/reports", json={"title": "待删研报", "text": "x"}).json()["id"]
+    assert client.delete(f"/api/reports/{did}").status_code == 200
+    assert client.get("/api/reports").json() == []
+
+
+def test_reports_delete_404(client):
+    assert client.delete("/api/reports/nope").status_code == 404
+
+
 # ---------- 持久化：重启后不丢 ----------
 
 def test_persistence_across_reopen(tmp_path):

@@ -1,271 +1,412 @@
-/** 会话 API 客户端 —— 打到 /api（vite 代理到 FastAPI）。 */
+import { apiUrl } from "./base";
+// 后端 API 客户端。/api → vite 代理到本仓库的 FastAPI（server.py，默认 8910）。
+// 后端未启动或数据源异常时抛 ApiError，页面据此优雅降级。
 
-export interface Message {
-  id: string;
-  session_id: string;
-  role: "user" | "assistant";
-  content: string;
-  seq: number;
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
 }
 
-export async function createSession(): Promise<string> {
-  const r = await fetch("/api/sessions", { method: "POST" });
-  if (!r.ok) throw new Error(`createSession ${r.status}`);
-  return (await r.json()).session_id;
+// 后端访问密钥（对应后端部署时的 VR_API_KEY，公网部署防蹭用）。只存本地浏览器。
+const ACCESS_KEY = "vr-access-key";
+
+export function loadAccessKey(): string {
+  try {
+    return localStorage.getItem(ACCESS_KEY) || "";
+  } catch {
+    return "";
+  }
 }
 
-export async function listMessages(sid: string): Promise<Message[]> {
-  const r = await fetch(`/api/sessions/${sid}/messages`);
-  if (!r.ok) throw new Error(`listMessages ${r.status}`);
-  return r.json();
+export function saveAccessKey(key: string) {
+  try {
+    if (key) localStorage.setItem(ACCESS_KEY, key);
+    else localStorage.removeItem(ACCESS_KEY);
+  } catch {
+    /* 隐私模式等场景 localStorage 不可用 */
+  }
 }
 
-export async function sendMessage(sid: string, content: string): Promise<void> {
-  const r = await fetch(`/api/sessions/${sid}/messages`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ content }),
-  });
-  if (!r.ok) throw new Error(`sendMessage ${r.status}`);
+export function authHeaders(): Record<string, string> {
+  const k = loadAccessKey();
+  return k ? { Authorization: `Bearer ${k}` } : {};
 }
 
-export function streamUrl(sid: string): string {
-  return `/api/sessions/${sid}/stream`;
+export interface MyReport {
+  id: string; name: string; industry: string; size: number; ext: string; ts: number;
 }
 
-// ── 展示页（ADR-0007：页面数据驱动）───────────────────────────────────────
+// 下载/预览研报：带鉴权头 fetch → blob → 触发浏览器下载（<a download> 无法带 Authorization，故走 blob）。
+export async function downloadReport(id: string, name: string): Promise<void> {
+  const resp = await fetch(apiUrl(`/api/myreports/file/${id}`), { headers: authHeaders() });
+  if (!resp.ok) throw new ApiError(`下载失败 HTTP ${resp.status}`, resp.status);
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
-export interface PageParam {
-  name: string;
-  type: "symbol_list" | "int" | "float" | "date_range" | "enum" | "str";
+async function request<T>(path: string, method: "GET" | "POST" | "DELETE" = "GET", body?: unknown): Promise<T> {
+  let resp: Response;
+  const headers: Record<string, string> = { ...authHeaders() };
+  const opts: RequestInit = { method };
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  }
+  if (Object.keys(headers).length > 0) opts.headers = headers;
+  try {
+    resp = await fetch(apiUrl(`/api${path}`), opts);
+  } catch {
+    throw new ApiError("连接不到后端，请先在项目根目录启动：.venv/bin/python server.py（默认 8910）", 0);
+  }
+  let payload: any = null;
+  try {
+    payload = await resp.json();
+  } catch {
+    /* 非 JSON 响应 */
+  }
+  if (!resp.ok) {
+    if (resp.status === 401) {
+      throw new ApiError("后端开启了访问鉴权（VR_API_KEY）：请在「接入 AI」页底部填写后端访问密钥", 401);
+    }
+    throw new ApiError(payload?.detail || `HTTP ${resp.status}`, resp.status);
+  }
+  return (payload?.data ?? payload) as T;
+}
+
+const get = <T>(path: string) => request<T>(path, "GET");
+
+export interface Quote {
+  name: string; price: number; last_close: number; change_pct: number;
+  pe_ttm: number; pb: number; mcap_yi: number; turnover_pct: number;
+  limit_up: number; limit_down: number;
+}
+
+export interface Valuation {
+  name: string; code: string; price: number; mcap_yi: number;
+  pe_ttm: number; pb: number;
+  eps_26e: number | null; eps_27e: number | null; pe_26e: number | null;
+  cagr_pct: number | null; peg: number | null; digest_years: number | null;
+  analyst_count: number; forecast_note?: string;
+}
+
+export interface Report {
+  title: string; publishDate: string; orgSName: string;
+  emRatingName?: string; indvInduName?: string; pdfUrl?: string | null;
+}
+
+export interface ValMetric {
+  current: number; percentile: number; min: number; max: number;
+  p20: number; p50: number; p80: number; n: number;
+}
+export interface ValPercentile {
+  period: string; metrics: { pe_ttm?: ValMetric; pb?: ValMetric };
+}
+
+export interface Announcement {
+  date: string; title: string; type: string; url: string;
+}
+
+export interface Financials {
+  period: string | null;
+  revenue: string | null; revenue_yoy: string | null;
+  net_profit: string | null; net_profit_yoy: string | null;
+  eps: string | null; bvps: string | null; roe: string | null;
+  gross_margin: string | null; net_margin: string | null; op_cf_ps: string | null;
+}
+
+export interface NewsItem {
+  新闻标题?: string; 发布时间?: string; 文章来源?: string; 新闻链接?: string;
+}
+
+export interface IndexQuote {
+  name: string; price: number; change_pct: number; change_amt: number;
+}
+
+export interface MarketSentiment {
+  up: number; down: number; flat: number; zt: number; zt_real: number; dt: number; dt_real: number;
+  active: string; breadth: string; speculation: string; date: string;
+}
+export interface SectorFlow {
+  name: string; pct: number; net: number; inflow: number; outflow: number; firms: number;
+}
+export interface MarketOverview {
+  sentiment: MarketSentiment; sectors: SectorFlow[]; updated: string;
+}
+
+// 短线情绪：连板梯队 / 最高连板 / 炸板率 / 封板率 / 晋级率 / 涨跌停家数 + 连板股清单（客观公开榜单）
+export interface EmotionTier { boards: number; count: number; plus: boolean }
+export interface LianbanStock {
+  code: string; name: string; boards: number;
+  price: number; pct: number; amount: number | null; float_cap: number | null; industry: string;
+  reason: string;  // 涨停原因题材串（问财；缺 key/失败为空串）
+}
+export interface ShortTermEmotion {
+  date: string;
+  zt_count: number; dt_count: number; zb_count: number;
+  max_boards: number; lianban_count: number;
+  ladder: EmotionTier[];
+  lianban_stocks: LianbanStock[];
+  seal_rate: number | null; break_rate: number | null; promotion_rate: number | null;
+  yzt_count: number;
+}
+
+// 每日盯盘：3 秒实时快照（持仓/自选/500亿大票/三板+/昨日成交前十 + 异动流）
+export interface WatchRow {
+  code: string; name: string;
+  price: number | null; pct: number | null; amount: number | null;
+  cost?: number; shares?: number; pnl_pct?: number;   // 持仓行
+  boards?: number; is_limit?: boolean;                 // 三板+行
+}
+export interface MonitorAlert {
+  ts: string; code: string; name: string; kind: string; msg: string; sources: string[];
+}
+export interface MonitorSnapshot {
+  ts: string; phase: "open" | "break" | "closed"; poll_seconds: number;
+  holdings: WatchRow[]; watchlist: WatchRow[];
+  bigcap: { total: number; top: WatchRow[] };
+  lianban3: WatchRow[];
+  turnover: { label: string; stocks: WatchRow[] };
+  alerts: MonitorAlert[];
+}
+
+// 首板分析：今日首板涨停股（连板数=1）+ 涨停原因题材串（客观公开榜单）
+export interface FirstBoardStock {
+  code: string; name: string;
+  price: number; pct: number; amount: number | null; float_cap: number | null;
+  industry: string; seal_time: string; break_count: number; reason: string;
+}
+export interface FirstBoardData {
+  date: string; total_zt: number; first_count: number;
+  reason_note: string | null;
+  stocks: FirstBoardStock[];
+}
+
+// 全市场成交额榜（客观公开榜单）
+export interface TurnoverStock {
+  code: string; name: string;
+  price: number | null; pct: number | null;
+  amount: number | null; mcap: number | null; float_cap: number | null; industry: string;
+}
+export interface TurnoverTop { stocks: TurnoverStock[]; updated: string }
+
+export interface RadarItem {
+  title: string; url: string; time: string; source: string; summary?: string; zh?: string;
+}
+export interface Industry {
+  key: string; name: string; accent: string; total: number; items: RadarItem[];
+}
+export interface RadarData {
+  generated_at: string | null; recent_days: number; industries: Industry[];
+  stats: { industries: number; total_sources: number; failed_sources?: number };
+}
+
+export interface Holding {
+  code: string; name: string; price: number; shares: number; cost: number;
+  market_value: number; pnl: number; pnl_pct: number;
+}
+export interface ClosedPosition {
+  code: string; name: string; date: string; price: number; shares: number; cost: number;
+  pnl: number; pnl_pct: number;
+}
+export interface PortfolioData {
+  holdings: Holding[];
+  totals: { market_value: number; cost: number; pnl: number; pnl_pct: number };
+  closed: ClosedPosition[];
+  realized_pnl: number;
+  updated: string; last_refresh: string | null;
+}
+
+// 资金面 / 筹码 / 信号（v3.3 并入，均为「用户查的那只股」的公开数据）
+export interface MarginRow { date: string; rzye: number; rzmre: number; rzche: number; rqye: number; rqmcl: number; rzrqye: number }
+export interface BlockTradeRow { date: string; price: number; close: number; premium_pct: number; vol: number; amount: number; buyer: string; seller: string }
+export interface HolderRow { date: string; holder_num: number; change_ratio: number; avg_shares: number }
+export interface DividendRow { date: string; bonus_rmb: number; transfer_ratio: number; bonus_ratio: number | null; plan: string }
+export interface FundFlowRow { date: string; main_net: number; small_net: number; mid_net: number; large_net: number; super_net: number }
+export interface DtSeat { name: string; buy_amt: number; sell_amt: number; net: number }
+export interface DragonTiger {
+  records: { date: string; reason: string; net_buy: number; turnover: number }[];
+  seats: { buy: DtSeat[]; sell: DtSeat[] };
+  institution: { buy_amt: number; sell_amt: number; net_amt: number };
+}
+export interface LockupRow { date: string; type: string; shares: number; able_shares: number; ratio: number }
+export interface Lockup { history: LockupRow[]; upcoming: LockupRow[] }
+export interface Board { name: string; code: string; change_pct: number | string; lead_stock: string }
+export interface Blocks { total: number; boards: Board[]; concept_tags: string[] }
+export interface HotConcept { concept: string; bk: string; hit: number }
+export interface QaRow { company: string; question: string; answer: string | null; answerer: string; ask_time: string }
+export interface IndustryRow { rank: number; name: string; change_pct: number; code: string; up_count: number; down_count: number }
+export interface IndustryData { top: IndustryRow[]; bottom: IndustryRow[]; total: number }
+
+// 全球市场（美股 / 港股，移植自 global-stock-data · 东财域内源）
+export interface GlobalIndex {
+  key: string; name: string; region: string;
+  price: number | null; change_pct: number | null;
+}
+export interface GlobalQuote {
+  code: string; name: string;
+  price: number | null; open: number | null; high: number | null; low: number | null;
+  prev_close: number | null; amount: number | null; mcap: number | null; change_pct: number | null;
+}
+export interface GlobalMetrics {
+  report_date: string;
+  revenue: number | null; revenue_yoy: number | null; net_profit: number | null;
+  eps: number | null; roe: number | null; gross_margin: number | null;
+  net_margin: number | null; debt_ratio: number | null;
+}
+export interface GlobalStock {
+  code: string; name: string; market: string;
+  quote: GlobalQuote; metrics: GlobalMetrics | null;
+}
+
+/** 此刻的「实时行情」属于哪一场 —— 盘前行情返回的是上一场收盘，UI 要如实标注 */
+export interface MarketSession {
+  now: string;
+  today: string;
+  /** 实时行情代表的交易日；取不到时为 null */
+  quotes_of: string | null;
+  is_today: boolean;
+  phase: string;
+  /** 直接可展示的一句话，如「盘前 · 显示 2026-07-29 收盘」 */
   label: string;
-  default?: unknown;
-  min?: number;
-  max?: number;
-  max_len?: number;
-  choices?: string[];
 }
 
-export interface PageSpec {
-  slug: string;
-  title: string;
-  kind?: string;
-  layout?: string;
-  params: PageParam[];
-}
-
-// 后端 GET /api/pages/{slug} 返回整行 {id,slug,title,kind,status,spec:{...}}，
-// 真正的 params/blocks 在内层 spec。这里解包为前端用的 PageSpec。
-interface PageRow {
-  slug: string;
-  title: string;
-  kind?: string;
-  spec: { params?: PageParam[]; layout?: string; title?: string };
-}
-
-export interface PageListItem {
-  slug: string;
-  title: string;
-  kind?: string;
-}
-
-export interface PageBlock {
-  kind: "chart" | "markdown" | "table" | "metric" | string;
-  span?: number;
-  title?: string;
-  option?: Record<string, unknown>;
-  text?: string;
-  table?: { columns?: string[]; rows?: (string | number)[][] };
-  metric?: {
-    items?: {
-      label: string;
-      value: string | number;
-      hint?: string;
-      tone?: "up" | "down" | "flat" | "muted";
-    }[];
-  };
-}
-
-export async function listPages(): Promise<PageListItem[]> {
-  const r = await fetch("/api/pages");
-  if (!r.ok) throw new Error(`listPages ${r.status}`);
-  return r.json();
-}
-
-export async function getPage(slug: string): Promise<PageSpec> {
-  const r = await fetch(`/api/pages/${slug}`);
-  if (!r.ok) throw new Error(`getPage ${r.status}`);
-  const row: PageRow = await r.json();
-  return {
-    slug: row.slug,
-    title: row.title,
-    kind: row.kind,
-    layout: row.spec?.layout,
-    params: row.spec?.params ?? [],
-  };
-}
-
-export async function renderPage(
-  slug: string,
-  params: Record<string, unknown>,
-): Promise<PageBlock[]> {
-  const r = await fetch(`/api/pages/${slug}/render`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(params),
-  });
-  if (!r.ok) throw new Error(`renderPage ${r.status}`);
-  return (await r.json()).blocks;
-}
-
-// ── 业务页 CRUD（S3：股票池 / 交易日志 / 我的研报）──────────────────────────
-
-export interface PoolItem {
-  id: string;
-  code: string;
+/** 隔夜外围快照：指数 + 美股七姐妹，各自带「属于哪一场」 */
+export interface OverseasRow {
   name: string;
-  note: string;
-  tags: string;
-}
-
-export async function listPool(): Promise<PoolItem[]> {
-  const r = await fetch("/api/stock-pool");
-  if (!r.ok) throw new Error(`listPool ${r.status}`);
-  return r.json();
-}
-
-export async function addPool(item: {
-  code: string;
-  name?: string;
-  note?: string;
-  tags?: string;
-}): Promise<void> {
-  const r = await fetch("/api/stock-pool", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(item),
-  });
-  if (!r.ok) throw new Error((await r.json()).detail ?? `addPool ${r.status}`);
-}
-
-export async function removePool(code: string): Promise<void> {
-  const r = await fetch(`/api/stock-pool/${code}`, { method: "DELETE" });
-  if (!r.ok) throw new Error(`removePool ${r.status}`);
-}
-
-export interface JournalEntry {
-  id: string;
-  code: string;
-  name: string;
-  side: "buy" | "sell";
   price: number;
-  shares: number;
-  fee: number;
-  traded_at: string;
-  note: string;
+  change_pct: number;
+  /** 该行行情所属交易日；取不到为 null（**不拿今天顶替**） */
+  session: string | null;
+  region?: string;
+  ticker?: string;
+}
+export interface OverseasSnapshot {
+  available: boolean;
+  reason?: string;
+  indices?: OverseasRow[];
+  mag7?: OverseasRow[];
+  us_session?: string | null;
+  hk_session?: string | null;
+  /** 可直接展示的一句话，如「美股 2026-07-29 收盘」「港股 2026-07-30 盘前」。
+   *  别用 us_session 自己拼「XX 收盘」—— 港股在北京白天可能正在交易。 */
+  us_label?: string | null;
+  hk_label?: string | null;
 }
 
-export async function listJournal(): Promise<JournalEntry[]> {
-  const r = await fetch("/api/journal");
-  if (!r.ok) throw new Error(`listJournal ${r.status}`);
-  return r.json();
+/** 今日实时打板情绪（盘面数据页）—— 与 ShortTermEmotion（已收盘那一场）分开 */
+export interface LiveEmotion {
+  available: boolean;
+  reason?: string;
+  date?: string;
+  /** 快照时刻 HH:MM */
+  as_of?: string;
+  phase?: string;
+  zt_count?: number;
+  dt_count?: number | null;
+  zb_count?: number | null;
+  max_boards?: number;
+  lianban_count?: number;
+  seal_rate?: number | null;
+  break_rate?: number | null;
+  promotion_rate?: number | null;
+  /** 晋级率的分母：上一场的涨停家数 */
+  promotion_base?: number | null;
+  /** 分母是哪一场。两张卡都叫「晋级率」，而各自的「昨」不是同一天，所以把日期给出来写死 */
+  promotion_base_date?: string | null;
 }
 
-export async function addJournal(entry: Omit<JournalEntry, "id">): Promise<void> {
-  const r = await fetch("/api/journal", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(entry),
-  });
-  if (!r.ok) throw new Error((await r.json()).detail ?? `addJournal ${r.status}`);
+// 股票池 / 交易日志（业务页 CRUD，真源 SQLite；见 backend/api/business.py）
+export interface PoolItem {
+  id: string; code: string; name: string; note: string; tags: string; created_at: number;
+}
+export interface JournalRow {
+  id: string; code: string; name: string; side: "buy" | "sell";
+  price: number; shares: number; fee: number; traded_at: string; note: string; created_at: number;
+}
+export interface JournalIn {
+  code?: string; name?: string; side: "buy" | "sell";
+  price: number; shares: number; fee?: number; traded_at?: string; note?: string;
 }
 
-export async function removeJournal(id: string): Promise<void> {
-  const r = await fetch(`/api/journal/${id}`, { method: "DELETE" });
-  if (!r.ok) throw new Error(`removeJournal ${r.status}`);
+// 涨停样本统计（确定性统计，非 AI；见 backend/alpha/limit_up_sample.py）
+export interface SampleStats {
+  sample: number; win_rate: number | null; avg: number | null; median: number | null;
+  best: number | null; worst: number | null; limit_up_rate: number | null;
+}
+export interface SampleDay { date: string; sample: number; avg: number | null; equity: number }
+export interface SampleStrategy { desc: string; overall: SampleStats; daily: SampleDay[]; final_equity: number }
+export interface SampleBucket extends SampleStats { bucket: string }
+export interface BacktestData {
+  available: boolean; reason?: string;
+  layer?: string; sample_caveat?: string;
+  days_requested?: number; days_used?: number;
+  date_from?: string; date_to?: string; missing_days?: string[];
+  seal_curve?: SampleBucket[];
+  strategies?: Record<string, SampleStrategy>;
 }
 
-export interface ReportItem {
-  id: string;
-  title: string;
-  source_path: string;
-  created_at: number;
-}
-
-export async function listReports(): Promise<ReportItem[]> {
-  const r = await fetch("/api/reports");
-  if (!r.ok) throw new Error(`listReports ${r.status}`);
-  return r.json();
-}
-
-export async function addReport(item: {
-  title: string;
-  text?: string;
-  source_path?: string;
-}): Promise<void> {
-  const r = await fetch("/api/reports", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(item),
-  });
-  if (!r.ok) throw new Error((await r.json()).detail ?? `addReport ${r.status}`);
-}
-
-// ── 模拟组合（S4：雪球式调仓事件）─────────────────────────────────────────
-
-export interface RebalanceEvent {
-  id: string;
-  effective_on: string;
-  weights: Record<string, number>;
-}
-
-export interface Portfolio {
-  id: string;
-  name: string;
-  benchmark: string;
-  created_on: string;
-  rebalances: RebalanceEvent[];
-}
-
-export async function listPortfolios(): Promise<Portfolio[]> {
-  const r = await fetch("/api/portfolios");
-  if (!r.ok) throw new Error(`listPortfolios ${r.status}`);
-  return r.json();
-}
-
-export async function createPortfolio(item: {
-  name: string;
-  benchmark?: string;
-  created_on?: string;
-}): Promise<string> {
-  const r = await fetch("/api/portfolios", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(item),
-  });
-  if (!r.ok) throw new Error((await r.json()).detail ?? `createPortfolio ${r.status}`);
-  return (await r.json()).id;
-}
-
-export async function deletePortfolio(id: string): Promise<void> {
-  const r = await fetch(`/api/portfolios/${id}`, { method: "DELETE" });
-  if (!r.ok) throw new Error(`deletePortfolio ${r.status}`);
-}
-
-export async function addRebalance(
-  id: string,
-  event: { effective_on: string; weights: Record<string, number> },
-): Promise<void> {
-  const r = await fetch(`/api/portfolios/${id}/rebalance`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(event),
-  });
-  if (!r.ok) throw new Error((await r.json()).detail ?? `addRebalance ${r.status}`);
-}
-
-export async function portfolioNav(id: string): Promise<Record<string, unknown>> {
-  const r = await fetch(`/api/portfolios/${id}/nav`);
-  if (!r.ok) throw new Error(`portfolioNav ${r.status}`);
-  return (await r.json()).option;
-}
+export const api = {
+  health: () => get<{ ok: boolean }>("/health"),
+  indices: () => get<IndexQuote[]>("/indices"),
+  marketSession: () => get<MarketSession>("/market/session"),
+  overseas: () => get<OverseasSnapshot>("/market/overseas"),
+  liveEmotion: () => get<LiveEmotion>("/market/live-emotion"),
+  marketOverview: () => get<MarketOverview>("/market/overview"),
+  emotion: () => get<ShortTermEmotion>("/market/emotion"),
+  monitorSnapshot: (watch: string) => get<MonitorSnapshot>(`/monitor/snapshot?watch=${encodeURIComponent(watch)}`),
+  firstBoard: () => get<FirstBoardData>("/market/first-board"),
+  turnoverTop: () => get<TurnoverTop>("/market/turnover-top"),
+  globalIndices: () => get<GlobalIndex[]>("/global/indices"),
+  globalStock: (symbol: string) => get<GlobalStock>(`/global/stock?symbol=${encodeURIComponent(symbol)}`),
+  radar: () => get<RadarData>("/radar"),
+  radarRefresh: () => request<RadarData>("/radar/refresh", "POST"),
+  portfolio: () => get<PortfolioData>("/portfolio"),
+  addHolding: (code: string, shares: number, cost: number) => request<PortfolioData>("/portfolio/holding", "POST", { code, shares, cost }),
+  removeHolding: (code: string) => request<PortfolioData>(`/portfolio/holding?code=${code}`, "DELETE"),
+  refreshPortfolio: () => request<PortfolioData>("/portfolio/refresh", "POST"),
+  closePosition: (code: string, date: string, price: number, shares: number, cost: number) =>
+    request<PortfolioData>("/portfolio/close", "POST", { code, date, price, shares, cost }),
+  removeClosed: (index: number) => request<PortfolioData>(`/portfolio/close?index=${index}`, "DELETE"),
+  valuation: (code: string) => get<Valuation>(`/valuation?code=${code}`),
+  percentile: (code: string) => get<ValPercentile>(`/valuation/percentile?code=${code}`),
+  financials: (code: string) => get<Financials>(`/financials?code=${code}`),
+  announcements: (code: string) => get<Announcement[]>(`/announcements?code=${code}`),
+  quote: (codes: string) => get<Record<string, Quote>>(`/quote?codes=${codes}`),
+  reports: (code: string) => get<Report[]>(`/reports?code=${code}`),
+  news: (code: string) => get<NewsItem[]>(`/news?code=${code}`),
+  margin: (code: string) => get<MarginRow[]>(`/margin?code=${code}`),
+  blockTrade: (code: string) => get<BlockTradeRow[]>(`/block-trade?code=${code}`),
+  holders: (code: string) => get<HolderRow[]>(`/holders?code=${code}`),
+  dividend: (code: string) => get<DividendRow[]>(`/dividend?code=${code}`),
+  fundFlow: (code: string) => get<FundFlowRow[]>(`/fund-flow?code=${code}`),
+  dragonTiger: (code: string) => get<DragonTiger>(`/dragon-tiger?code=${code}`),
+  lockup: (code: string) => get<Lockup>(`/lockup?code=${code}`),
+  blocks: (code: string) => get<Blocks>(`/blocks?code=${code}`),
+  hotConcepts: (code: string) => get<HotConcept[]>(`/hot-concepts?code=${code}`),
+  investorQa: (code: string) => get<QaRow[]>(`/investor-qa?code=${code}`),
+  industry: (top = 20) => get<IndustryData>(`/industry?top=${top}`),
+  myReports: () => get<MyReport[]>("/myreports"),
+  uploadReport: (name: string, contentB64: string) =>
+    request<MyReport>("/myreports", "POST", { name, content_b64: contentB64 }),
+  deleteReport: (id: string) => request<{ ok: boolean }>(`/myreports/${id}`, "DELETE"),
+  // 股票池 CRUD
+  stockPool: () => get<PoolItem[]>("/stock-pool"),
+  addPool: (body: { code: string; name?: string; note?: string; tags?: string }) =>
+    request<{ id: string; code: string }>("/stock-pool", "POST", body),
+  removePool: (code: string) => request<{ ok: boolean }>(`/stock-pool/${code}`, "DELETE"),
+  // 交易日志 CRUD
+  journal: () => get<JournalRow[]>("/journal"),
+  addJournal: (body: JournalIn) => request<{ id: string }>("/journal", "POST", body),
+  removeJournal: (jid: string) => request<{ ok: boolean }>(`/journal/${jid}`, "DELETE"),
+  // 涨停样本统计
+  backtest: (days: number) => get<BacktestData>(`/backtest?days=${days}`),
+  backtestRefresh: (days: number) => request<BacktestData>(`/backtest/refresh?days=${days}`, "POST"),
+};

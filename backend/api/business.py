@@ -148,6 +148,12 @@ def build_business_router(store: Store) -> APIRouter:
         did = store.docs.add_doc(body.title, body.source_path or "manual", body.text)
         return {"id": did}
 
+    @router.delete("/reports/{did}")
+    def remove_report(did: str) -> dict:
+        if not store.docs.delete_doc(did):
+            raise HTTPException(404, "研报不存在")
+        return {"ok": True}
+
     # ---------- 模拟组合（雪球式调仓事件）----------
     @router.get("/portfolios")
     def list_portfolios() -> list:

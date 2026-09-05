@@ -26,6 +26,7 @@ from agent.providers.dsh import DshProvider
 from api.builtin_pages import register_builtin_pages
 from api.business import build_business_router
 from api.jobs import JobQueue
+from api.market import build_market_router
 from api.pages import build_pages_router
 from api.session_manager import SessionManager
 from api.store import Store
@@ -204,4 +205,5 @@ def create_app(
     app.include_router(router)
     app.include_router(build_pages_router(store))
     app.include_router(build_business_router(store))
+    app.include_router(build_market_router())
     return app

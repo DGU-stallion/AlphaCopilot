@@ -34,6 +34,25 @@ def test_quote_valuation_global_news_delegate(monkeypatch):
     assert data.news_radar(force=True) == {"force": True}
 
 
+def test_names_maps_and_falls_back(monkeypatch):
+    # 有 name 取 name；缺 name / 缺该 code / 异常 → 回退代码本身（不伪造）。
+    monkeypatch.setattr(
+        data.astock, "tencent_quote",
+        lambda codes: {"600519": {"name": "贵州茅台"}, "000001": {}},
+    )
+    assert data.names(["600519", "000001", "999999"]) == {
+        "600519": "贵州茅台",  # 有 name
+        "000001": "000001",   # 有 quote 无 name → 回退
+        "999999": "999999",   # 无 quote → 回退
+    }
+
+    def boom(codes):
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(data.astock, "tencent_quote", boom)
+    assert data.names(["600519"]) == {"600519": "600519"}  # 异常 → 全回退
+
+
 def test_closes_extracts_close(monkeypatch):
     monkeypatch.setattr(
         data.astock, "kline",

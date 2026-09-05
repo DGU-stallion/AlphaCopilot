@@ -37,6 +37,8 @@ def fake_data(monkeypatch):
     def fake_closes_with_dates(code, period=factor.data.DAY, count=250):
         return list(_FAKE[code])
     monkeypatch.setattr(factor.data, "closes_with_dates", fake_closes_with_dates)
+    # 无网络：names 回退代码本身 —— series/轴标签仍是代码，既有断言不变。
+    monkeypatch.setattr(factor.data, "names", lambda codes: {c: c for c in codes})
 
 
 def _series_by_name(option, name):
