@@ -305,16 +305,26 @@ Conventional Commits，PR 标题带任务号；任务号从 T21 续编。
 
 ### 缝合顺序（最小可用，逐步含验收）
 
-**阶段 S1 — 接缝准备（不迁业务页）**
-- 内容：新增业务页专用路由（现仅 `pages/:slug`）；建立页面上下文 Provider（参考 useAiPage）；
-  修 pnpm `allowBuilds` 门禁使 `pnpm test` 可跑。
-- 验收：① 新增一条专用路由可渲染占位页；② 页面能向 Agent 注册 `{key,title,context}`；
-  ③ `pnpm test` 与 `pnpm build` 均绿；④ 现有 88 非 dsh 后端测试仍绿。
-- 不做：不动 dsh provider（其 SDK 不匹配问题另案）。
+> 调整（2026-09-05）：**先把确定性平台跑通，Agent 作为后置增量到 S5 才真正接入**。
+> S1–S4 全程 Agent 只留**占位 UI + 接口约定**，不接任何 provider。接缝设计为
+> **provider 中立**——不预设接什么 agent 框架（dsh / Codex / Claude CLI / 其它均可经
+> `AgentProvider` 防腐层接入）；**dsh 相关代码保留**，作为一个既有候选实现，不删。
+> 当前 dsh SDK 签名不匹配的 8 个测试已 `@pytest.mark.skip`（reason 指向本节 S5），
+> 使基线全绿；恢复条件写在 skip reason 里。
+
+**阶段 S1 — 接缝准备（不迁业务页，不接 Agent）**
+- 内容：新增业务页专用路由（现仅 `pages/:slug`）；**Agent 只做占位**——右下角浮标 +
+  chat panel 占位 UI（显示「AI 助手即将上线」），并定义页面向 Agent 暴露上下文的**接口
+  约定**（`{key, title, context, suggestions}`），**不接 provider、不发起对话**；
+  后端 `agent/provider` 防腐层保持不动、不调用；修 pnpm `allowBuilds` 门禁使 `pnpm test` 可跑。
+- 验收：① 新增一条专用路由可渲染占位页；② 页面能向占位接口注册 `{key,title,context}`（有单测断言接口形状）；
+  ③ `pnpm test` 与 `pnpm build` 均绿；④ 后端 `88 passed, 8 skipped` 保持；⑤ 全程无任何 provider 调用。
 
 **阶段 S2 — 迁只读确定性页（低风险优先）**
 - 顺序：盘面数据 → 涨停样本统计 → 复盘看板（确定性部分，**不含五分析师/复盘裁判**）。
 - 方式：适配 vibe-astock 计算模块进 `alpha/`，走 page spec 或专用只读页。
+  现有 `daily-review`/`correlation` 两个 builtin 页走确定性 `alpha.review`/`alpha.factor`、
+  不经 agent，**保留可用**，作为 S2 先行样例。
 - 验收（每页）：① 首屏渲染 **0 次 LLM 调用**（断言无 provider 调用）；② 关键指标数值
   与 vibe-astock 同输入下一致（固定 fixture 断言）；③ 数据源不可用时显式标「不可用」，
   不显示为 0；④ 有针对性单测。
@@ -334,22 +344,28 @@ Conventional Commits，PR 标题带任务号；任务号从 T21 续编。
 - 模拟组合验收：雪球式调仓事件（生效日期+调权历史不可覆盖）；净值 vs 沪深300 归一化；
   权重不足 100% 视为现金；页面显式声明手续费假设。
 
-**阶段 S5 — Agent 页面感知与草案写**
-- 内容：每页提供确定性数据快照给 Agent（含 as_of/来源/样本数）；只读解释先行；
+> ──────── S1–S4 跑通 = 第一版确定性平台可用（不含 Agent）────────
+
+**阶段 S5 — 引入 Agent（provider 中立，此时才真正接入）**
+- 内容：先选定并接入一个 agent provider（dsh / Codex / Claude CLI 均可，dsh 代码已保留）；
+  解决所选 provider 的接入问题（如选 dsh 则对齐 `DeepSeekHarnessConfig` 签名 / 锁定 SDK 版本，
+  并恢复 8 个 skip 测试）；页面上下文快照接入消费方；只读解释先行；
   再加白名单草案动作 `stock_pool.add/remove`、`portfolio.create/rebalance`（草案→确认→确定性写接口）。
 - 验收：① Agent 回答基于页面快照、不另起取数；② 换页不串上下文；③ 写操作必须经用户确认，
-  Agent 不直接写库；④ 合规底线（不荐股/不预测/不给买卖时机）测试固化。
+  Agent 不直接写库；④ 合规底线（不荐股/不预测/不给买卖时机）测试固化；⑤ 所选 provider 的
+  接入测试恢复绿。
 
 **阶段 S6 — 清理遗留**
-- 内容：新能力验证通过后，退役旧占位页与不再符合定位的实现；处理 dsh provider SDK 不匹配
-  （独立任务：对齐 `DeepSeekHarnessConfig` 签名或锁定 SDK 版本）。
-- 验收：全后端测试（含 dsh）绿；无死引用。
+- 内容：新能力验证通过后，退役旧占位页与不再符合定位的实现。
+- 验收：全后端测试绿；无死引用。
 
 ### 风险与依赖
 
 - **回测引擎迁移是最大不确定项**：Vibe-Research 引擎依赖其数据 `loader`，迁移时数据源要接到
   本项目取数层；先写回归测试对齐，避免「看着正常其实算错」。列为 S4 高风险子任务。
-- **dsh provider SDK 不匹配**：当前 8 个测试因 `DeepSeekHarnessConfig.session_root` 失败，
-  是既有问题，不阻塞 S1–S4（确定性页不经 dsh），但 S5 Agent 功能前必须解决。
+- **Agent 后置、provider 中立**：S1–S4 不接 Agent，只留占位 UI + 接口约定。接缝经
+  `AgentProvider` 防腐层，不预设 agent 框架（dsh/Codex/Claude CLI/其它均可），dsh 代码保留。
+  当前 dsh SDK 的 `DeepSeekHarnessConfig.session_root` 不匹配导致 8 个测试已 skip（基线全绿），
+  不阻塞 S1–S4（确定性页不经 agent）；S5 接入所选 provider 时再解决并恢复对应测试。
 - **技术栈**：Vibe-Research 回测是 Python（与本项目一致，可直接迁）；其 orchestrator 是 TS，
   **不迁**（本项目单 FastAPI 后端，避免双后端）。

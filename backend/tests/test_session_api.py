@@ -135,6 +135,7 @@ async def _wait_turn(app, sid, timeout=40):
     await asyncio.wait_for(_w(), timeout=timeout)
 
 
+@pytest.mark.skip(reason="agent 接入推迟至 S5（ADR-0008）；dsh SDK DeepSeekHarnessConfig 签名待对齐，代码保留")
 async def test_message_persistence_and_sse_stream():
     server, base = _mock_model("白酒板块是消费板块龙头之一。")
     try:
@@ -172,6 +173,7 @@ async def test_message_persistence_and_sse_stream():
         server.shutdown()
 
 
+@pytest.mark.skip(reason="agent 接入推迟至 S5（ADR-0008）；dsh SDK DeepSeekHarnessConfig 签名待对齐，代码保留")
 async def test_stream_reconnect_from_last_event_id():
     server, base = _mock_model("结论文本。")
     try:

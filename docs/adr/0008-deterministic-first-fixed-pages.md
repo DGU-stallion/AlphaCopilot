@@ -47,10 +47,12 @@
 
 ## 权衡
 
-- **保留 dsh provider 而非立即替换** → dsh 作为当前 Agent runtime 的一个 provider 实现
-  暂留（ADR-0007 的 provider 防腐层已就绪）；是否引入其它 runtime 后续按需决定。
-  注：当前 dsh SDK 版本与 `agent/providers/dsh.py` 存在 `DeepSeekHarnessConfig` 签名
-  不匹配，属独立的 provider 维护问题，不在本次定位调整范围内。
+- **Agent 后置接入，provider 中立** → 第一版先把确定性平台（S1–S4）跑通，Agent 到 S5
+  才真正接入。接缝经 ADR-0007 的 `AgentProvider` 防腐层，**不预设 agent 框架**——dsh /
+  Codex / Claude CLI / 其它均可接入；**dsh 相关代码保留**作为一个既有候选实现。
+  注：当前 dsh SDK 版本与 `agent/providers/dsh.py` 存在 `DeepSeekHarnessConfig` 签名不匹配，
+  相关 8 个测试已 `@pytest.mark.skip`（reason 指向 S5）使基线全绿；属所选 provider 的接入
+  期维护项，不在本次定位调整范围内。
 - **旧 research 模块先删无引用者**（chat/cli_runtime/portfolio/myreports/caches），
   live 数据层（astock/gstock/market/newsradar/models）保留。
 

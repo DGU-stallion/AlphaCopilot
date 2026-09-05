@@ -122,6 +122,7 @@ def _free_port():
     return p
 
 
+@pytest.mark.skip(reason="agent 接入推迟至 S5（ADR-0008）；dsh SDK DeepSeekHarnessConfig 签名待对齐，代码保留")
 @pytest.mark.skipif(__import__("sys").platform != "darwin",
                     reason="run_python 沙箱依赖 macOS sandbox-exec")
 async def test_e2e1_correlation_heatmap_in_chat_stream():

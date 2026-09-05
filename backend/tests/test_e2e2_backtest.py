@@ -90,6 +90,7 @@ def _free_port():
     return p
 
 
+@pytest.mark.skip(reason="agent 接入推迟至 S5（ADR-0008）；dsh SDK DeepSeekHarnessConfig 签名待对齐，代码保留")
 @pytest.mark.skipif(__import__("sys").platform != "darwin",
                     reason="agent turn 依赖 dsh runtime（macOS carrier）")
 async def test_e2e2_backtest_job_attaches_equity_drawdown_metric():

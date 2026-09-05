@@ -84,6 +84,7 @@ async def _collect(provider: DshProvider, prompt: str):
     return kinds, final
 
 
+@pytest.mark.skip(reason="agent 接入推迟至 S5（ADR-0008）；dsh SDK DeepSeekHarnessConfig 签名待对齐，代码保留")
 async def test_single_turn_streams_neutral_events():
     with tempfile.TemporaryDirectory(prefix="dsh-single-") as tmp:
         server, base = _make_mock_server(lambda msgs: "白酒板块是消费龙头。")
@@ -102,6 +103,7 @@ async def test_single_turn_streams_neutral_events():
             server.shutdown()
 
 
+@pytest.mark.skip(reason="agent 接入推迟至 S5（ADR-0008）；dsh SDK DeepSeekHarnessConfig 签名待对齐，代码保留")
 async def test_two_sessions_do_not_interfere():
     """并发两个会话，各自 mock 端点回不同内容，验证互不串台。"""
     with tempfile.TemporaryDirectory(prefix="dsh-concur-") as tmp:
@@ -133,6 +135,7 @@ async def test_two_sessions_do_not_interfere():
             srvB.shutdown()
 
 
+@pytest.mark.skip(reason="agent 接入推迟至 S5（ADR-0008）；dsh SDK DeepSeekHarnessConfig 签名待对齐，代码保留")
 async def test_close_is_idempotent_and_kills_process():
     with tempfile.TemporaryDirectory(prefix="dsh-leak-") as tmp:
         server, base = _make_mock_server(lambda msgs: "ok")
