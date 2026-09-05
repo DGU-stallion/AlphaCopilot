@@ -41,7 +41,9 @@ describe("Sidebar 收展", () => {
 
   it("展示 builtin 占位 tab", () => {
     renderSidebar();
-    expect(screen.getByText("每日复盘")).toBeTruthy();
+    expect(screen.getByText("复盘看板")).toBeTruthy();
+    expect(screen.getByText("盘面数据")).toBeTruthy();
+    expect(screen.getByText("涨停样本统计")).toBeTruthy();
     expect(screen.getByText("相关性分析")).toBeTruthy();
   });
 });

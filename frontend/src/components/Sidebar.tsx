@@ -16,9 +16,11 @@ export interface PageTab {
   label: string;
 }
 
-/** 静态占位（ADR-0007 builtin 页）；固定排在动态页之前。 */
+/** 静态占位（ADR-0008 第一版页面）；固定排在动态页之前。 */
 export const DEFAULT_TABS: PageTab[] = [
-  { slug: "daily-review", label: "每日复盘" },
+  { slug: "daily-review", label: "复盘看板" },
+  { slug: "market", label: "盘面数据" },
+  { slug: "limit-up-stats", label: "涨停样本统计" },
   { slug: "correlation", label: "相关性分析" },
 ];
 

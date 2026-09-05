@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 import alpha.factor  # noqa: F401 —— 触发 correlation.* 注册
+import alpha.market  # noqa: F401 —— 触发 market.* / limit_up.* 注册
 import alpha.review  # noqa: F401 —— 触发 daily_review.summary 注册
 from api.store import Store
 
@@ -53,7 +54,40 @@ DAILY_REVIEW_SPEC: dict[str, Any] = {
     "refresh": {"mode": "on_open"},
 }
 
-_BUILTIN_SPECS = (CORRELATION_SPEC, DAILY_REVIEW_SPEC)
+MARKET_SPEC: dict[str, Any] = {
+    "slug": "market",
+    "title": "盘面数据",
+    "kind": "builtin",
+    "status": "published",
+    "layout": "grid",
+    "blocks": [
+        {"kind": "metric", "span": 3, "analysis_ref": {"fn": "market.breadth"}},
+        {"kind": "table", "span": 1, "analysis_ref": {"fn": "market.index"}},
+        {"kind": "table", "span": 2, "analysis_ref": {"fn": "market.turnover"}},
+    ],
+    "refresh": {"mode": "on_open"},
+}
+
+LIMIT_UP_STATS_SPEC: dict[str, Any] = {
+    "slug": "limit-up-stats",
+    "title": "涨停样本统计",
+    "kind": "builtin",
+    "status": "published",
+    "layout": "grid",
+    "blocks": [
+        {"kind": "metric", "span": 3, "analysis_ref": {"fn": "limit_up.summary"}},
+        {"kind": "chart", "span": 2, "analysis_ref": {"fn": "limit_up.ladder"}},
+        {"kind": "table", "span": 1, "analysis_ref": {"fn": "limit_up.industry"}},
+    ],
+    "refresh": {"mode": "on_open"},
+}
+
+_BUILTIN_SPECS = (
+    CORRELATION_SPEC,
+    DAILY_REVIEW_SPEC,
+    MARKET_SPEC,
+    LIMIT_UP_STATS_SPEC,
+)
 
 
 def register_builtin_pages(store: Store) -> None:
