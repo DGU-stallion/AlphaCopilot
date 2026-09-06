@@ -8,7 +8,7 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { AiPageProvider } from "@/lib/ai-page";
-import { AiDockFab } from "@/components/ui/AiDockFab";
+import { AiConsole } from "@/components/ai/AiConsole";
 
 // AlphaCopilot 导航（见 CONTEXT.md「导航分组（第一版）」）。
 // 定位：确定性计算为主、AI 只解释。全局 Agent 浮标独立于分组，覆盖在所有页面之上。
@@ -142,8 +142,8 @@ export function Layout() {
             <Outlet />
           </div>
         </main>
-        {/* 全局 AI 浮标：覆盖所有页面，页面感知见 lib/ai-page */}
-        <AiDockFab />
+        {/* 全局 AI 助手：可调整大小的顶层对话面板，覆盖所有页面，页面感知见 lib/ai-page */}
+        <AiConsole />
       </AiPageProvider>
     </div>
   );

@@ -8,7 +8,7 @@ import { Portfolios } from "@/pages/Portfolios";
 import { MyReports } from "@/pages/MyReports";
 import { Watchlist } from "@/pages/Watchlist";
 import { Journal } from "@/pages/Journal";
-import { Placeholder } from "@/pages/Placeholder";
+import { Settings } from "@/pages/Settings";
 
 // AlphaCopilot IA（见 CONTEXT.md）。复盘看板 = 盘面数据（DailyReview）。
 export const router = createBrowserRouter([
@@ -28,7 +28,7 @@ export const router = createBrowserRouter([
       { path: "/portfolios", element: <Portfolios /> },
       // 个人与系统
       { path: "/journal", element: <Journal /> },
-      { path: "/settings", element: <Placeholder title="接入 AI" /> },
+      { path: "/settings", element: <Settings /> },
       { path: "*", element: <Navigate to="/daily-review" replace /> },
     ],
   },

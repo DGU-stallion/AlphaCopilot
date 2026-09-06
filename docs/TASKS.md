@@ -120,17 +120,45 @@ spike 类任务（T21–T24）允许无测试，但**必须产出结论文档**�
 | 事项 | 内容 | 状态 |
 |------|------|------|
 | 前端基座替换 | 玻璃暖橙设计系统 + lib(api/base/colors/cache/research) + ui 组件 + Layout；旧 page-spec 集群移除 | ✅ |
-| 10 页缝合 | 宏观看板/复盘看板(含涨停样本)/股票池/我的研报/回测/相关性/模拟组合/交易日志/接入AI(占位) | ✅ |
+| 10 页缝合 | 宏观看板/复盘看板(含涨停样本)/股票池/我的研报/回测/相关性/模拟组合/交易日志/接入AI | ✅ |
 | 后端端点逆向 | api/market.py（indices/quote/market.*/overseas/session/live-emotion/backtest/macro.*）+ duanxian + limit_up_sample | ✅ |
 | 宏观看板 | 5 类分组（股市/大宗商品/债市/汇率/加密），多数据源降级；商品/汇率走 gtimg、美债走财政部 CSV、BTC 暂不可用不伪造 | ✅ |
 | 复盘看板合并 | 涨停样本统计并入；删关注股票（自选归股票池）；大盘指数/隔夜外围牵移至宏观看板 | ✅ |
 | 回测多策略 | STRATEGIES 注册表（现 dual_ma，预留 vnpy 扩展位）；前端策略下拉 | ✅ |
-| AI 面板 | 右下角全局浮标 chat UI（AiDockFab）+ useAiPage 页面感知快照；对话逻辑占位待 S5 | ✅ UI 就绪 |
+| AI 面板 | 右下角全局浮标 → 可调整大小的顶层对话面板（AiConsole，玻璃暖橙 + markdown 回答）；useAiChat 会话状态机 + useAiPage 页面感知快照注入对话上下文；「接入 AI」页真实上线（运行状态 + 连通自检 + 合规说明） | ✅ S5 已接入真实对话 |
 | 死代码清理 | 移除死 page-spec（daily-review/market/limit-up-stats）+ alpha/market.py、alpha/review.py | ✅ |
 
 数据源可达性（本机实测）：大宗商品/汇率/美债 available；BTC 降级（无靠谱免费现货源）。
 mac 无 mootdx，按原降级路径，数据源不可用显示「暂不可用」不伪造 0。
 验证：前端 tsc 0 + build ✓；后端 pytest 153 passed / 8 skipped。
+
+### S5 —— 真实 Agent 对话接入（dsh SDK + agnes）
+
+按 `docs`（S5 交接）用 **dsh SDK（node carrier）+ agnes 端点 + 项目专属 profile** 打通真实对话，
+替换此前的占位 UI。要点：
+
+- **Provider = dsh SDK**：`backend/agent/providers/dsh.py::DshProvider` 对齐当前 SDK 签名
+  （`profile` + `dsh_home` + `env`，无 `session_root`/`cordis`）。provider 按端点选：官方
+  deepseek → `deepseek-official`，非官方（agnes）→ `openai-completions`；非官方 `max_tokens` 收敛 65536。
+- **项目专属 profile（方案 B）**：`~/.dsh/profiles/alphacopilot-prod`
+  = bundle `@deepseek-ai/dsh-sdk-minimal` + `cordis.patch.yml`（停用持久 bash / 代码仅经 MCP；
+  pi-ai 注册 openai-completions/agnes 路由；会话根改 `DSH_SESSION_ROOT`；挂 skills + 我们的 MCP server）。
+  本机仅此一个 alphacopilot profile（旧 `~/.dsh/profiles/alphacopilot` ACP 遗留已删；`web`/`dshdian` 系其它项目，未动）。
+  > 注：交接文档假设可直接复用 `backend/agent/cordis.yml`，但其依赖的 `dsh-agent-spine-demo`
+  > 已从当前 dsh runtime 移除，故改用 sdk-minimal 基座 + patch 达成同一意图（合规 persona + skills + MCP）。
+- **agnes 走 http(s) 代理**：DshProvider 注入 `http_proxy`/`https_proxy`，置空 socks `all_proxy`；
+  `DSH_RUNTIME_MODE=node`（exe carrier 未构建）在父进程 os.environ 设定（carrier 解析在 spawn 前）。
+- **前端**：`useAiChat`（会话状态机，移植 Vibe-Research core/ai：竞态锁 / 半截回答不入下一轮 / 空回答拒收）
+  + `AiConsole`（右下浮标 → 可拖拽调整大小的顶层对话面板，玻璃暖橙 + `ReactMarkdown` 回答，尺寸持久化）
+  + `AiMessages`/`AiComposer`；`useAiPage` 页面快照（复盘/宏观/相关性/回测 4 页）注入对话上下文。
+  「接入 AI」页（`pages/Settings.tsx`）真实上线：运行配置 + 连通自检 + 使用说明 + 合规边界。
+  清理被取代的 stub：`lib/llm.ts`、`lib/ai-models.ts`、`AiDockFab.tsx`、`AgentChat.tsx`、`useAgentStream.ts`。
+- **合规底线**：persona（不推荐/不预测/不给买卖时机/不承诺收益/不打分）经 `DSH_SYSTEM_PROMPT` 注入，模型可见并受约束。
+
+验证：后端 pytest **161 passed / 0 skipped**（解除全部 10 个 S5 skip/deselect：harness×3 keyless、
+session_api×2、compliance、e2e1、e2e2）+ **2 个 `-m live` 真实 agnes 测试通过**
+（hello 非空回复 + run_python 自主产图）；前端 tsc 0 / vitest 60 / build ✓；
+运行栈真机端到端：真实 agnes 就着页面快照数据流式回复。
 
 
 
