@@ -9,13 +9,13 @@ AI 只解释、固定业务页面）。历史决策 ADR-0002/0004/0005/0006/0007
 - `backend/research/*.py`：数据层，纯函数，**禁加框架依赖**
 - `backend/alpha/*`：业务层库（data · chart · factor · backtest · report）
 - `backend/api/*`：FastAPI；`backend/agent/*`：dsh SDK 适配层（唯一耦合点）
-- `backend/mcp/*`：我们的 MCP server（run_python / publish_* / create_page / search_docs）
+- `backend/mcpserver/*`：我们的 MCP server（run_python / get_quote / submit_backtest）
 - `frontend/`：React SPA；`workspace/`：agent 可写区（sandbox 根）
 - `docs/PLAN.md` 第一节是北极星；`docs/TASKS.md` 任务状态（改代码前先看，完工后更新）
 
 ## 硬规则
 
-1. 一切开发走任务流：分支 `feat/T<nn>-<slug>` → squash PR，标题带任务号；号从 T21 起
+1. 开发从当前 `main`（阶段性可用版本）拉功能分支 `feat/<slug>` → squash PR，conventional commits
 2. **前端永不读取 dsh 的 session JSONL**；产品真源在我们自己的数据库
 3. **agent 不直接写数据库**：只写 workspace 文件 + 调副作用 MCP 工具，业务层校验后落库
 4. **重活不进 agent 的 turn**：长任务走 job 队列，agent 只「写代码 → 提交 job → 读结果」
