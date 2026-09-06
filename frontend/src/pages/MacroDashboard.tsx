@@ -10,6 +10,7 @@ import {
   type MacroSnapshot, type MacroRates,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useAiPage } from "@/lib/ai-page";
 
 // A 股惯例：红涨绿跌（pctColor），全站一致，与国际绿涨相反是有意选择。
 const pct = (v: number | null | undefined) =>
@@ -89,6 +90,22 @@ export function MacroDashboard() {
   const usRows: OverseasRow[] = oversea?.available ? (oversea.indices ?? []).filter((r) => r.region === "美股") : [];
   const hkRows: OverseasRow[] = oversea?.available ? (oversea.indices ?? []).filter((r) => r.region !== "美股") : [];
   const mag7 = oversea?.available ? (oversea.mag7 ?? []) : [];
+
+  // 向全局 AI 浮标登记本页确定性数据快照，作对话上下文（红涨绿跌口径）。
+  const idxLine = indices.length
+    ? indices.map((i) => `${i.name} ${i.price ?? "—"}(${pct(i.change_pct)})`).join("、")
+    : "暂未取到";
+  const usLine = usRows.length ? usRows.map((r) => `${r.name} ${pct(r.change_pct)}`).join("、") : "暂未取到";
+  useAiPage({
+    key: "macro-dashboard",
+    title: "宏观看板",
+    context:
+      `A 股大盘：${idxLine}\n隔夜美股：${usLine}\n` +
+      `大宗商品：${commodities?.available ? "已取到" : "暂不可用"}；` +
+      `汇率：${forex?.available ? "已取到" : "暂不可用"}；` +
+      `债市：${rates ? "已取到" : "暂不可用"}；加密：${crypto?.available ? "已取到" : "暂不可用"}`,
+    suggestions: ["隔夜外围对 A 股什么影响", "当前宏观环境怎么看", "大盘指数说明什么"],
+  });
 
   return (
     <div>

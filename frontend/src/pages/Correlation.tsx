@@ -9,6 +9,7 @@ import { EChart } from "@/components/ui/EChart";
 import { api } from "@/lib/api";
 import { useCachedResource } from "@/lib/cache";
 import { renderPage, type RenderResult } from "@/lib/research";
+import { useAiPage } from "@/lib/ai-page";
 
 // 相关性分析 —— 多标的对比。后端 correlation.* 白名单函数：
 //   overlay 归一化叠加走势（起点=100，看相对强弱）
@@ -46,6 +47,17 @@ export function Correlation() {
 
   const key = `corr:${params.symbols.join(",")}:${params.window}:${params.range}`;
   const res = useCachedResource<RenderResult>(key, () => renderPage("correlation", params));
+
+  // 向全局 AI 浮标登记本页确定性数据快照，作对话上下文。
+  useAiPage({
+    key,
+    title: "相关性分析",
+    context:
+      `对比标的：${params.symbols.map((c) => `${c}${names[c] ? `(${names[c]})` : ""}`).join("、")}\n` +
+      `滚动窗口：${params.window} 日；区间：${params.range}\n` +
+      `分析口径：收益率皮尔逊相关矩阵 + 归一化叠加走势 + 滚动相关（基于收益率，非价格伪相关）`,
+    suggestions: ["这几只标的相关性说明什么", "怎么理解收益率相关矩阵", "相关性高低对分散风险的意义"],
+  });
 
   const addSymbol = () => {
     const code = draft.trim();

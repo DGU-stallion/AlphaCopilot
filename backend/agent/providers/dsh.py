@@ -2,15 +2,16 @@
 
 现 harness.py 的 HarnessSession 下沉于此，成为实现 agent.provider.AgentProvider 的
 DshProvider。业务层只认 agent.provider 的中立抽象；所有 dsh 私有词汇
-（cordis / session_root / text-delta / thinking / reasoningEffort）都被本模块吸收。
+（profile / patches / cordis / session_root / text-delta / thinking）都被本模块吸收。
 
 一会话一子进程 + 进程内固定一个 dsh session_id（沿用 T27/M0 结论，避免 id-collision）。
 
-模型参数归一化（ADR-0007 决策 2 / 权衡）：cordis.yml 默认给 llm-deepseek 配了
-thinking/reasoningEffort（deepseek 官方专用）。真实 agnes 端点走 openai-completions，
-不认这两个字段（会 400）。DshProvider 在 start() 时按 base_url 是否 deepseek 官方
-决定：非官方端点生成一份**去掉 thinking/reasoningEffort 两行**的临时 cordis，
-使这两个字段完全不出现在 wire 上（serialize.js：thinking 未定义即不上 wire）。
+组合方式（对齐当前 dsh SDK 签名）：SDK 不再收 `cordis=`/`session_root=`，改用
+`profile=` + `patches=`(tuple) + `dsh_home=` + `env`。生产组合 = 独立的 `sdk-minimal`
+profile（自带 JSON-RPC server + llm-deepseek + agent + JSONL 会话，persona 读
+`DSH_SYSTEM_PROMPT`）叠加一份本模块生成的 **patch**：挂 skills 服务 + skill 工具、
+挂我们的 MCP server（run_python/get_quote/submit_backtest），并**停用持久 bash**
+（合规底线 ADR-0007 决策 2：代码仅经 MCP 执行）。会话持久化根由 dsh_home 管理。
 
 零业务逻辑：不碰数据库，不校验产出。只「起进程 / 发 prompt / 流事件 / 关进程」。
 """
@@ -19,9 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-import re
 import sys
-import tempfile
 import threading
 import uuid
 from collections.abc import AsyncIterator
@@ -48,12 +47,22 @@ for _p in _SDK_PATHS:
         sys.path.insert(0, _p)
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-# 生产 dsh 组合（合规 persona + skills + MCP）。dsh 私有配置定义在 agent 层内。
-_DEFAULT_CORDIS = Path(__file__).resolve().parents[1] / "cordis.yml"
+# 生产 dsh 组合（合规 persona + skills + MCP）。dsh 私有配置定义在**项目专属 profile**内
+# （~/.dsh/profiles/alphacopilot-prod/{package.json,cordis.patch.yml}，方案 B），
+# 业务层只经 env 注入路径变量。
 _DEFAULT_MCP_SERVER = _REPO_ROOT / "backend" / "mcpserver" / "server.py"
 _DEFAULT_SKILLS_DIR = _REPO_ROOT / "skills"
 
-# deepseek 官方端点前缀（仅这些端点启用 thinking/reasoningEffort）。
+# 项目专属 profile（方案 B）：~/.dsh/profiles/alphacopilot-prod。
+# = bundle @deepseek-ai/dsh-sdk-minimal（自洽基座）+ cordis.patch.yml（停 bash + pi-ai
+# 注册 openai-completions/agnes 路由 + 会话根改 DSH_SESSION_ROOT + skills + 我们的 MCP）。
+_PROD_PROFILE = "alphacopilot-prod"
+_DSH_HOME = str(Path.home() / ".dsh")
+
+# agnes 端点（openai-completions）。profile 内 pi-ai 路由的 baseURL 读 AGNES_BASE_URL。
+_AGNES_BASE_URL = "https://apihub.agnes-ai.com/v1"
+
+# deepseek 官方端点前缀（这些端点用内置 deepseek-official provider；其余走 openai-completions）。
 _DEEPSEEK_OFFICIAL_HOSTS = ("api.deepseek.com", "api.deepseek.cn")
 
 # 非官方端点（openai-completions，如 agnes）的 max_tokens 上限。dsh 默认 256000
@@ -71,19 +80,9 @@ def _is_deepseek_official(base_url: str | None) -> bool:
     return any(host in base_url for host in _DEEPSEEK_OFFICIAL_HOSTS)
 
 
-def _cordis_without_thinking(cordis_text: str) -> str:
-    """从 cordis.yml 文本删掉 llm-deepseek 下的 thinking / reasoningEffort 两行。
-
-    非官方端点（openai-completions，如 agnes）不认这两个字段；删行后 serialize
-    不会把 thinking 放上 wire（serialize.js: thinking 未定义 → {}）。
-    只删这两行，其余组合原样保留（外科手术式）。
-    """
-    kept = [
-        ln
-        for ln in cordis_text.splitlines()
-        if not re.match(r"\s*(thinking|reasoningEffort)\s*:", ln)
-    ]
-    return "\n".join(kept) + "\n"
+def _provider_for(base_url: str | None) -> str:
+    """按端点选 dsh provider：官方 deepseek → deepseek-official；其余 → openai-completions。"""
+    return "deepseek-official" if _is_deepseek_official(base_url) else "openai-completions"
 
 
 class DshProvider:
@@ -95,44 +94,68 @@ class DshProvider:
         self._dsh_session_id = f"conv-{uuid.uuid4().hex[:12]}"  # 全新 id，避免 collision
         self._lock = threading.Lock()  # 串行化 turn（同一进程同一时刻一个 turn）
         self._closed = False
-        self._tmp_cordis: str | None = None  # 归一化后写出的临时 cordis 路径（若有）
+        self._dsh_home: str | None = None  # dsh home（~/.dsh，profile 从此处找）
 
     def start(self) -> None:
-        """起子进程 + initialize。initialize 成功即证明 MCP 挂载完成。"""
+        """起子进程 + initialize。initialize 成功即证明 MCP 挂载 + skills 服务就绪。
+
+        对齐当前 dsh SDK 签名：profile=alphacopilot-prod（项目专属 profile，方案 B）
+        + dsh_home=~/.dsh（profile 从 <dsh_home>/profiles/ 找）+ env（persona / MCP /
+        skills / agnes 路由 / 代理 注入）。provider 按端点选：官方→deepseek-official，
+        非官方（agnes）→openai-completions。
+        """
         from deepseek_harness import DeepSeekHarness, DeepSeekHarnessConfig
 
         spec = self._spec
         mcp_server = str(_DEFAULT_MCP_SERVER)
         skills_dir = str(spec.skills_dir) if spec.skills_dir else str(_DEFAULT_SKILLS_DIR)
-        # cordis.yml 的 !!js process.env.* 需要这些环境变量。
-        os.environ["ALPHACOPILOT_MCP_PY"] = sys.executable
-        os.environ["ALPHACOPILOT_MCP_SERVER"] = mcp_server
-        os.environ["ALPHACOPILOT_SKILLS_DIR"] = skills_dir
-        # 兼容旧 spike cordis 仍用的旧变量名（保持 spike 可跑）。
-        os.environ.setdefault("G1_MCP_PY", sys.executable)
-        os.environ.setdefault("G1_MCP_SERVER", mcp_server)
-        # 合规底线：system_prompt 经 cordis persona 注入，对模型可见。
-        os.environ["DSH_SYSTEM_PROMPT"] = spec.system_prompt
 
-        # 模型参数归一化：非 deepseek 官方端点去掉 thinking/reasoningEffort，
-        # 并把 max_tokens 收敛到端点上限内（dsh 默认 256000，agnes 上限 65536 → 会 500）。
-        cordis_path = str(_DEFAULT_CORDIS)
+        # node carrier 解析发生在 spawn 前的**父进程**，读 os.environ（cfg.env 太晚）；
+        # exe carrier 未构建的开发环境必须走 node。不覆盖调用方已显式设定的模式。
+        os.environ.setdefault("DSH_RUNTIME_MODE", "node")
+
+        dsh_home = _DSH_HOME
+        Path(dsh_home).mkdir(parents=True, exist_ok=True)
+        self._dsh_home = dsh_home
+
+        # 会话持久化根：本会话 workspace 下（profile 的 sessions row 读 DSH_SESSION_ROOT），
+        # 避免与 ~/.dsh/sessions 里其它 profile 的 .jsonl.zstd 会话在 compression 上冲突。
+        session_root = str(spec.workspace / ".sessions")
+
+        # profile 内 !!js process.env.* 需要这些变量；persona 承载合规底线（模型可见）。
+        env: dict[str, str] = {
+            "DSH_RUNTIME_MODE": os.environ.get("DSH_RUNTIME_MODE", "node"),
+            "DSH_HOME": dsh_home,
+            "DSH_SYSTEM_PROMPT": spec.system_prompt,
+            "DSH_SESSION_ROOT": session_root,
+            "DSH_CWD": str(spec.workspace),
+            "ALPHACOPILOT_MCP_PY": sys.executable,
+            "ALPHACOPILOT_MCP_SERVER": mcp_server,
+            "ALPHACOPILOT_SKILLS_DIR": skills_dir,
+            "AGNES_BASE_URL": spec.base_url or _AGNES_BASE_URL,
+            "DSH_TELEMETRY_DISABLED": "1",
+            # agnes（境外）走 http(s) 代理；socks 的 all_proxy dsh 不支持会警告直连，置空避免干扰。
+            "all_proxy": "",
+            "ALL_PROXY": "",
+        }
+        for proxy_var in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
+            val = os.environ.get(proxy_var)
+            if val:
+                env[proxy_var] = val
+
+        # 非 deepseek 官方端点把 max_tokens 收敛到端点上限内（agnes 上限 65536）。
         max_tokens: int | None = None
         if not _is_deepseek_official(spec.base_url):
-            normalized = _cordis_without_thinking(_DEFAULT_CORDIS.read_text())
-            fd, tmp = tempfile.mkstemp(prefix="cordis-agnes-", suffix=".yml")
-            with os.fdopen(fd, "w") as f:
-                f.write(normalized)
-            self._tmp_cordis = tmp
-            cordis_path = tmp
             max_tokens = _NON_OFFICIAL_MAX_TOKENS
 
         cfg = DeepSeekHarnessConfig(
-            model=spec.model or "deepseek-v4-flash",
+            provider=_provider_for(spec.base_url),
+            model=spec.model or "agnes-2.5-flash",
             max_tokens=max_tokens,
             cwd=str(spec.workspace),
-            session_root=str(spec.workspace / ".sessions"),
-            cordis=cordis_path,
+            profile=_PROD_PROFILE,
+            dsh_home=dsh_home,
+            env=env,
             base_url=spec.base_url,
             api_key=spec.api_key,
             request_timeout_seconds=spec.request_timeout_seconds,
@@ -149,11 +172,32 @@ class DshProvider:
             raise RuntimeError("DshProvider 未 start()")
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue = asyncio.Queue()
+        # 当前 SDK（sdk-minimal）多数情况把整段回复放在单条 assistant/message 里，
+        # 不逐字发 assistant/chunk。为让 SSE 也拿到 text_delta（而非只在 turn_end 收全文），
+        # 若本轮没出现任何 chunk 增量，就把 assistant/message 的整段文本作为一条 text_delta 发出。
+        # 若 runtime 确实逐字发 chunk（streaming），则以 chunk 为准、跳过 message 全文（避免重复）。
+        saw_chunk = {"v": False}
 
         def on_notification(n: Any) -> None:
             if n.method != "session.event":
                 return
             ev = n.payload.get("event", {})
+            if ev.get("type") == "assistant/chunk":
+                item = _translate(ev)
+                if item is not None:
+                    if item.kind == EVENT_TEXT_DELTA:
+                        saw_chunk["v"] = True
+                    loop.call_soon_threadsafe(queue.put_nowait, item)
+                return
+            if ev.get("type") == "assistant/message":
+                if not saw_chunk["v"]:
+                    text = _message_text(ev)
+                    if text:
+                        loop.call_soon_threadsafe(
+                            queue.put_nowait,
+                            AgentEvent(kind=EVENT_TEXT_DELTA, payload={"text": text}),
+                        )
+                return
             item = _translate(ev)
             if item is not None:
                 loop.call_soon_threadsafe(queue.put_nowait, item)
@@ -198,19 +242,13 @@ class DshProvider:
             await task
 
     def close(self) -> None:
-        """杀子进程 + 清理临时 cordis。幂等。"""
+        """杀子进程。幂等。（profile 常驻磁盘，无临时文件需清理。）"""
         if self._closed:
             return
         self._closed = True
         if self._harness is not None:
             self._harness.close()
             self._harness = None
-        if self._tmp_cordis is not None:
-            try:
-                os.unlink(self._tmp_cordis)
-            except OSError:
-                pass
-            self._tmp_cordis = None
 
     def is_alive(self) -> bool:
         """子进程是否存活 —— 用于进程泄漏测试。"""
@@ -218,6 +256,28 @@ class DshProvider:
             return False
         proc = getattr(self._harness.client, "_proc", None)
         return proc is not None
+
+
+def _message_text(ev: dict[str, Any]) -> str:
+    """从一条 assistant/message 事件提取整段文本。
+
+    wire 形状：data.message.content = [{type:'text', text:...}, ...]（少数变体把
+    content 直接放在 data 下）。拼接所有 text block。
+    """
+    data = ev.get("data")
+    if not isinstance(data, dict):
+        return ""
+    message = data.get("message")
+    owner = message if isinstance(message, dict) else data
+    content = owner.get("content")
+    if not isinstance(content, list):
+        return ""
+    parts = [
+        str(block.get("text") or "")
+        for block in content
+        if isinstance(block, dict) and block.get("type") == "text"
+    ]
+    return "".join(parts)
 
 
 def _translate(ev: dict[str, Any]) -> AgentEvent | None:

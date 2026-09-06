@@ -23,7 +23,7 @@ from agent.provider import (
     EVENT_TURN_END,
     ProviderSpec,
 )
-from agent.providers.dsh import DshProvider, _cordis_without_thinking, _is_deepseek_official
+from agent.providers.dsh import DshProvider, _is_deepseek_official, _provider_for
 
 pytestmark = pytest.mark.asyncio
 
@@ -84,7 +84,6 @@ async def _collect(provider: DshProvider, prompt: str):
     return kinds, final
 
 
-@pytest.mark.skip(reason="agent 接入推迟至 S5（ADR-0008）；dsh SDK DeepSeekHarnessConfig 签名待对齐，代码保留")
 async def test_single_turn_streams_neutral_events():
     with tempfile.TemporaryDirectory(prefix="dsh-single-") as tmp:
         server, base = _make_mock_server(lambda msgs: "白酒板块是消费龙头。")
@@ -103,7 +102,6 @@ async def test_single_turn_streams_neutral_events():
             server.shutdown()
 
 
-@pytest.mark.skip(reason="agent 接入推迟至 S5（ADR-0008）；dsh SDK DeepSeekHarnessConfig 签名待对齐，代码保留")
 async def test_two_sessions_do_not_interfere():
     """并发两个会话，各自 mock 端点回不同内容，验证互不串台。"""
     with tempfile.TemporaryDirectory(prefix="dsh-concur-") as tmp:
@@ -135,7 +133,6 @@ async def test_two_sessions_do_not_interfere():
             srvB.shutdown()
 
 
-@pytest.mark.skip(reason="agent 接入推迟至 S5（ADR-0008）；dsh SDK DeepSeekHarnessConfig 签名待对齐，代码保留")
 async def test_close_is_idempotent_and_kills_process():
     with tempfile.TemporaryDirectory(prefix="dsh-leak-") as tmp:
         server, base = _make_mock_server(lambda msgs: "ok")
@@ -159,16 +156,8 @@ def test_non_official_base_url_is_not_deepseek_official():
     assert _is_deepseek_official("https://apihub.agnes-ai.com/v1") is False
 
 
-def test_cordis_normalization_strips_thinking_lines():
-    src = (
-        "- id: llm-deepseek\n"
-        "  config:\n"
-        "    thinking: enabled\n"
-        "    reasoningEffort: max\n"
-        "- id: other\n"
-    )
-    out = _cordis_without_thinking(src)
-    assert "thinking" not in out
-    assert "reasoningEffort" not in out
-    assert "id: llm-deepseek" in out
-    assert "id: other" in out
+def test_provider_selected_by_endpoint():
+    # 官方 deepseek（含 base_url 缺省）→ deepseek-official；非官方（agnes）→ openai-completions。
+    assert _provider_for(None) == "deepseek-official"
+    assert _provider_for("https://api.deepseek.com") == "deepseek-official"
+    assert _provider_for("https://apihub.agnes-ai.com/v1") == "openai-completions"

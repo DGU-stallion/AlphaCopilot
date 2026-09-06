@@ -1,11 +1,10 @@
 /**
  * 右下角全局浮标（FAB）+ 可展开的 chat 面板 —— **每一页都有**，覆盖所有页。
  *
- * 本轮只做前端壳 + 页面感知：
+ * S5 接入：对话走后端会话运行时（useAgentStream → /api/sessions + SSE）。
  *  - 面板顶部显示「当前页面: XXX」（从 useCurrentAiPage 读，见 lib/ai-page）；
- *  - 用户发消息显示用户气泡；
- *  - 助手回复用**静态占位文案**（S5 才接真正的 agent 对话）——
- *    这里不调任何 provider、不碰后端，保持「Agent 零 provider 调用」不变量。
+ *  - 用户发消息显示用户气泡，助手回复经 SSE 流式逐字追加；
+ *  - 页面确定性数据快照作为本轮上下文一并发给后端（合规 persona + 工具由后端 provider 承载）。
  *
  * 面板是浮层（fixed），不占页面布局；风格用现有玻璃暖橙设计系统（.glass）。
  */
@@ -13,20 +12,12 @@ import { useEffect, useRef, useState } from "react";
 import { Sparkles, X, Send, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrentAiPage } from "@/lib/ai-page";
-
-interface Msg {
-  role: "user" | "assistant";
-  content: string;
-}
-
-// S5 之前的占位回复：复用「AI 助手即将上线」的语义，不真的接 provider。
-const COMING_SOON =
-  "AI 助手即将上线（S5），届时将基于当前页面的确定性数据为你解释。";
+import { useAgentStream } from "@/hooks/useAgentStream";
 
 export function AiDockFab() {
   const page = useCurrentAiPage();
+  const { messages: msgs, busy, send: sendMsg } = useAgentStream();
   const [open, setOpen] = useState(false);
-  const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -44,10 +35,9 @@ export function AiDockFab() {
 
   const send = (text: string) => {
     const q = text.trim();
-    if (!q) return;
+    if (!q || busy) return;
     setInput("");
-    // 先放用户气泡，再放固定占位回复（S5 前不调 provider）
-    setMsgs((m) => [...m, { role: "user", content: q }, { role: "assistant", content: COMING_SOON }]);
+    void sendMsg(q, page?.context ?? "");
   };
 
   return (
@@ -83,8 +73,8 @@ export function AiDockFab() {
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-auto p-3.5 text-sm">
             {msgs.length === 0 && (
               <div className="space-y-3">
-                <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs text-muted-foreground">
-                  {COMING_SOON}
+                <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 text-xs text-muted-foreground">
+                  问我关于本页数据的问题。我会基于当前页面的确定性数据为你解释，只做客观分析，不构成投资建议。
                 </div>
                 {page?.context && (
                   <div>
@@ -114,7 +104,7 @@ export function AiDockFab() {
                   "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 leading-relaxed",
                   m.role === "user" ? "bg-primary/20 text-foreground" : "bg-muted/40 text-foreground",
                 )}>
-                  {m.content}
+                  {m.content || (m.role === "assistant" && busy ? "思考中…" : m.content)}
                 </div>
               </div>
             ))}
@@ -128,10 +118,11 @@ export function AiDockFab() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
                 rows={1}
-                placeholder="就本页内容提问…"
-                className="flex-1 resize-none rounded-lg border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:border-primary/50"
+                disabled={busy}
+                placeholder={busy ? "回复生成中…" : "就本页内容提问…"}
+                className="flex-1 resize-none rounded-lg border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:border-primary/50 disabled:opacity-60"
               />
-              <button onClick={() => send(input)} disabled={!input.trim()}
+              <button onClick={() => send(input)} disabled={!input.trim() || busy}
                 className="rounded-lg bg-primary/15 p-2 text-primary hover:bg-primary/25 disabled:opacity-40">
                 <Send className="h-4 w-4" />
               </button>

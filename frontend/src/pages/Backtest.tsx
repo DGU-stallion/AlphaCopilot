@@ -11,6 +11,7 @@ import { pctColor } from "@/lib/colors";
 import { cn } from "@/lib/utils";
 import { useCachedResource } from "@/lib/cache";
 import { renderPage, type RenderResult, type MetricItem } from "@/lib/research";
+import { useAiPage } from "@/lib/ai-page";
 
 // 回测（量化）—— 双均线金叉策略净值 vs 买入持有 + 回撤曲线 + 指标卡。
 // 后端 backtest.* 白名单分析函数（alpha/backtest_page.py），页面 spec slug=backtest。
@@ -47,6 +48,17 @@ export function Backtest() {
 
   const key = `bt:${params.symbol}:${params.fast}:${params.slow}:${params.range}:${params.strategy}`;
   const res = useCachedResource<RenderResult>(key, () => renderPage("backtest", params));
+
+  // 向全局 AI 浮标登记本页确定性数据快照，作对话上下文。
+  useAiPage({
+    key,
+    title: "回测",
+    context:
+      `标的：${params.symbol}${symbolName ? `(${symbolName})` : ""}\n` +
+      `策略：${params.strategy}（快线 ${params.fast} / 慢线 ${params.slow}）；区间：${params.range}\n` +
+      `口径：净值扣 A 股费用、无未来函数（信号次日成交、涨跌停按前收）`,
+    suggestions: ["这个回测结果怎么解读", "净值和回撤说明什么", "双均线策略的局限在哪"],
+  });
 
   const run = () => {
     const code = symbol.trim();

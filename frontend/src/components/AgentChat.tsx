@@ -1,31 +1,24 @@
 import { useState } from "react";
 import { Send, Loader2, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { type ChatMsg } from "@/lib/agent";
+import { useAgentStream } from "@/hooks/useAgentStream";
 
 interface Props {
-  endpoint: string;
   placeholder?: string;
   suggestions?: string[];
+  /** 可选：本页确定性数据快照，作为追问上下文一并发给后端。 */
+  context?: string;
 }
 
-// endpoint 保留在 Props 类型里（接入 AI 时恢复），占位期不解构以免未使用报错。
-export function AgentChat({ placeholder = "就上面的结论追问…", suggestions = [] }: Props) {
-  const [msgs, setMsgs] = useState<ChatMsg[]>([]);
+export function AgentChat({ placeholder = "就上面的结论追问…", suggestions = [], context }: Props) {
+  const { messages: msgs, busy: loading, send: sendMsg } = useAgentStream();
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  // AI 对话占位（S5 上线）：不调后端 /api/review/chat，回一条"即将上线"提示。
-  // endpoint 保留在 props 里，接入 AI 时恢复流式对话。
-  async function send(q?: string) {
+  function send(q?: string) {
     const text = (q ?? input).trim();
     if (!text || loading) return;
-    const next: ChatMsg[] = [...msgs, { role: "user", content: text }];
-    setMsgs(next);
     setInput("");
-    setLoading(true);
-    setMsgs([...next, { role: "assistant", content: "复盘追问 AI 即将上线(S5)" }]);
-    setLoading(false);
+    void sendMsg(text, context);
   }
 
   return (
