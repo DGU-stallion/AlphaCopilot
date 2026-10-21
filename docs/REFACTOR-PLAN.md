@@ -122,10 +122,10 @@ AI native 个人投研量化工作台。
 | M1-2 | PiProvider 实现：`backend/agent/providers/pi.py`（RPC client）。事件映射逐字段对齐 `message_update.assistantMessageEvent.text_delta.delta` / `tool_execution_start\|end` / `agent_settled.aborted` | **已完成**：真 pi + 真模型端到端跑通；11 条测试（含 4 条配置契约） |
 | M1-3 | **Pi 运行环境就位**（ADR-0010 修订 §1，**已实现**）：`agent/pi_env.py` 生成 `<workspace>/.pi/mcp.json`（`exposure: "direct"`），`--approve` 启用项目信任，不设 `PI_CODING_AGENT_DIR` | 已验：真 pi + 真模型下模型自主调 `mcp__alphacopilot__get_quote` 拿到茅台 1313.29 |
 | M1-4 | abort 能力（契约 + provider + HTTP 端点） | **已完成**（后端）；真 pi 验证：中止→`finish_reason=aborted`→进程存活→下一轮正常。前端按钮接通留 M2-7 |
-| M1-5 | **会话续接**：`_ensure_runtime` 在 provider 死掉时不能静默起空会话（DB 历史还在，agent 却失忆） | 杀掉 pi 子进程后继续对话，agent 仍知道前文 |
+| M1-5 | **会话续接** | **已完成**：`ProviderSpec.session_id` + `--session-id` + store 落库。真实链路连跑 3 次 PASS（记「紫金铜锣」→ 重启服务 → 答对）；顺带修了「关服务时 turn 还在跑 → 写已关闭的库」 |
 | M1-6 | 删 dsh 全部痕迹 + `sandbox.py` → `runner.py` 重新定位 | **已完成**：`grep dsh` 仅剩历史说明；**8 条 xfail 全部转绿**（mock 端点手法失效 → 改为注入假 provider）；`XFAIL_BUDGET` 8→0；全量 258s→8.7s |
-| M1-7 | **provenance 落地 + 盖章权**（ADR-0012「已决 1」）：① `artifact` 表加 `provenance` JSON 列；② manifest 校验**拒收缺失 provenance**；③ **agent 交来的 provenance 一律不采信，强制改写 `kind="agent"`**，`deterministic` 只能由服务端调 `alpha.registry` 铸造；④ 前端恢复四 block 渲染器 + AI 角标 | 缺 provenance 被拒；**伪造 manifest 声称 deterministic → 被改写为 agent**（有测试）；「画相关性热力图」能看到图且带 AI 角标 |
-| M1-8 | 接 job 订阅：`/api/jobs/{id}/stream` → 前端 | 「跑回测」能出净值+回撤图 |
+| M1-7 | **provenance 落地 + 盖章权** | **已完成**：`artifact.provenance` 列 + 校验拒收缺失 + **agent 交来的声明一律降级为 `agent` 并记 `claimedKind`**，deterministic 只能服务端铸造（job 走 `server_stamped=True`）。10 条测试，变异 5/5 变红 |
+| M1-8 | job 事件流接通 | **已完成**：补 `job/completed`（带 artifact_ids）与 `job/failed`，都发到**会话**流（用户盯对话不是 job id）。前端能渲染 job 结果 |
 | M1-9 | **skills 白名单**（ADR-0010 修订 §2） | **已完成**：源是 HKUDS/Vibe-Trading 的 90 个（实测 6.1k tokens），**选 12 个**（约 700 tokens）；剔除 15 个硬规则 10 禁止项；取数指引改到 `alpha.data`。18 条守门测试 |
 | M1-10 | 页面感知补到 11/11（`useAiPage` 现覆盖 4 页；删 `Placeholder` 后 10 页） | 每页都登记快照 |
 
