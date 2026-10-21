@@ -1,7 +1,7 @@
 # AlphaCopilot v2 重构方案（REFACTOR PLAN）
 
 > 决策依据：ADR-0010（agent→pi）、ADR-0011（前端 TS + 后端/数据 Python）、
-> ADR-0012（双轨产物）、ADR-0013（UI 设计系统）
+> ADR-0012（双轨产物）、ADR-0013（UI 设计系统 v1）、**ADR-0014（UI 设计系统 v2，取代 0013 §1–3）**
 > 编写：2026-10-20 · 修订：**2026-10-21** · 基准 commit：`84198c5`（main）
 >
 > **2026-10-21 修订要点**（重要，先看这个）：
@@ -136,17 +136,31 @@ AI native 个人投研量化工作台。
 
 ### M2 — UI 换皮（5–7 天）
 
+> **2026-10-21 重写**：M2 原任务表是照 ADR-0013 写的，但 ADR-0013 只有方向没有手段，
+> 实际做了 4 版原型才收敛。现以 **ADR-0014** 为准重写本表，并把原型里已验证的实现
+> 直接搬进来（原型在 `frontend/src/pages/__proto__/`，是 throwaway，不并入 main）。
+
 | ID | 任务 | 验收 |
 |---|---|---|
-| M2-1 | `index.css` token 重写（ADR-0013）+ 双主题 + 涨跌双口径 | 切主题全站变色；切口径图表跟着变 |
-| M2-2 | 删 `glass` / `shadow-glow` / 渐变 / 大圆角 | `grep -rn "glass\|glow"` 为空 |
-| M2-3 | 接入 Lightweight Charts（K线/净值/回撤/买卖点）+ `attributionLogo` | hover/缩放/pane 联动可用 |
-| M2-4 | 布局重排：顶栏命令栏 + 主画布 + 右侧 Agent 面板（从浮标改成常驻可折叠） | 页面 3 区布局 |
-| **M2-5** | **图表渲染器判别符**（ADR-0013 与 ADR-0012 的缝合）：block 增加 `renderer: "echarts" \| "lwc"`，`kind:"chart"` 不再是唯一依据 | agent 产的 K 线 artifact 用 LWC 渲染，热力图用 ECharts，没有两套库画同一个东西 |
-| M2-6 | 页面按新 token 重排（现 `pages/` 有 **11 个** tsx，删 `Placeholder` 后 **10 个**） | 视觉验收 |
-| M2-7 | `npx skills add tradingview/lightweight-charts` | agent 写图表代码用 v5 API |
+| **M2-0** | **文档先行**（本 ADR-0014 + 本表 + AGENTS 硬规则 7 修订） | 三处表述一致，无冲突 |
+| **M2-1** | `theme/tokens.ts` 落地：深/浅两套 Palette + antd token + 字体/间距/字号 | `grep -rn "#[0-9A-Fa-f]\{6\}" src --include=*.tsx` 只剩 tokens.ts |
+| **M2-2** | 迁 `index.css`：旧 HSL token → tokens.ts；删 `glass`/`shadow-glow`/渐变/大圆角 | `grep -rn "glass\|glow\|rounded-2xl" src` 为空 |
+| **M2-3** | `chart-theme.ts` 改为从 tokens.ts 读（不再自定义颜色），LWC 与 ECharts 同源 | 切主题图表跟着变；图表色 == token 色 |
+| **M2-4** | `Num` 组件 + 字体接入（Inter Variable / JetBrains Mono 自托管） | 全站数字等宽；`grep "toFixed(" src/pages` 只出现在 `<Num>` 内 |
+| **M2-5** | 布局重排：左导航(176/52) + 顶栏 + 主画布 + **右 Agent 栏(360/44 可折叠)** + 底栏 | 三区布局 + 两侧都能折；折叠后主画布变宽 |
+| **M2-6** | **单 chart 多 pane**：K线+成交量、净值+回撤各用一个实例的多个 pane | 两 pane 左右边缘左坐标相等；缩放联动 |
+| **M2-7** | **`renderer` 判别符**（ADR-0012 与 ADR-0013 的缝合）：block 增加 `renderer: "lwc" \| "echarts"` | agent 产 K 线走 LWC、热力图走 ECharts，同一图形不出现两种实现 |
+| **M2-8** | 10 个页面按新 token 重排（`pages/` 现有 11 个 tsx，删 `Placeholder` 后 10 个） | 逐页视觉验收 |
+| **M2-9** | 涨跌双口径切换 + localStorage 持久化 | 切换后全站数字与图表同步反向 |
+| **M2-10** | `npx skills add tradingview/lightweight-charts` | agent 写图表代码用 v5 API |
 
----
+**M2 的 DoD**：`grep` 三连为空（glass/glow、颜色字面量、`toFixed` 裸渲染）；
+双主题 + 双口径切换无样式漂移；K 线与成交量左右严格对齐且缩放联动；
+10 个页面视觉一致。
+
+**已验证的实现参考**（原型 v4，可直接抄结构，不要抄代码）：
+- `frontend/src/pages/__proto__/ProtoApp.tsx` —— 三区布局 + 可折叠 Agent 栏 + 单 chart 双 pane
+- `frontend/src/theme/tokens.ts` —— Palette 结构 + antd token 映射
 
 ### M3 — 对象化 + 数据层换代（2–4 周）
 

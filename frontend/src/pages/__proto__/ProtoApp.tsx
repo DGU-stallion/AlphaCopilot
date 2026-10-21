@@ -80,11 +80,22 @@ function useQuote(code: string) {
 //     series 的 cleanup 随后 removeSeries 打到已销毁实例上，整页白屏（踩过）
 //   · autoSize: true —— 由容器决定尺寸，图表永远填满，不留固定高度造成的空白
 
-function KLineChart({ bars, palette }: { bars: Bar[]; palette: Palette }) {
+// 同一个 chart 里放两个 pane（K 线 + 成交量）。
+//
+// 为什么必须同一个实例：v4 曾用两个独立 chart 拼成上下两段，结果
+//   · 左右边缘对不齐（两个实例各自计算价格轴宽度，差几像素）
+//   · 缩放/十字光标不联动（各管各的 timeScale）
+//   · 多一份 WebGL/canvas 开销
+// pane API 天然解决这三件事：时间轴是共享的，缩放自动同步。
+function PriceChart({ bars, palette }: { bars: Bar[]; palette: Palette }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const paneRO = useRef<ResizeObserver | null>(null);
 
+  // 建实例：**不依赖 palette**。依赖了切主题会销毁重建，series 的 cleanup
+  // 随后 removeSeries 打到已销毁实例上，整页白屏（v3 踩过）。
   useEffect(() => {
     if (!ref.current) return;
     const c = createChart(ref.current, {
@@ -92,17 +103,29 @@ function KLineChart({ bars, palette }: { bars: Bar[]; palette: Palette }) {
       layout: { background: { color: "transparent" }, textColor: "#6B7385", fontSize: 10, attributionLogo: true },
     });
     chartRef.current = c;
-    return () => { seriesRef.current = null; chartRef.current = null; c.remove(); };
+    return () => {
+      paneRO.current?.disconnect();
+      paneRO.current = null;
+      candleRef.current = null;
+      volRef.current = null;
+      chartRef.current = null;
+      c.remove();
+    };
   }, []);
 
+  // 主题：只换色
   useEffect(() => {
     const c = chartRef.current;
     if (!c) return;
     c.applyOptions({
       layout: { textColor: palette.textTertiary, background: { color: "transparent" } },
       grid: { vertLines: { color: palette.border }, horzLines: { color: palette.border } },
-      // entireTextOnly: 边缘刻度宁可不显示，也不要露半截数字（贴边时会被 canvas 裁掉）
-      rightPriceScale: { borderColor: palette.border, scaleMargins: { top: 0.08, bottom: 0.08 }, entireTextOnly: true },
+      rightPriceScale: {
+        borderColor: palette.border,
+        scaleMargins: { top: 0.06, bottom: 0.06 },
+        // 边缘刻度宁可不显示，也不要露半截数字（canvas 会裁掉）
+        entireTextOnly: true,
+      },
       timeScale: { borderColor: palette.border, timeVisible: false },
       crosshair: {
         mode: 1,
@@ -110,73 +133,55 @@ function KLineChart({ bars, palette }: { bars: Bar[]; palette: Palette }) {
         horzLine: { color: palette.textTertiary, style: 3, labelBackgroundColor: palette.raised },
       },
     });
-    seriesRef.current?.applyOptions({
+    candleRef.current?.applyOptions({
       upColor: palette.up, downColor: palette.down,
       wickUpColor: palette.up, wickDownColor: palette.down,
     });
   }, [palette]);
 
+  // 数据：K 线在 pane 0，成交量在 pane 1
   useEffect(() => {
     const c = chartRef.current;
     if (!c || !bars.length) return;
-    let s = seriesRef.current;
-    if (!s) {
-      s = c.addSeries(CandlestickSeries, {
+
+    const toTs = (d: string) => (Date.parse(d + "T00:00:00Z") / 1000) as UTCTimestamp;
+
+    let candle = candleRef.current;
+    if (!candle) {
+      candle = c.addSeries(CandlestickSeries, {
         upColor: palette.up, downColor: palette.down, borderVisible: false,
         wickUpColor: palette.up, wickDownColor: palette.down,
-      });
-      seriesRef.current = s;
+      }, 0);
+      candleRef.current = candle;
     }
-    s.setData(bars.map((b) => ({
-      time: (Date.parse(b.datetime + "T00:00:00Z") / 1000) as UTCTimestamp,
-      open: b.open, high: b.high, low: b.low, close: b.close,
+    candle.setData(bars.map((b) => ({
+      time: toTs(b.datetime), open: b.open, high: b.high, low: b.low, close: b.close,
     })));
-    c.timeScale().fitContent();
-  }, [bars, palette]);
 
-  return <div ref={ref} style={{ width: "100%", height: "100%" }} />;
-}
-
-function VolumeChart({ bars, palette }: { bars: Bar[]; palette: Palette }) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
-
-  useEffect(() => {
-    if (!ref.current) return;
-    const c = createChart(ref.current, {
-      autoSize: true,
-      layout: { background: { color: "transparent" }, textColor: "#6B7385", fontSize: 10, attributionLogo: false },
-    });
-    chartRef.current = c;
-    return () => { seriesRef.current = null; chartRef.current = null; c.remove(); };
-  }, []);
-
-  useEffect(() => {
-    const c = chartRef.current;
-    if (!c) return;
-    c.applyOptions({
-      layout: { textColor: palette.textTertiary },
-      grid: { vertLines: { color: palette.border }, horzLines: { color: palette.border } },
-      rightPriceScale: { borderColor: palette.border, scaleMargins: { top: 0.1, bottom: 0 } },
-      timeScale: { borderColor: palette.border, visible: false },
-      crosshair: { vertLine: { visible: false }, horzLine: { labelBackgroundColor: palette.raised } },
-    });
-  }, [palette]);
-
-  useEffect(() => {
-    const c = chartRef.current;
-    if (!c || !bars.length) return;
-    let s = seriesRef.current;
-    if (!s) {
-      s = c.addSeries(HistogramSeries, { priceFormat: { type: "volume" } });
-      seriesRef.current = s;
+    let vol = volRef.current;
+    if (!vol) {
+      vol = c.addSeries(HistogramSeries, { priceFormat: { type: "volume" } }, 1);
+      volRef.current = vol;
+      // 成交量占整体约 1/4：图表 resize 时按比例给两个 pane 定高。
+      // 不设的话两个 pane 等高，K 线会被压扁。
+      const setPaneHeights = () => {
+        const panes = c.panes();
+        if (panes.length < 2) return;
+        const total = ref.current?.clientHeight ?? 0;
+        if (total < 80) return;
+        panes[1].setHeight(Math.max(48, Math.round(total * 0.24)));
+      };
+      setPaneHeights();
+      const ro = new ResizeObserver(setPaneHeights);
+      if (ref.current) ro.observe(ref.current);
+      paneRO.current = ro;
     }
-    s.setData(bars.map((b, i) => ({
-      time: (Date.parse(b.datetime + "T00:00:00Z") / 1000) as UTCTimestamp,
+    vol.setData(bars.map((b, i) => ({
+      time: toTs(b.datetime),
       value: b.vol,
       color: i > 0 && b.close >= bars[i - 1].close ? `${palette.up}55` : `${palette.down}55`,
     })));
+
     c.timeScale().fitContent();
   }, [bars, palette]);
 
@@ -275,17 +280,7 @@ function MainCanvas({ palette, code }: { palette: Palette; code: string }) {
 
       {/* 图表区：flex:1 + minHeight:0 才能真正压缩到父容器高度 */}
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        {view === "k" && (
-          <>
-            <div style={{ flex: 3, minHeight: 0 }}>
-              <KLineChart bars={bars} palette={palette} />
-            </div>
-            <div style={{ height: 1, background: palette.border, flex: "0 0 auto" }} />
-            <div style={{ flex: 1, minHeight: 0, paddingTop: 4 }}>
-              <VolumeChart bars={bars} palette={palette} />
-            </div>
-          </>
-        )}
+        {view === "k" && <PriceChart bars={bars} palette={palette} />}
         {view === "corr" && <Placeholder palette={palette} text="相关性热力图（ECharts）· M2-5" />}
         {view === "bt" && <Placeholder palette={palette} text="净值 + 回撤双 pane（LWC）· M2-5" />}
       </div>

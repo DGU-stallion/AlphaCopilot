@@ -58,10 +58,14 @@ Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共
      强制改写为 `kind = "agent"`，前端显示 AI 角标。
    - 后果：agent 用 bash 自己手算的数字照样能显示，但**带 AI 角标**，用户知道它不可信。
      这就是本规则的全部效力——不再假装能审计 agent 的代码。
-7. **颜色/主题只写在 `index.css` 的 token 与 `lib/chart-theme.ts` 两处**，
-   双主题 + 涨跌双口径（ADR-0013）
+7. **颜色/主题只有一个真源：`frontend/src/theme/tokens.ts`**（ADR-0014）。
+   antd 主题、Lightweight Charts、ECharts 都从它读；`index.css` 不再定义颜色。
+   双主题 + 涨跌双口径。**组件里出现 `#` 开头的颜色字面量即违规**；
+   **数字一律走 `<Num>` 组件**（等宽 + tabular-nums + 涨跌色），不裸写 `.toFixed()`。
 8. 图表分工：K 线/净值/回撤/买卖点 → **Lightweight Charts**；
-   热力图/分层/散点/归因 → **ECharts**。
+   热力图/分层/散点/归因 → **ECharts**。**LWC 内多图一律用 pane 分区
+   （`addSeries(..., paneIndex)`），不叠加两个 chart 实例**——两个实例会导致
+   左右边缘不齐、缩放与十字光标不联动（ADR-0014 §6，实测）。。
    block 必须带 `renderer` 判别符，不能只看 `kind: "chart"`
 9. **agent 拥有完整工具集（含 bash / read / write / edit）**（ADR-0010）。
    这是显式接受的风险，不是疏忽：agent 以 OS 用户权限执行。
