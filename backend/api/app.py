@@ -60,14 +60,23 @@ class BacktestIn(BaseModel):
 _SKILLS_DIR = _REPO_ROOT / "skills"
 
 
-def _default_provider_factory(workspace_root: Path, base_url=None, api_key=None, model=None):
+def _default_provider_factory(
+    workspace_root: Path, store=None, base_url=None, api_key=None, model=None
+):
     def factory(session_id: str):
         ws = workspace_root / session_id / "ws"
         ws.mkdir(parents=True, exist_ok=True)
+        # 续接：读出上次用过的运行时会话 id 填回 spec。
+        # 为 None 表示「这条会话还没续接 id」→ 开新会话，start() 后再存回来。
+        stored_sid = None
+        if store is not None:
+            row = store.get_session(session_id) or {}
+            stored_sid = row.get("runtime_session_id")
         spec = ProviderSpec(
             workspace=ws,
             system_prompt=_compliance_prompt(),
             model=model,
+            session_id=stored_sid,
             # skills 目录是可选的：不存在时不挂载（Pi 侧会 --no-skills 全关）。
             skills_dir=_SKILLS_DIR if _SKILLS_DIR.is_dir() else None,
             base_url=base_url,
@@ -101,14 +110,16 @@ def create_app(
     ws_root = workspace_root or Path(tempfile.mkdtemp(prefix="alphacopilot-ws-"))
     jobs = JobQueue(store, ws_root)
     factory = provider_factory or _default_provider_factory(
-        ws_root, base_url=base_url, api_key=api_key, model=model
+        ws_root, store=store, base_url=base_url, api_key=api_key, model=model
     )
     manager = SessionManager(store, factory, jobs=jobs)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         yield
-        manager.close_all()
+        # 先等 agent 手上的 turn 收尾，再关库。
+        # 顺序反了会让 turn 写已关闭的 sqlite，消息丢失。
+        await manager.aclose_all()
         store.close()
 
     app = FastAPI(title="AlphaCopilot API", version="0.2.0", lifespan=lifespan)

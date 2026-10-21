@@ -68,6 +68,10 @@ _SHUTDOWN_GRACE_SECONDS = 3.0
 # 无数据时 select 的轮询间隔。只影响 abort 响应的及时性，不是性能参数。
 _READ_POLL_SECONDS = 0.05
 
+# start() 时查会话 id 的等待上限。查不到不致命（会话仍能用，只是重启后不续接），
+# 所以这里宁可短一点，不要让启动卡住。
+_STATE_QUERY_TIMEOUT_SECONDS = 3.0
+
 
 def _split_model(model: str) -> tuple[str | None, str]:
     """把 `provider/id` 拆成 (provider, id)；不带斜线时 provider 为 None。
@@ -107,6 +111,9 @@ class PiProvider:
         # 用它而不是「直接关 stdin」，因为关 stdin 是**关闭整个进程**的语义，
         # 而用户想要的是只停这一轮、会话还能继续聊。
         self._abort_reason: str | None = None
+        # Pi 实际使用的会话 id。start() 之前等于 spec.session_id（可能为 None）；
+        # start() 之后一定会被填上（通过 get_state 查询）。
+        self.session_id: str | None = spec.session_id
 
     # ---------------------------------------------------------------- 生命周期
 
@@ -148,6 +155,16 @@ class PiProvider:
             ) from e
 
         self._drain_stderr()
+        # 拿到 Pi 实际使用的会话 id。
+        #
+        # 为什么必须查：首次启动我们没给 --session-id，id 是 Pi 自己生成的
+        # （落成 <timestamp>_<uuid>.jsonl）。业务层需要把它存进数据库，
+        # 否则下次启动无从续接，agent 就失忆了。
+        #
+        # 查不到（超时/旧版 Pi 没这个字段）不致命：session_id 保持 spec 里那个
+        # （可能为 None），会话仍能用，只是重启后不续接。这种降级要静默，
+        # 因为「无法续接」不该阻断「开始对话」。
+        self._query_session_id()
 
     def _build_argv(self) -> list[str]:
         """组装 pi 命令行。
@@ -172,6 +189,15 @@ class PiProvider:
         session_dir = spec.workspace / ".pi-sessions"
         session_dir.mkdir(parents=True, exist_ok=True)
         argv += ["--session-dir", str(session_dir)]
+
+        # 会话续接：给了 id 就续上，没给就开新的。
+        #
+        # 只给 --session-dir 是不够的 —— Pi 会在该目录下新建一个
+        # <timestamp>_<uuid>.jsonl，每次启动都是新会话。实测后果：
+        # 重启后问「我刚让你记的词是什么」，agent 答「我这里没有记录」，
+        # 而界面上那一整条历史都还在。这比没有记忆更糟，因为它让人无法信任上下文。
+        if spec.session_id:
+            argv += ["--session-id", spec.session_id]
 
         if spec.model:
             # `--model "provider/id"` 在 pi 1.3 里不被识别（会报 Model not found），
@@ -222,6 +248,56 @@ class PiProvider:
         # 这种假配置比没有配置更糟。要换端点应当改 models.json。
         env.update(self._extra_env)
         return env
+
+    def _query_session_id(self) -> None:
+        """通过 get_state 问 Pi 当前会话的 id，最多等 3 秒。"""
+        proc = self._proc
+        if proc is None or proc.stdin is None or proc.stdout is None:
+            return
+
+        request_id = f"state-{int(time.time() * 1000)}"
+        try:
+            cmd = {"id": request_id, "type": "get_state"}
+            proc.stdin.write((json.dumps(cmd) + "\n").encode("utf-8"))
+            proc.stdin.flush()
+        except (BrokenPipeError, OSError):
+            return
+
+        import select
+
+        buf = bytearray()
+        deadline = time.monotonic() + _STATE_QUERY_TIMEOUT_SECONDS
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            if not select.select([proc.stdout], [], [], remaining)[0]:
+                return
+            chunk = proc.stdout.read(4096)
+            if not chunk:
+                return
+            buf.extend(chunk)
+            while True:
+                idx = buf.find(b"\n")
+                if idx < 0:
+                    break
+                line = bytes(buf[:idx])
+                del buf[: idx + 1]
+                if line.endswith(b"\r"):
+                    line = line[:-1]
+                if not line.strip():
+                    continue
+                try:
+                    rec = json.loads(line.decode("utf-8"))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+                if rec.get("type") != "response" or rec.get("command") != "get_state":
+                    continue
+                data = rec.get("data") or {}
+                sid = data.get("sessionId") or data.get("session_id")
+                if sid:
+                    self.session_id = str(sid)
+                return
 
     def _drain_stderr(self) -> None:
         """后台线程持续读 stderr。

@@ -68,6 +68,15 @@ class ProviderSpec:
     mcp_servers: list[McpServerSpec] = field(default_factory=list)
     skills_dir: Path | None = None
     model: str | None = None
+    # 会话 id：跨进程续接的抓手。
+    #
+    # 为什么放在 spec 而不是 provider 实例上：id 属于**业务层**——是它知道
+    # "这是同一个会话"（我们的 session 表有一行）。放在实例里，进程一重启就丢了，
+    # agent 也就失忆了：界面上一整条对话历史都在，它却什么都不记得。
+    #
+    # None 表示「开新会话」；start() 之后可以从 provider.session_id 读到
+    # Pi 实际分配的 id，业务层负责把它存下来供下次用。
+    session_id: str | None = None
     # 下面两个字段**仅为向后兼容保留**，PiProvider 不使用它们：
     # Pi 从 `~/.pi/agent/models.json` + `auth.json` 读端点与凭据，
     # 传进来也不起作用。要换端点请改 models.json。

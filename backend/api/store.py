@@ -34,6 +34,10 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS session (
     id          TEXT PRIMARY KEY,
     title       TEXT NOT NULL DEFAULT '',
+    -- 运行时会话 id（Pi 的 sessionId）。跨进程续接的抓手：
+    -- 首次启动由 PiProvider 从 get_state 取回后写这里；之后每次启动读出来
+    -- 填回 ProviderSpec.session_id，agent 才不会「界面有历史、自己却失忆」。
+    runtime_session_id TEXT,
     created_at  REAL NOT NULL
 );
 
@@ -154,6 +158,17 @@ def _migrate_page_kind(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migrate_session_runtime_id(conn: sqlite3.Connection) -> None:
+    """幂等迁移：老库 session 表缺 runtime_session_id 列时补列。
+
+    旧行留 NULL —— 表示「这条会话是续接功能上线前建的，不知道它的运行时 id」。
+    下次启动会重新生成一个新 id 填进去（相当于从那一刻开始可以续接了）。
+    """
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(session)").fetchall()}
+    if "runtime_session_id" not in cols:
+        conn.execute("ALTER TABLE session ADD COLUMN runtime_session_id TEXT")
+
+
 def _migrate_artifact_provenance(conn: sqlite3.Connection) -> None:
     """幂等迁移：老库 artifact 表缺 provenance 列时补列。
 
@@ -181,6 +196,13 @@ class SessionRepo:
         )
         self.conn.commit()
         return sid
+
+    def set_runtime_session_id(self, sid: str, runtime_session_id: str | None) -> None:
+        """记录该会话在运行时里的 id（用于跨进程续接）。幂等，可覆盖。"""
+        self.conn.execute(
+            "UPDATE session SET runtime_session_id=? WHERE id=?", (runtime_session_id, sid)
+        )
+        self.conn.commit()
 
     def get_session(self, sid: str) -> dict[str, Any] | None:
         row = self.conn.execute("SELECT * FROM session WHERE id=?", (sid,)).fetchone()
@@ -628,6 +650,7 @@ class Store:
         self.conn.executescript(SCHEMA)
         _migrate_page_kind(self.conn)
         _migrate_artifact_provenance(self.conn)
+        _migrate_session_runtime_id(self.conn)
         self.conn.commit()
 
     def close(self) -> None:
@@ -639,6 +662,9 @@ class Store:
 
     def get_session(self, sid: str) -> dict[str, Any] | None:
         return self.sessions.get_session(sid)
+
+    def set_runtime_session_id(self, sid: str, runtime_session_id: str | None) -> None:
+        self.sessions.set_runtime_session_id(sid, runtime_session_id)
 
     def list_sessions(self) -> list[dict[str, Any]]:
         return self.sessions.list_sessions()

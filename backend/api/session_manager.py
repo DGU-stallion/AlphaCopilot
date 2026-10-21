@@ -74,6 +74,9 @@ class SessionManager:
     def __init__(self, store: Store, provider_factory, jobs=None) -> None:
         self._store = store
         self._provider_factory = provider_factory  # (session_id) -> AgentProvider
+        # 在跑的 turn 任务。必须留引用：否则关服务时无处 cancel，
+        # turn 会在库关掉之后醒来写库，抛 ProgrammingError 且消息丢失。
+        self._turn_tasks: set[asyncio.Task] = set()
         self._jobs = jobs  # JobQueue（可选；agent submit_backtest 请求在 turn 末入队）
         self._runtimes: dict[str, SessionRuntime] = {}
 
@@ -86,6 +89,19 @@ class SessionManager:
             return rt
         provider, workspace = self._provider_factory(session_id)
         await asyncio.to_thread(provider.start)
+
+        # 会话续接：把运行时实际用的 session id 存下来。
+        #
+        # 首次启动时 id 是 Pi 自己生成的（我们没给），只有 start() 之后才知道；
+        # 业务层必须把它落到库里，否则下次启动无从续接 —— agent 会「界面有历史、
+        # 自己却失忆」。provider_factory 负责把存下的 id 填回 spec（见 app.py），
+        # 这里负责把新 id 读出来写回库。
+        runtime_sid = getattr(provider, "session_id", None)
+        if runtime_sid:
+            current = self._store.get_session(session_id) or {}
+            if current.get("runtime_session_id") != runtime_sid:
+                self._store.set_runtime_session_id(session_id, runtime_sid)
+
         rt = SessionRuntime(provider=provider, workspace=str(workspace))
         self._runtimes[session_id] = rt
         return rt
@@ -100,7 +116,9 @@ class SessionManager:
         """
         self._store.add_message(session_id, "user", content)
         rt = await self._ensure_runtime(session_id)
-        asyncio.create_task(self._run_turn(session_id, rt, content))
+        task = asyncio.create_task(self._run_turn(session_id, rt, content))
+        self._turn_tasks.add(task)
+        task.add_done_callback(self._turn_tasks.discard)
         return session_id
 
     async def _run_turn(
@@ -225,5 +243,29 @@ class SessionManager:
             rt.provider.close()
 
     def close_all(self) -> None:
+        """关闭所有会话运行时。
+
+        注意：本方法**不能**自己 await（调用方是同步的 lifespan 清理）。
+        在跑的 turn 由 `aclose_all` 负责取消并等待；这里只做同步部分。
+        直接调本方法而库里还有 turn 在跑时，请改用 `await aclose_all()`。
+        """
         for sid in list(self._runtimes):
             self.close_session(sid)
+
+    async def aclose_all(self) -> None:
+        """关闭所有运行时，并**等在跑的 turn 收尾**。
+
+        为什么必须等：turn 收尾要写库（assistant 消息 + artifact）。
+        不等的话，调用方关掉 sqlite 之后 turn 才醒来，抛
+        `ProgrammingError: Cannot operate on a closed database`，
+        用户看到的是「消息发出去了但没存下来」。
+
+        先 cancel 再 await：cancel 让它别再继续跑（provider 会收到 close），
+        await 确保它真的停下来了，之后关库才是安全的。
+        """
+        tasks = [t for t in self._turn_tasks if not t.done()]
+        for t in tasks:
+            t.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self.close_all()
