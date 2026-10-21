@@ -4,6 +4,11 @@
 > ADR-0012（双轨产物）、ADR-0013（UI 设计系统 v1）、**ADR-0014（UI 设计系统 v2，取代 0013 §1–3）**
 > 编写：2026-10-20 · 修订：**2026-10-21** · 基准 commit：`84198c5`（main）
 >
+> **2026-10-22 进度快照**：M0 ✅ M1 ✅ M2 ✅（11/11）·
+> M3 部分完成（1/2/3/4 后端、V1/V2/V3）· M4-1 ✅ · M5-4/M5-5 ✅。
+> 未做：M3-5 monorepo 搬迁、M3-4 的 Rerun、M3-V4/V5/V6/V7、
+> M4-2~M4-5、M5-1~M5-3。**vendor 已可加载（101 个函数），但尚未接进 REST**。
+>
 > **2026-10-21 修订要点**（重要，先看这个）：
 > 1. **应用后端保留 Python**，不做 TS 重写（ADR-0011 §0）——M1/M3 任务表已同步
 > 2. **vendor a-stock-data 从 M0 移到 M3**（M0 只做真止血；依赖与主环境冲突）
@@ -181,20 +186,20 @@ AI native 个人投研量化工作台。
 > 为 TS」这一隐藏大头；但原 M0-5b 的 vendor 全套（2–3 天）回到这里，
 > 且 monorepo 搬迁是纯搬目录。
 
-| ID | 任务 | 验收 |
-|---|---|---|
-| M3-1 | `Run` registry（参数 + codeHash + dataAsOf + 指标 + artifacts） | 每次回测可比较、可复现、可重跑 |
-| M3-2 | `Universe` as query（不是 localStorage 代码串） | 改条件重算；明天数据变了自动更新 |
-| M3-3 | `View` / `Page` 模型（ADR-0012） | 页面 = 保存的 View 集合 |
-| M3-4 | Pin / Rerun / Diff 交互 | 两个 Run 可对比净值+指标差异 |
-| M3-5 | 迁移到 monorepo 布局（`apps/web` + `apps/server` + `data-service`）。**纯目录搬迁**，同时修所有 `Path(__file__).parents[N]` 与 `sys.path.insert` | `git log --follow` 仍可追溯；`pytest` 与 `vite build` 均绿 |
-| **M3-V1** | **data-service 独立 venv**（vendor 依赖 `baostock`/`xlrd`/`openpyxl` 与主环境 `mcp>=1.9`→`httpx>=0.27`、`mootdx`→`httpx<0.26` 冲突，必须环境隔离）；**`mootdx` 不装**（ADR-0011 事实 1：连财务也拿不到） | vendor 测试能在独立 venv 里跑；主环境不需装 `mootdx` |
-| **M3-V2** | Vendor `SKILL.md`（V3.10.2 / commit `29b07d2e3700`）+ `LICENSE` + `CHANGELOG.md` + `tests/` + `NOTICE` 到 `data-service/vendor/a-stock-data/`，**按 [`research/a-stock-data-v3.10.md` §7.1](research/a-stock-data-v3.10.md) 的 curl 命令钉死 commit** | `SKILL.md` 7585 行 / 91 个 python 块 / sha256 记入 NOTICE |
-| **M3-V3** | 写 loader（骨架见 [§7.4](research/a-stock-data-v3.10.md)）：抽 91 块 → AST 去示例调用 → 同 namespace exec | `list_capabilities()` 列出 87 个端点；182 定义 / 181 唯一名 |
-| **M3-V4** | 跑上游 `tests/`（179 条离线测试，从 SKILL.md 抽代码执行） | 179 条全绿，不联网 |
-| **M3-V5** | 两层暴露：agent 走 `/v1/capabilities` + `/v1/invoke`（87 个），页面继续走现有 curated 端点，**不重复实现「第二套 REST」** | agent 能调任意 vendor 端点；页面无回归 |
-| **M3-V6** | `scripts/vendor-a-stock-data.sh`：下载 → 跑测试 → 绿则更新 NOTICE，红则回滚；**`vendor/` 目录只读约定**（CI 校验无本地改动） | 一条命令完成同步；CI 里 `git diff --exit-code vendor/` 绿 |
-| M3-7 | 删除旧移植 `backend/research/astock.py`（被 vendor 替代） | `grep -r "移植自 a-stock-data"` 为空 |
+| ID | 任务 | 状态 | 验收 | |
+|---|---|---|---|---|
+| M3-1 | `Run` registry（参数 + codeHash + dataAsOf + 指标 + artifacts） | ✅ | 每次回测可比较、可复现 | |
+| M3-2 | `Universe` as query（不是 localStorage 代码串） | ✅ | 改条件重算；数据变了自动更新 | |
+| M3-3 | `View` / `Page` 模型（ADR-0012） | ✅ 后端 + 页面 | 页面 = 保存的 View 集合 | |
+| M3-4 | Pin / Rerun / Diff 交互 | ⚠️ Diff+Pin 已做，**Rerun 未做** | 两个 Run 可对比差异 | |
+| M3-5 ⬜ | 迁移到 monorepo 布局（`apps/web` + `apps/server` + `data-service`）。**纯目录搬迁**，同时修所有 `Path(__file__).parents[N]` 与 `sys.path.insert` | `git log --follow` 仍可追溯；`pytest` 与 `vite build` 均绿 |
+| **M3-V1** ✅ | **data-service 独立 venv**（vendor 依赖 `baostock`/`xlrd`/`openpyxl` 与主环境 `mcp>=1.9`→`httpx>=0.27`、`mootdx`→`httpx<0.26` 冲突，必须环境隔离）；**`mootdx` 不装**（ADR-0011 事实 1：连财务也拿不到） | vendor 测试能在独立 venv 里跑；主环境不需装 `mootdx` |
+| **M3-V2** ✅ | Vendor `SKILL.md`（V3.10.2 / commit `29b07d2e3700`）+ `LICENSE` + `CHANGELOG.md` + `tests/` + `NOTICE` 到 `data-service/vendor/a-stock-data/`，**按 [`research/a-stock-data-v3.10.md` §7.1](research/a-stock-data-v3.10.md) 的 curl 命令钉死 commit** | `SKILL.md` 7585 行 / 91 个 python 块 / sha256 记入 NOTICE |
+| **M3-V3** ✅ | 写 loader（骨架见 [§7.4](research/a-stock-data-v3.10.md)）：抽 91 块 → AST 去示例调用 → 同 namespace exec | `list_capabilities()` 列出 87 个端点；182 定义 / 181 唯一名 |
+| **M3-V4** ⬜ | 跑上游 `tests/`（179 条离线测试，从 SKILL.md 抽代码执行） | 179 条全绿，不联网 |
+| **M3-V5** ⬜ | 两层暴露：agent 走 `/v1/capabilities` + `/v1/invoke`（87 个），页面继续走现有 curated 端点，**不重复实现「第二套 REST」** | agent 能调任意 vendor 端点；页面无回归 |
+| **M3-V6** ⬜ | `scripts/vendor-a-stock-data.sh`：下载 → 跑测试 → 绿则更新 NOTICE，红则回滚；**`vendor/` 目录只读约定**（CI 校验无本地改动） | 一条命令完成同步；CI 里 `git diff --exit-code vendor/` 绿 |
+| M3-7 ⬜ | 删除旧移植 `backend/research/astock.py`（被 vendor 替代） | `grep -r "移植自 a-stock-data"` 为空 |
 
 ---
 
@@ -213,11 +218,11 @@ AI native 个人投研量化工作台。
 
 | ID | 任务 | 验收 |
 |---|---|---|
-| M4-1 | Factor lab：IC / RankIC / ICIR / 衰减 / 分位数收益 / 换手 | 因子页能回答「这个信号有没有用」 |
-| M4-2 | Tear sheet 标准化（滚动 Sharpe、月度热力图、回撤持续期、暴露） | 每份回测都有标准报告 |
-| M4-3 | 参数扫描 + 热力图（vectorbt 式） | 一次跑 100+ 参数组合 |
-| M4-4 | Walk-forward / 样本外 | 防止「参数扫出来的漂亮曲线」 |
-| M4-5 | 归因（Brinson + 因子归因） | 收益拆解到行业/因子 |
+| M4-1 ✅ | Factor lab：IC / RankIC / ICIR / 衰减 / 分位数收益 / 换手 | 因子页能回答「这个信号有没有用」 |
+| M4-2 ⬜ | Tear sheet 标准化（滚动 Sharpe、月度热力图、回撤持续期、暴露） | 每份回测都有标准报告 |
+| M4-3 ⬜ | 参数扫描 + 热力图（vectorbt 式） | 一次跑 100+ 参数组合 |
+| M4-4 ⬜ | Walk-forward / 样本外 | 防止「参数扫出来的漂亮曲线」 |
+| M4-5 ⬜ | 归因（Brinson + 因子归因） | 收益拆解到行业/因子 |
 
 ---
 
@@ -225,11 +230,11 @@ AI native 个人投研量化工作台。
 
 | ID | 任务 | 验收 |
 |---|---|---|
-| M5-1 | 命令栏（⌘K）自然语言入口 | 输入「把这三个票和沪深300 做 60 日滚动相关」直接出图 |
-| M5-2 | Build 模式：agent 产出 View 草稿 → 预览 → 确认落地 | 一句话产出新 View 并保存 |
-| M5-3 | 研究线（Note → Run → View → 复盘 Note） | 半年后能回答「我当时为什么买、后来对了吗」 |
-| M5-4 | 数据 as-of 全站可见 + 跨日失效 | 早上打开看到的数字带时间戳 |
-| M5-5 | 缓存加 TTL | 不会静默用昨天的数据 |
+| M5-1 ⬜ | 命令栏（⌘K）自然语言入口 | 输入「把这三个票和沪深300 做 60 日滚动相关」直接出图 |
+| M5-2 ⬜ | Build 模式：agent 产出 View 草稿 → 预览 → 确认落地 | 一句话产出新 View 并保存 |
+| M5-3 ⬜ | 研究线（Note → Run → View → 复盘 Note） | 半年后能回答「我当时为什么买、后来对了吗」 |
+| M5-4 ✅ | 数据 as-of 全站可见 + 跨日失效 | 早上打开看到的数字带时间戳 |
+| M5-5 ✅ | 缓存加 TTL | 不会静默用昨天的数据 |
 
 ---
 
