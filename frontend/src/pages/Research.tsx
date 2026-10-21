@@ -7,7 +7,7 @@ import { Button, TextArea, TextInput, Field } from "@/components/ui/Form";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { useCachedResource } from "@/lib/cache";
 import { useAiPage } from "@/lib/ai-page";
-import { useDataAsOf } from "@/lib/data-asof";
+import { useDataAsOfAuto } from "@/lib/data-asof";
 import { runsApi, type NoteRow, type NoteThread } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -51,10 +51,8 @@ export function Research() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  useDataAsOf(
-    notes.length
-      ? { dataAsOf: "", fetchedAt: Date.now(), label: "研究笔记（本机 SQLite）" }
-      : null,
+  useDataAsOfAuto(
+    notes.length ? { dataAsOf: "", label: "研究笔记（本机 SQLite）" } : null,
   );
 
   useAiPage({

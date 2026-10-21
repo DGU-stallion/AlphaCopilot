@@ -7,7 +7,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
-  DataAsOfProvider, useDataAsOf, useDataAsOfValue, formatAsOf, type DataAsOf,
+  DataAsOfProvider, useDataAsOf, useDataAsOfAuto, useDataAsOfValue, formatAsOf,
+  type DataAsOf,
 } from "@/lib/data-asof";
 
 function Probe({ info }: { info: DataAsOf | null }) {
@@ -79,6 +80,47 @@ describe("依赖稳定性（无限重渲染的守门）", () => {
     // 如果没有无限循环，这里能正常返回且渲染次数是有限的小数字。
     // React 会在无限 setState 时抛 "Maximum update depth exceeded"，测试会失败。
     expect(renders).toBeLessThan(10);
+  });
+});
+
+describe("useDataAsOfAuto（防无限重渲染的安全变体）", () => {
+  it("字段不变时反复渲染，不会无限 setState", async () => {
+    // 这条守的是实测崩过的场景：页面写 `fetchedAt: Date.now()` 在渲染体里
+    // → 每次渲染新值 → effect 反复触发 → React 抛
+    // "Maximum update depth exceeded"。整页崩，但单测页面组件时看不出来。
+    const { render } = await import("@testing-library/react");
+    let renders = 0;
+    function Page() {
+      renders += 1;
+      useDataAsOfAuto({ dataAsOf: "2026-10-21", label: "x" });
+      return null;
+    }
+    render(
+      <DataAsOfProvider>
+        <Page />
+      </DataAsOfProvider>,
+    );
+    expect(renders).toBeLessThan(10);
+  });
+
+  it("as-of 变化时会更新，且 fetchedAt 不倒退", async () => {
+    const { renderHook } = await import("@testing-library/react");
+    const { wrapper } = await import("@testing-library/react").then((m) => ({
+      wrapper: ({ children }: { children: React.ReactNode }) =>
+        <DataAsOfProvider>{children}</DataAsOfProvider>,
+    }));
+    const { result, rerender } = renderHook(
+      ({ v }: { v: string }) => {
+        useDataAsOfAuto({ dataAsOf: v, label: "y" });
+        return useDataAsOfValue();
+      },
+      { initialProps: { v: "2026-10-20" }, wrapper },
+    );
+    expect(result.current?.dataAsOf).toBe("2026-10-20");
+    const t1 = result.current?.fetchedAt ?? 0;
+    rerender({ v: "2026-10-21" });
+    expect(result.current?.dataAsOf).toBe("2026-10-21");
+    expect(result.current!.fetchedAt).toBeGreaterThanOrEqual(t1);
   });
 });
 

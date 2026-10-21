@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Form";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { useCachedResource } from "@/lib/cache";
 import { useAiPage } from "@/lib/ai-page";
-import { useDataAsOf } from "@/lib/data-asof";
+import { useDataAsOfAuto } from "@/lib/data-asof";
 import { runsApi, type RunRow, type RunDiff, type ViewRow } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -68,10 +68,12 @@ export function Runs() {
     { ttlMs: 5_000 },
   );
 
-  useDataAsOf(
+  // 用 auto 版：取数时刻由 hook 自己记录（key 变化时记一次）。
+  // 手写 fetchedAt: Date.now() 是无限重渲染的经典错法，已在这页踩过一次。
+  useDataAsOfAuto(
     runs.length
-      ? { dataAsOf: runs[0].data_as_of, fetchedAt: Date.now(), label: "Run 记录" }
-      : { dataAsOf: "", fetchedAt: 0, label: "Run 记录" },
+      ? { dataAsOf: runs[0].data_as_of, label: "Run 记录" }
+      : { dataAsOf: "", label: "Run 记录" },
   );
 
   useAiPage({

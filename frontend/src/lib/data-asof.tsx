@@ -13,7 +13,7 @@
  *   - dataAsOf：数据所属交易日（"2026-10-21"）
  *   - fetchedAt：什么时候取的（盘口类数据要精确到分钟，因为它会变）
  */
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 export interface DataAsOf {
   /** 数据所属交易日 "YYYY-MM-DD"；空串表示未知。 */
@@ -44,6 +44,28 @@ export function DataAsOfProvider({ children }: { children: ReactNode }) {
  * 有数据但时点未知，要明确显示「时点未知」，而不是装作没这回事 ——
  * 未知的时间戳和不显示时间戳一样危险。
  */
+/**
+ * 更安全的用法：只报 as-of 与 label，取数时刻由 hook 自己在
+ * 「as-of 或 label 变化时」记录一次。
+ *
+ * 为什么要有这个变体：`useDataAsOf({fetchedAt: Date.now()})` 是最容易
+ * 写错的写法（每次渲染新值 → effect 反复触发 → 无限重渲染），
+ * 而它错得很隐蔽 —— 单页面测不出来，只有整页渲染时才崩。已在 Runs 与
+ * DailyReview 各踩一次。
+ */
+export function useDataAsOfAuto(info: { dataAsOf: string; label?: string } | null) {
+  const atRef = useRef(0);
+  const key = info ? `${info.dataAsOf}|${info.label ?? ""}` : "";
+  const prevKey = useRef(key);
+  if (prevKey.current !== key) {
+    prevKey.current = key;
+    atRef.current = Date.now();
+  }
+  useDataAsOf(info
+    ? { dataAsOf: info.dataAsOf, fetchedAt: atRef.current, label: info.label }
+    : null);
+}
+
 export function useDataAsOf(info: DataAsOf | null) {
   const { set } = useContext(DataAsOfContext);
   // 依赖用具体字段而不是对象：调用方常写内联对象字面量，
