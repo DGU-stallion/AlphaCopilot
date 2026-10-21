@@ -67,6 +67,10 @@ RENDERER_BY_FN: dict[str, str] = {
     "factorlab.ic_decay": RENDERER_LWC,             # 衰减曲线（横轴为期限 t+N）
     "factorlab.quantile_returns": RENDERER_ECHARTS,  # 分层收益柱状图
     "factorlab.quantile_heatmap": RENDERER_ECHARTS,  # 分层收益热力图
+    # M4-2 Tear sheet
+    "tearsheet.rolling_sharpe": RENDERER_LWC,        # 滚动 Sharpe 时间序列（金融时间轴）
+    "tearsheet.drawdown": RENDERER_LWC,              # 回撤（净值域序列，同 backtest.drawdown）
+    "tearsheet.monthly_heatmap": RENDERER_ECHARTS,   # 月度收益热力图（年份×月份二维聚合）
 }
 
 

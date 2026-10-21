@@ -116,12 +116,19 @@ def test_render_backtest_blocks(client):
         json={"symbol": "600519", "fast": 5, "slow": 10, "range": "1y"},
     ).json()["blocks"]
     kinds = [b["kind"] for b in blocks]
-    assert kinds == ["metric", "chart", "chart"]
+    # M4-2 之后 backtest 页多了两个 tearsheet 图（滚动 Sharpe / 月度热力图），
+    # 所以是 1 metric + 4 chart。这里断言「指标在首位、其余都是 chart」，
+    # 而不是写死块数 —— 写死个数会让每次加图都要改测试，
+    # 而这条测试真正要守的是「指标卡在图前面 + 净值图有两条线」。
+    assert kinds[0] == "metric"
+    assert all(k == "chart" for k in kinds[1:])
+    assert len(kinds) >= 3                           # 至少净值 + 回撤
     # 指标卡含总收益/夏普
     labels = [it["label"] for it in blocks[0]["metric"]["items"]]
     assert "总收益" in labels and "夏普" in labels
-    # 净值图有策略 + 买入持有两条线
-    assert len(blocks[1]["option"]["series"]) == 2
+    # 净值图有策略 + 买入持有两条线（按 title 找，不按位置找）
+    equity = next(b for b in blocks if "净值" in (b.get("title") or ""))
+    assert len(equity["option"]["series"]) == 2
 
 
 def test_render_backtest_degrades_when_no_data(client, monkeypatch):

@@ -19,6 +19,7 @@ from typing import Any
 import alpha.backtest_page  # noqa: F401 —— 触发 backtest.* 注册
 import alpha.factor  # noqa: F401 —— 触发 correlation.* 注册
 import alpha.factor_lab  # noqa: F401 —— 触发 factorlab.* 注册
+import alpha.tearsheet  # noqa: F401 —— 触发 tearsheet.* 注册（M4-2）
 from api.store import Store
 
 CORRELATION_SPEC: dict[str, Any] = {
@@ -72,6 +73,11 @@ BACKTEST_SPEC: dict[str, Any] = {
          "analysis_ref": {"fn": "backtest.equity"}},
         {"kind": "chart", "span": 1, "renderer": "lwc",
          "analysis_ref": {"fn": "backtest.drawdown"}},
+        # M4-2 Tear sheet：滚动 Sharpe（时间序列 → lwc）+ 月度收益热力图（聚合 → echarts）。
+        {"kind": "chart", "span": 2, "renderer": "lwc",
+         "analysis_ref": {"fn": "tearsheet.rolling_sharpe"}},
+        {"kind": "chart", "span": 1, "renderer": "echarts",
+         "analysis_ref": {"fn": "tearsheet.monthly_heatmap"}},
     ],
     "refresh": {"mode": "manual"},
 }

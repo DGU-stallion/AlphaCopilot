@@ -485,6 +485,15 @@ export const runsApi = {
   noteThread: (did: string) =>
     get<NoteThread>(`/notes/${encodeURIComponent(did)}/thread`),
 
+  // ---------- M5-2 Build 模式：草稿 → 预览 → 确认发布 ----------
+  /** agent 或用户产出的 page spec 落成草稿。坏 spec → 400。 */
+  createDraft: (spec: Record<string, unknown>) =>
+    request<{ id: string; slug: string; status: string }>("/pages/drafts", "POST", spec),
+  publishPage: (pid: string) =>
+    request<{ id: string; status: string }>(`/pages/${encodeURIComponent(pid)}/publish`, "POST"),
+  unpublishPage: (pid: string) =>
+    request<{ id: string; status: string }>(`/pages/${encodeURIComponent(pid)}/unpublish`, "POST"),
+
   /** M3-4：用同一条 Run 的输入快照重跑。409=无快照，501=未启用 job 队列。 */
   rerun: (rid: string) =>
     request<{ job_id: string; rerun_of: string }>(

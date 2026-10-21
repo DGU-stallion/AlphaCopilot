@@ -11,6 +11,7 @@ import { Journal } from "@/pages/Journal";
 import { Settings } from "@/pages/Settings";
 import { Runs } from "@/pages/Runs";
 import { Research } from "@/pages/Research";
+import { Build } from "@/pages/Build";
 
 // AlphaCopilot IA（见 CONTEXT.md）。复盘看板 = 盘面数据（DailyReview）。
 export const router = createBrowserRouter([
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
       { path: "/settings", element: <Settings /> },
       { path: "/runs", element: <Runs /> },
       { path: "/research", element: <Research /> },
+      { path: "/build", element: <Build /> },
       { path: "*", element: <Navigate to="/daily-review" replace /> },
     ],
   },

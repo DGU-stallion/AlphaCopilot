@@ -87,6 +87,42 @@ def build_pages_router(store: Store) -> APIRouter:
     def list_pages() -> list:
         return store.list_pages()
 
+    # ---------- M5-2 Build 模式：草稿 → 预览 → 确认发布 ----------
+    #
+    # 关键设计：**agent 只能产 draft，发布是独立动作。**
+    # 如果 agent 能自己发布，那 page_spec 的全部白名单校验就形同虚设 ——
+    # 校验的意义正是防止未经审阅的结构落进产品页面。
+
+    @router.post("/pages/drafts")
+    def create_draft(spec: dict) -> dict:
+        """agent（或用户）产出的 page spec 落成草稿。
+
+        校验不通过 → 400。坏 spec 绝不能变成 draft：
+        用户会打开它、看到一个白屏，而不知道是 agent 写错了还是我们坏了。
+        """
+        try:
+            pid = store.pages.create_page_from_spec(spec, kind="user")
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        page = store.pages.get_page(pid)
+        return {"id": pid, "slug": page["slug"], "status": page["status"]}
+
+    @router.post("/pages/{pid}/publish")
+    def publish(pid: str) -> dict:
+        if store.pages.get_page(pid) is None:
+            raise HTTPException(404, f"page not found: {pid}")
+        store.pages.set_status(pid, "published")
+        return {"id": pid, "status": "published"}
+
+    @router.post("/pages/{pid}/unpublish")
+    def unpublish(pid: str) -> dict:
+        """撤回发布。agent 写的页面可能有细微问题，要能收回来改，
+        而不是只能删了重建。"""
+        if store.pages.get_page(pid) is None:
+            raise HTTPException(404, f"page not found: {pid}")
+        store.pages.set_status(pid, "draft")
+        return {"id": pid, "status": "draft"}
+
     @router.get("/pages/{slug}")
     def get_page(slug: str) -> dict:
         page = store.pages.get_page_by_slug(slug)

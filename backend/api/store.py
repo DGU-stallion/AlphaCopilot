@@ -395,6 +395,14 @@ class PageRepo:
         from api.page_spec import validate_spec
 
         spec = validate_spec(spec)
+        # slug 冲突必须在落库前检查并给出清晰原因：slug 是 URL 的一部分，
+        # 重复会让「打开哪个页面」变得不确定。依赖 UNIQUE 约束报错的话，
+        # 上层拿到的是 sqlite3.IntegrityError，看不出是 slug 的事。
+        existing = self.conn.execute(
+            "SELECT id FROM page WHERE slug=?", (spec["slug"],)
+        ).fetchone()
+        if existing is not None:
+            raise ValueError(f"slug 已被占用：{spec['slug']!r}（page {existing[0]}）")
         pid = _new_id("p")
         now = time.time()
         status = "published" if kind == "builtin" else "draft"
@@ -454,6 +462,28 @@ class PageRepo:
         self.conn.execute(
             "UPDATE page SET status='published', updated_at=? WHERE id=?",
             (time.time(), pid),
+        )
+        self.conn.commit()
+
+    # ---------- M5-2 Build 模式：草稿生命周期 ----------
+
+    _ALLOWED_STATUS = ("draft", "published")
+
+    def set_status(self, pid: str, status: str) -> None:
+        """draft ↔ published 双向切换（M5-2）。
+
+        为什么必须能撤回：agent 写的页面可能有细微问题（图表选错数据、
+        标题写错），发布后要能收回来修改，而不是只能删了重建。
+
+        非法状态直接 ValueError 而不是静默接受：
+        status 是 CHECK 约束列，让 SQLite 报错的话信息是一句
+        "CHECK constraint failed"，不如在这里说清合法值是什么。
+        """
+        if status not in self._ALLOWED_STATUS:
+            raise ValueError(f"非法状态 {status!r}，只允许 {self._ALLOWED_STATUS}")
+        self.conn.execute(
+            "UPDATE page SET status=?, updated_at=? WHERE id=?",
+            (status, time.time(), pid),
         )
         self.conn.commit()
 

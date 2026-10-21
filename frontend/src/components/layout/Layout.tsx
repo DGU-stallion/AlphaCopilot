@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import {
   Moon, Sun, ChevronsLeft, ChevronsRight, CandlestickChart, Cog,
   Activity, Globe, Star, FileText, TrendingDown, GitCompare, Briefcase,
-  NotebookPen, Sparkles, PanelRightClose, ArrowUpDown, Clock3, History, GitBranch,
+  NotebookPen, Sparkles, PanelRightClose, ArrowUpDown, Clock3, History, GitBranch, Hammer,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -56,6 +56,7 @@ const QUANT_NAV = [
 ];
 const SYSTEM_NAV = [
   { to: "/journal", icon: NotebookPen, label: "交易日志" },
+  { to: "/build", icon: Hammer, label: "Build" },
   { to: "/settings", icon: Cog, label: "接入 AI" },
 ];
 
