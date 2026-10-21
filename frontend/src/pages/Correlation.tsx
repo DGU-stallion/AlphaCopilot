@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Play, RefreshCw, X, Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { Caliber } from "@/components/ui/Caliber";
 import { EChart } from "@/components/ui/EChart";
+import { Num } from "@/components/Num";
+import { ChartLegend, bareChartOption, chartSeriesNames } from "@/components/ui/ChartLegend";
 import { api } from "@/lib/api";
 import { useCachedResource } from "@/lib/cache";
-import { renderPage, type RenderResult } from "@/lib/research";
+import { renderPage, type RenderBlock, type RenderResult } from "@/lib/research";
 import { useAiPage } from "@/lib/ai-page";
 
 // 相关性分析 —— 多标的对比。后端 correlation.* 白名单函数：
@@ -17,6 +19,88 @@ import { useAiPage } from "@/lib/ai-page";
 // 缓存：切页不重取；改标的/窗口点「计算」才重拉（cacheKey 带参数）。AI 占位(S5)。
 
 const MAX = 8;
+
+// ---- 相关矩阵：正方形格子（M2-8 缺陷 2）-----------------------------------
+// ECharts heatmap 的格子 = 绘图区均分 (n,n)；格子不拉伸 ⇔ 绘图区宽 = 高。
+// 后端产出的 grid（left 80 / bottom 80 + visualMap 缩在底部）是按整宽设计的，
+// 两列布局下格子被压成矩形。这里改由页面接管布局：visualMap 挪到右侧竖排、
+// grid 四边收紧，再按容器实测宽反解出容器高（height 使绘图区恰为正方形）。
+
+/** 实测元素内容宽度（ResizeObserver；侧栏折叠时也能跟上）。 */
+function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
+  const ref = useRef<T | null>(null);
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const cr = entries[0]?.contentRect;
+      if (cr?.width) setW(Math.round(cr.width));
+    });
+    ro.observe(el);
+    setW(Math.round(el.getBoundingClientRect().width));
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w];
+}
+
+/** 轴标签像素宽估算（12px 字号）：全角字符 12、其余 6.6，另加 4px 缓冲。 */
+function labelPixelWidth(s: string): number {
+  let w = 0;
+  for (const ch of s) w += ch.charCodeAt(0) > 0xff ? 12 : 6.6;
+  return w + 4;
+}
+
+const PAD = 4;        // grid 四边留白
+const VISMAP_W = 56;  // 右侧竖排 visualMap（手柄 + 可拖拽手柄头）总占宽估算
+
+function MatrixPanel({ block }: { block: RenderBlock }) {
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const base = bareChartOption(block.option) as
+    | { xAxis?: { data?: string[] }; yAxis?: unknown; visualMap?: unknown }
+    | null;
+
+  const labels = base?.xAxis?.data ?? [];
+  const n = Math.max(labels.length, 1);
+  const maxLabelW = Math.max(1, ...labels.map(labelPixelWidth));
+  // 绘图区宽：容器宽 − grid 四边 − visualMap 占位 − y 轴标签宽（containLabel 计入）
+  const plotW = Math.max(240, width - PAD * 2 - VISMAP_W - maxLabelW);
+  // x 轴标签：一行放得下就横排，否则斜 45°（高按斜投影估算）
+  const rot = maxLabelW > plotW / n;
+  const labelH = rot ? Math.ceil(maxLabelW * 0.75) + 8 : 18;
+  // 绘图区高 = plotW（正方形的另一半）：height = plotW + 上下留白 + x 标签高
+  const height = Math.ceil(plotW + PAD * 2 + labelH);
+
+  const square: Record<string, unknown> | null = base
+    ? {
+        ...base,
+        grid: { left: PAD, right: PAD + VISMAP_W, top: PAD, bottom: PAD, containLabel: true },
+        xAxis: { ...base.xAxis, axisLabel: { interval: 0, ...(rot ? { rotate: 45 } : {}) } },
+        yAxis: { ...(base.yAxis as Record<string, unknown> | undefined), axisLabel: { interval: 0 } },
+        visualMap:
+          base.visualMap && !Array.isArray(base.visualMap)
+            ? {
+                ...(base.visualMap as Record<string, unknown>),
+                orient: "vertical",
+                left: undefined,
+                bottom: undefined,
+                right: PAD,
+                top: "center",
+              }
+            : base.visualMap,
+      }
+    : null;
+
+  return (
+    <Panel>
+      {block.title && <h3 className="mb-2 text-sm font-semibold">{block.title}</h3>}
+      <div ref={ref} className="w-full" style={{ height }}>
+        {/* key 带实测宽：侧栏折叠改变容器宽时重建实例（EChart 只监听 window resize）*/}
+        <EChart key={width || "init"} option={width > 0 ? square : null} height={height} />
+      </div>
+    </Panel>
+  );
+}
 
 export function Correlation() {
   const [symbols, setSymbols] = useState<string[]>(["600519", "000858", "000568", "002304"]);
@@ -79,11 +163,23 @@ export function Correlation() {
   const [overlay, matrix, rolling] = blocks;
   const err = res.error;
 
+  // ECharts 自带的图例已停用（窄容器会压住绘图区，见 ChartLegend.tsx）：
+  // 标题由 <h3> 渲染、图例由 <ChartLegend> 在图上方自绘，连重叠的可能性一起拿掉。
+  const bare = (b?: (typeof blocks)[number]) =>
+    b ? { block: b, option: bareChartOption(b.option) } : null;
+  const overlayB = bare(overlay);
+  const rollingB = bare(rolling);
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <PageHeader
         title="相关性分析"
         subtitle="多标的归一化叠加走势 + 日收益率相关矩阵 · 确定性计算"
+        meta={
+          <>
+            滚动窗口 <Num v={params.window} digits={0} /> 日 · 区间 {params.range}
+          </>
+        }
       />
 
       <Panel>
@@ -128,25 +224,22 @@ export function Correlation() {
         <Panel><p className="py-8 text-center text-sm text-muted-foreground/60">计算中…</p></Panel>
       ) : (
         <>
-          {overlay && (
+          {overlayB?.block && (
             <Panel>
-              {overlay.title && <h3 className="mb-2 text-sm font-semibold">{overlay.title}</h3>}
-              <EChart option={overlay.option ?? null} height={360} />
+              {overlayB.block.title && <h3 className="mb-2 text-sm font-semibold">{overlayB.block.title}</h3>}
+              <ChartLegend items={chartSeriesNames(overlayB.option ?? undefined)} />
+              <EChart option={overlayB.option} height={340} />
             </Panel>
           )}
           <div className="grid gap-3 lg:grid-cols-2">
-            {matrix && (
+            {rollingB?.block && (
               <Panel>
-                {matrix.title && <h3 className="mb-2 text-sm font-semibold">{matrix.title}</h3>}
-                <EChart option={matrix.option ?? null} height={360} />
+                {rollingB.block.title && <h3 className="mb-2 text-sm font-semibold">{rollingB.block.title}</h3>}
+                <ChartLegend items={chartSeriesNames(rollingB.option ?? undefined)} />
+                <EChart option={rollingB.option} height={300} />
               </Panel>
             )}
-            {rolling && (
-              <Panel>
-                {rolling.title && <h3 className="mb-2 text-sm font-semibold">{rolling.title}</h3>}
-                <EChart option={rolling.option ?? null} height={360} />
-              </Panel>
-            )}
+            {matrix && <MatrixPanel block={matrix} />}
           </div>
         </>
       )}

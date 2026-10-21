@@ -66,6 +66,12 @@ def _render_block(block: dict[str, Any], values: dict[str, Any]) -> dict[str, An
         out["metric"] = result
     else:
         out["option"] = result
+        # renderer=lwc 时**额外**产出时间序列（ADR-0014 §6）：前端 LWC 直接吃
+        # {time,value}，不用反解 ECharts option。option 仍保留给 ECharts 消费方，
+        # 两条路并存但数据只有一个来源（同一份 result）。
+        if out.get("renderer") == "lwc":
+            from alpha.lwc import lwc_payload
+            out["lwc"] = lwc_payload(result)
     if isinstance(result, dict) and "title" in result and kind != "markdown":
         # block.title 是给前端 <h3> 的展示字符串；chart helper 里 title 是 ECharts
         # 结构 {"text": ...}，这里取其 text，避免把对象塞进 title 让 React 渲染时崩溃。

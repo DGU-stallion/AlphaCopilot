@@ -174,3 +174,23 @@ describe("带符号的数字不能被固定语义类包裹", () => {
     ).toEqual([]);
   });
 });
+
+describe("ECharts 自带 legend 停用（M2-8 缺陷 1）", () => {
+  it("pages 代码不得把 legend 传给 ECharts —— 多系列图例统一自绘", () => {
+    // 违反的后果：ECharts legend 的自动布局假定「容器够宽」；多系列名一行放不下时
+    // 不换行，而是与 title / grid 争夺顶部空间，在两列窄面板里侵入绘图区盖住曲线。
+    //
+    // 规则要精确到「传给 ECharts 的 option 里出现 legend」，不能禁词：
+    // 页面完全可以自己有 legend 变量、或自绘 HTML 图例（Backtest 页就是这么做的，
+    // 第一版规则用禁词误报了它 —— 守门测试误报会让人开始绕过它，那比没有更糟）。
+    // 真正要禁的形态：option 对象字面量里出现 legend / option.legend 赋值。
+    const offenders = prodFiles()
+      .filter((f) => /(^|\/)pages\//.test(f.rel.replace(/\\/g, "/")))
+      .filter((f) => /(^\s*|[{,]\s*)legend\s*:/.test(f.src) || /\.legend\s*=/.test(f.src))
+      .map((f) => f.rel);
+    expect(
+      offenders,
+      "图例一律经 ChartLegend 自绘，页面不要给 ECharts 传/提 legend：\n" + offenders.join("\n"),
+    ).toEqual([]);
+  });
+});

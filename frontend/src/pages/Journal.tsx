@@ -8,6 +8,7 @@ import { api, type JournalRow } from "@/lib/api";
 import { useCachedResource, dropCache } from "@/lib/cache";
 import { useAiPage } from "@/lib/ai-page";
 import { cn } from "@/lib/utils";
+import { SIZE, ROW } from "@/theme/tokens";
 
 // 交易日志 —— 基于 AlphaCopilot 已有 journal 后端（add/list/delete）新建的务实录入页。
 // 参考上游项目 Journal.tsx 的信息架构（录入 + 列表 + 基础盈亏），但不搬其 80KB 专有特性。
@@ -98,7 +99,9 @@ export function Journal() {
   });
 
   const set = (k: keyof Form, v: string) => setForm((f) => ({ ...f, [k]: v }));
-  const inputCls = "rounded-lg border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:border-primary/50";
+  // 统一控件样式（ADR-0014 §5）：高 28 / 圆角 4 / 实色底，与 antd controlHeight 对齐。
+  // 原来这里用 rounded-lg + bg-black/20，和股票池/研报页的输入框长得不一样。
+  const inputCls = "h-7 rounded-[4px] border border-border bg-[hsl(var(--card))] px-2.5 text-[13px] outline-none placeholder:text-muted-foreground/60 focus:border-[hsl(var(--primary))]";
 
   return (
     <div>
@@ -141,16 +144,16 @@ export function Journal() {
             <h3 className="text-sm font-semibold text-muted-foreground">
               现金流盈亏（卖出所得 − 买入花费 − 费用）
             </h3>
-            <span className={cn("font-mono text-sm font-bold", totalNet > 0 ? "text-danger" : totalNet < 0 ? "text-success" : "text-muted-foreground")}>
-              合计 <Num v={totalNet} signed inheritColor />
+            <span className="text-sm font-bold text-muted-foreground">
+              合计 <Num v={totalNet} signed colorBySign />
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {[...byCode.entries()].map(([code, v]) => (
               <div key={code} className="rounded-lg bg-muted/25 p-3">
                 <p className="truncate text-xs text-muted-foreground">{v.name} <span className="font-mono">{code}</span></p>
-                <p className={cn("mt-0.5 font-mono text-lg font-bold", v.net > 0 ? "text-danger" : v.net < 0 ? "text-success" : "text-muted-foreground")}>
-                  <Num v={v.net} signed inheritColor />
+                <p className="mt-0.5 text-lg font-bold">
+                  <Num v={v.net} signed colorBySign />
                 </p>
                 <p className="mt-0.5 text-[10px] text-muted-foreground/60">买 <Num v={v.buy} digits={2} inheritColor /> · 卖 <Num v={v.sell} digits={2} inheritColor /></p>
               </div>
@@ -179,27 +182,27 @@ export function Journal() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
+                <tr className="border-b border-border/50 text-left text-muted-foreground" style={{ fontSize: SIZE.xs }}>
                   {["成交日", "名称", "代码", "方向", "价格", "股数", "费用", "金额", "备注", ""].map((h) => (
-                    <th key={h} className="whitespace-nowrap px-2 py-2 font-medium">{h}</th>
+                    <th key={h} className="whitespace-nowrap px-2 py-1.5 font-medium">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-border/30">
-                    <td className="whitespace-nowrap px-2 py-2.5 font-mono text-xs text-muted-foreground">{r.traded_at || "—"}</td>
-                    <td className="px-2 py-2.5 font-medium">{r.name || "—"}</td>
-                    <td className="px-2 py-2.5 font-mono text-xs text-muted-foreground">{r.code || "—"}</td>
-                    <td className={cn("px-2 py-2.5 font-medium", r.side === "buy" ? "text-danger" : "text-success")}>
+                  <tr key={r.id} className="border-b border-border/30" style={{ height: ROW.compact }}>
+                    <td className="whitespace-nowrap px-2 py-1 font-mono text-xs text-muted-foreground">{r.traded_at || "—"}</td>
+                    <td className="px-2 py-1 font-medium">{r.name || "—"}</td>
+                    <td className="whitespace-nowrap px-2 py-1 font-mono text-xs text-muted-foreground">{r.code || "—"}</td>
+                    <td className={cn("px-2 py-1 font-medium", r.side === "buy" ? "text-danger" : "text-success")}>
                       {r.side === "buy" ? "买入" : "卖出"}
                     </td>
-                    <td className="px-2 py-2.5"><Num v={r.price} digits={2} /></td>
-                    <td className="px-2 py-2.5"><Num v={r.shares} digits={0} /></td>
-                    <td className="px-2 py-2.5 text-muted-foreground"><Num v={r.fee} digits={2} inheritColor /></td>
-                    <td className="px-2 py-2.5 font-mono text-muted-foreground"><Num v={r.price * r.shares} digits={2} inheritColor /></td>
-                    <td className="max-w-40 truncate px-2 py-2.5 text-xs text-muted-foreground">{r.note || "—"}</td>
-                    <td className="px-2 py-2.5">
+                    <td className="px-2 py-1"><Num v={r.price} digits={2} /></td>
+                    <td className="px-2 py-1"><Num v={r.shares} digits={0} /></td>
+                    <td className="px-2 py-1 text-muted-foreground"><Num v={r.fee} digits={2} inheritColor /></td>
+                    <td className="whitespace-nowrap px-2 py-1 font-mono text-muted-foreground"><Num v={r.price * r.shares} digits={2} inheritColor /></td>
+                    <td className="max-w-40 truncate px-2 py-1 text-xs text-muted-foreground">{r.note || "—"}</td>
+                    <td className="px-2 py-1">
                       <button onClick={() => remove(r.id)} className="text-muted-foreground/50 hover:text-destructive" title="删除">
                         <X className="h-3.5 w-3.5" />
                       </button>

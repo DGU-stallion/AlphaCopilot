@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FileText, Trash2, Loader2, FolderOpen, Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { TextInput, TextArea, Button, Field } from "@/components/ui/Form";
 import { Panel } from "@/components/ui/Panel";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { useCachedResource, dropCache } from "@/lib/cache";
@@ -69,19 +70,20 @@ export function MyReports() {
       {/* 录入 */}
       <Panel className="mb-4">
         <h3 className="mb-3 text-sm font-semibold">归档一份研报</h3>
-        <div className="space-y-2">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="标题，如 白酒行业 2025 年报对比"
-            className="w-full rounded-lg border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:border-primary/50" />
-          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="正文 / 结论要点（可选）"
-            className="w-full resize-y rounded-lg border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:border-primary/50" />
-          <button onClick={add} disabled={busy}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/25 disabled:opacity-50">
+        <div className="space-y-2.5">
+          <Field label="标题">
+            <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="如 白酒行业 2025 年报对比" />
+          </Field>
+          <Field label="正文 / 结论要点" hint="可选">
+            <TextArea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="把结论、关键数据、当时的前提写清楚，半年后回看才有用" />
+          </Field>
+          <Button onClick={add} disabled={busy}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} 归档
-          </button>
+          </Button>
         </div>
       </Panel>
 
-      {err && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{err}</div>}
+      {err && <div className="mb-4 rounded-[4px] border border-[hsl(var(--danger))]/30 bg-[hsl(var(--danger))]/5 p-3 text-sm text-danger">{err}</div>}
 
       {/* 列表 */}
       {list.loading && reports.length === 0 ? (

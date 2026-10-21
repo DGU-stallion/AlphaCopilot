@@ -66,18 +66,18 @@ export function Settings() {
           <button
             onClick={check}
             disabled={probe.state === "checking"}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-3.5 py-2 text-sm text-primary transition-colors hover:bg-primary/25 disabled:opacity-50"
+            className="inline-flex h-7 items-center gap-1.5 rounded-[4px] bg-[hsl(var(--primary))] px-3 text-[13px] font-medium text-[hsl(var(--primary-foreground))] transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {probe.state === "checking" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
             检查后端连通
           </button>
           {probe.state === "ok" && (
-            <span className="inline-flex items-center gap-1.5 text-sm text-success">
+            <span className="inline-flex items-center gap-1.5 text-sm text-[hsl(var(--success))]">
               <CheckCircle2 className="h-4 w-4" /> {probe.detail}
             </span>
           )}
           {probe.state === "fail" && (
-            <span className="inline-flex items-center gap-1.5 text-sm text-destructive">
+            <span className="inline-flex items-center gap-1.5 text-sm text-[hsl(var(--danger))]">
               <XCircle className="h-4 w-4" /> 不可达：{probe.detail}（确认后端已启动）
             </span>
           )}

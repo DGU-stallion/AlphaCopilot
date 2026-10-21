@@ -10,24 +10,28 @@ import {
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Num } from "@/components/Num";
+import { usePalette } from "@/theme/usePalette";
 import { useAiPage } from "@/lib/ai-page";
 
 // A 股惯例：红涨绿跌，全站一致，与国际绿涨相反是有意选择；界面经由 <Num> / palette，字符串快照用 pct()
 const pct = (v: number | null | undefined) =>
   v == null ? "—" : `${v > 0 ? "+" : ""}${v}%`;
 
-/** 单只行情卡：名称 + 现价 + 涨跌幅（红涨绿跌）。ticker 作副标。 */
+/** 单只行情卡：名称 + 现价 + 涨跌幅。颜色按涨跌符号走 palette（口径可切：
+ *  A 股红涨绿跌 ↔ 国际绿涨红跌），不写死 text-danger —— 硬规则 7 + M2-8 一致性。 */
 function Quote({ name, price, change_pct, sub }: {
   name: string; price: number | null; change_pct: number | null; sub?: string;
 }) {
+  const p = usePalette();
+  const tone =
+    change_pct == null || change_pct === 0 ? p.textSecondary : change_pct > 0 ? p.up : p.down;
   return (
     <Panel className="p-3">
       <p className="truncate text-xs text-muted-foreground">
         {name}
         {sub && <span className="ml-1 font-mono text-[10px] text-muted-foreground/40">{sub}</span>}
       </p>
-      <p className={cn("mt-1 text-lg font-bold",
-        change_pct == null || change_pct === 0 ? "text-muted-foreground" : change_pct > 0 ? "text-danger" : "text-success")}>
+      <p className="mt-1 text-lg font-bold" style={{ color: tone }}>
         <Num v={price} digits={2} inheritColor />
       </p>
       <p className="text-xs"><Num v={change_pct} pct /></p>
@@ -41,7 +45,7 @@ function Section({ icon: Icon, title, caliber, extra, children }: {
   extra?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
-    <section className="mb-6">
+    <section className="mb-4">
       <div className="mb-3 flex flex-wrap items-baseline gap-2">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
           <Icon className="h-4 w-4" /> {title}
@@ -181,7 +185,9 @@ export function MacroDashboard() {
             ? (rates.items ?? []).map((r) => (
                 <Panel key={r.name} className="p-3">
                   <p className="truncate text-xs text-muted-foreground">{r.name}</p>
-                  <p className="mt-1 font-mono text-lg font-bold">{r.yield_pct}%</p>
+                  <p className="mt-1 text-lg font-bold">
+                    <Num v={r.yield_pct} suffix="%" />
+                  </p>
                 </Panel>
               ))
             : <Unavailable reason={rates?.reason} />}

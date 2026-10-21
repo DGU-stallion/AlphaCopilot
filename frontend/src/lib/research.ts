@@ -48,6 +48,12 @@ export interface RenderBlock {
   renderer?: ChartRenderer;
   title?: string;
   option?: Record<string, unknown>;
+  /**
+   * renderer === "lwc" 时后端额外给的时间序列（alpha/lwc.py 产）。
+   * option 仍保留（向后兼容 ECharts 消费方），但 LWC 只需读这个，
+   * 不去反解 option（那是渲染层结构，反解脆且方向错）。
+   */
+  lwc?: import("@/components/charts/equity-data").LwcPayload;
   metric?: { items: MetricItem[] };
   table?: { columns: string[]; rows: unknown[][] };
   text?: string;

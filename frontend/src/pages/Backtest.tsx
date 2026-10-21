@@ -4,7 +4,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { Caliber } from "@/components/ui/Caliber";
-import { EChart } from "@/components/ui/EChart";
+import { EquityChart, equityLegend } from "@/components/charts/EquityChart";
+import { usePalette } from "@/theme/usePalette";
 import { api } from "@/lib/api";
 import { pctColor } from "@/lib/colors";
 import { cn } from "@/lib/utils";
@@ -73,7 +74,13 @@ export function Backtest() {
 
   const blocks = res.data?.blocks ?? [];
   const metric = blocks.find((b) => b.kind === "metric");
-  const [equity, drawdown] = blocks.filter((b) => b.kind === "chart");
+  const charts = blocks.filter((b) => b.kind === "chart");
+  // 净值与回撤在同一个实例的两个 pane（ADR-0014 §6）。优先取声明 lwc 的那块，
+  // 老后端（无 renderer）时回退到第一块 chart —— 但那时没有 lwc 载荷，会提示无数据。
+  // 后端有两个 lwc chart 块（净值 + 回撤）。回撤已在净值块的 payload.drawdown 里，
+  // 所以只画「有 series 的那个」（净值块），避免同一段回撤画两遍。
+  const equity = charts.find((b) => (b.lwc?.series?.length ?? 0) > 0);
+  const legend = equityLegend(equity?.lwc ?? null, usePalette());
   const err = res.error;
 
   return (
@@ -150,14 +157,30 @@ export function Backtest() {
           )}
           {equity && (
             <Panel>
-              {equity.title && <h3 className="mb-2 text-sm font-semibold">{equity.title}</h3>}
-              <EChart option={equity.option ?? null} height={360} />
-            </Panel>
-          )}
-          {drawdown && (
-            <Panel>
-              {drawdown.title && <h3 className="mb-2 text-sm font-semibold">{drawdown.title}</h3>}
-              <EChart option={drawdown.option ?? null} height={280} />
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold">{equity.title || "净值与回撤"}</h3>
+                <span className="text-[11px] text-muted-foreground">上：净值　下：回撤</span>
+              </div>
+              {/* 图例在图上方的 HTML 里自绘，不交给 ECharts（窄容器下 ECharts
+                  的 legend 会侵入绘图区，踩过） */}
+              {/* 图例颜色必须与线的颜色同源：直接用 equityLegend 的 color，
+                  不用 ChartLegend 内部的 seriesColors 序（那是 ECharts 的序，
+                  两边不一致会出现「图例橙、线是蓝」）。 */}
+              <div className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-1">
+                {legend.map((l) => (
+                  <span key={l.name} className="inline-flex items-center gap-1.5">
+                    <span className="inline-block h-2 w-2 shrink-0 rounded-[2px]" style={{ background: l.color }} />
+                    <span className="text-[11px] text-muted-foreground">{l.name}</span>
+                  </span>
+                ))}
+              </div>
+              {equity.lwc && (equity.lwc.series?.length ?? 0) > 0 ? (
+                <EquityChart payload={equity.lwc} height={420} />
+              ) : (
+                <p className="py-16 text-center text-sm text-muted-foreground/60">
+                  净值序列暂不可用（后端未返回时间序列载荷）
+                </p>
+              )}
             </Panel>
           )}
         </>
