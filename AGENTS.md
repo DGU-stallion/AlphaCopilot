@@ -79,6 +79,11 @@ Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共
     白名单见 ADR-0010 修订 §2。
 11. LLM 输出合规底线：不荐股、不预测涨跌、不给买卖时机（persona 固化）。
     **这是 prompt 层约束，不是运行时限制**——agent 能力不受限，输出有底线
+12. **派发 subagent 不得使用 `commandcode-plan/*claude*` 系列模型**（成本过高，
+    额度已接近耗尽）。可用：`magpie/commandcode-plan/z-ai/glm-5.3-flash`、
+    `magpie/commandcode-plan/zai-org/GLM-5.3`、`magpie/commandcode-plan/gpt-5.6-*`、
+    `deepseek/deepseek-flash` 等。`pi --list-models` 是唯一权威，但**先看清价格档位**。
+    正在运行的 claude 系 subagent 应立即替换（`.pi/` 与 `subagents_list` 可查）
 
 ## 反模式（重构中必须避免）
 
