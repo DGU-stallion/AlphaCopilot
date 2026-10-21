@@ -29,10 +29,9 @@ function collect(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** 生产源码：排除原型（__proto__ 是 throwaway，不参与守门）。 */
+/** 全部生产源码（原型目录已于 M2 完成时删除，不再有豁免）。 */
 function prodFiles(): { path: string; rel: string; src: string }[] {
   return collect(SRC)
-    .filter((p) => !p.includes("__proto__"))
     .map((p) => ({ path: p, rel: relative(SRC, p), src: readFileSync(p, "utf8") }));
 }
 
@@ -62,7 +61,7 @@ describe("数字渲染唯一路径", () => {
     const offenders: string[] = [];
     for (const f of prodFiles()) {
       const rel = f.rel.replace(/\\/g, "/");
-      if (rel.includes("components/Num") || rel.includes("__proto__")) continue;
+      if (rel.includes("components/Num")) continue;
       // 只抓「JSX 里直接渲染」的形态：`{x.toFixed(2)}`，且该 `{` 不在模板字符串里。
       // 合法的三类要排除：
       //   · 模板字符串里的（`权重和 ${total.toFixed(3)}`）——错误消息，不是渲染数字
@@ -94,7 +93,6 @@ describe("图表实例纪律（ADR-0014 §6/§7）", () => {
     const offenders: string[] = [];
     for (const f of prodFiles()) {
       const rel = f.rel.replace(/\\/g, "/");
-      if (rel.includes("__proto__")) continue;
       const n = (f.src.match(/createChart\s*\(/g) ?? []).length;
       if (n > 1) offenders.push(`${rel}: createChart × ${n}`);
     }
@@ -111,7 +109,6 @@ describe("图表实例纪律（ADR-0014 §6/§7）", () => {
     const offenders: string[] = [];
     for (const f of prodFiles()) {
       const rel = f.rel.replace(/\\/g, "/");
-      if (rel.includes("__proto__")) continue;
       // 找 `createChart(` 之后的第一个 `}, [` 依赖数组里是否含 palette
       const idx = f.src.search(/createChart\s*\(/);
       if (idx < 0) continue;
@@ -136,7 +133,6 @@ describe("禁用的旧视觉残留（ADR-0013 §5）", () => {
     const offenders: string[] = [];
     for (const f of prodFiles()) {
       const rel = f.rel.replace(/\\/g, "/");
-      if (rel.includes("__proto__")) continue;
       for (const b of banned) {
         if (f.src.includes(b)) offenders.push(`${rel}: ${b}`);
       }
@@ -159,7 +155,6 @@ describe("带符号的数字不能被固定语义类包裹", () => {
     const offenders: string[] = [];
     for (const f of prodFiles()) {
       const rel = f.rel.replace(/\\/g, "/");
-      if (rel.includes("__proto__")) continue;
       const lines = f.src.split("\n");
       lines.forEach((line, i) => {
         const hasFixed = /text-(danger|success)[^\n]*<Num/.test(line);

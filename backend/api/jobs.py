@@ -142,11 +142,11 @@ class JobQueue:
         """
         if not symbol:
             return []
-        try:
-            from research import astock
-            bars = astock.kline(symbol, category=4, offset=len(closes))
-        except Exception:  # noqa: BLE001
-            return []
+        # 不吞错：取数失败必须让上层知道，由上层决定「用合成日期兜底」还是失败。
+        # `except Exception: return []` 会让「数据源挂了」和「这只票没有数据」
+        # 看起来一样 —— 本项目已经栽过一次（取数失败静默返回空 → 模型自己造数据）。
+        from research import astock
+        bars = astock.kline(symbol, category=4, offset=len(closes))
         return [str(b["datetime"]) for b in bars][-len(closes):]
 
     def _compute_and_write(self, jid: str, params: dict[str, Any]) -> dict[str, Any]:
@@ -156,23 +156,36 @@ class JobQueue:
             raise ValueError("closes 至少 2 个点")
         fast = int(params.get("fast", 20))
         slow = int(params.get("slow", 60))
-        # 没有真实交易日历时，**不要**用索引占位（"119" 会被当成日期写进
-        # provenance，让「数据时点」显示成一个假的时间点）。
-        # 正确做法是从数据源取真实交易日；取不到就直接失败 ——
-        # provenance 的 dataAsOf 是必填的（api/artifacts.py 会拒收空值），
-        # 而「不知道数据是哪天的」本来就不该产出一个声称可复现的 artifact。
+        # ---- 交易日历：三级优先，绝不造假日期 ----
+        #
+        # provenance 的 dataAsOf 是**必填**的（api/artifacts.py 会拒收空值），
+        # 但也不能用索引占位 —— "119" 会被当成日期写进 provenance，
+        # 「数据时点」于是显示成一个看起来像日期、实际毫无意义的东西。
+        # 假的时间戳比不显示更危险：它让人相信它。
+        #
+        #   ① 调用方给了 dates      → 直接用（最可信）
+        #   ② 有 symbol 且数据源可用 → 取真实交易日
+        #   ③ 以上都不行            → SYNTHETIC-0001 序列（自曝是合成，不是冒充日期）
+        #
+        # ③ 的存在理由：回测的**数值**仍然是真的（closes 由调用方提供），
+        # 只有时间轴是占位。为此让整个 job 失败反而更糟 —— 用户会以为回测算不出来。
         symbol = str(params.get("symbol") or "")
-        dates = params.get("dates") or self._trading_dates(closes, symbol=symbol)
+        dates: list[str] = list(params.get("dates") or [])
+
+        if not dates and symbol:
+            from research.astock import DataUnavailable
+            try:
+                dates = self._trading_dates(closes, symbol=symbol)
+            except (DataUnavailable, KeyError, IndexError):
+                # 数据源不可用：不吞错到「假装没这回事」，而是明确走到 ③。
+                dates = []
+
         if not dates:
-            # 拿不到真实交易日历（合成数据 / 无代码 / 数据源不可用）时，
-            # 用**明确标注为合成**的日期序列，而不是索引数字：
-            #   - provenance 的 dataAsOf 必填（api/artifacts.py 会拒空值），
-            #     所以不能留空；
-            #   - 但也不能写 "119" 冒充日期。
-            # 合成序列形如 SYNTHETIC-0001，任何人看到都知道这不是真实交易日。
             dates = [f"SYNTHETIC-{i + 1:04d}" for i in range(len(closes))]
+
         if len(dates) != len(closes):
             raise ValueError(f"交易日历长度 {len(dates)} 与收盘价 {len(closes)} 不一致")
+
         res = bt.backtest_golden_cross(closes, fast=fast, slow=slow, dates=dates)
 
         run_dir = self._ws / "runs" / f"job-{jid}"

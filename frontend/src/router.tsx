@@ -10,9 +10,6 @@ import { Watchlist } from "@/pages/Watchlist";
 import { Journal } from "@/pages/Journal";
 import { Settings } from "@/pages/Settings";
 import { Runs } from "@/pages/Runs";
-import { ProtoReview } from "@/pages/__proto__/ProtoReview";
-import { ProtoShell } from "@/pages/__proto__/ProtoShell";
-import { ProtoApp } from "@/pages/__proto__/ProtoApp";
 
 // AlphaCopilot IA（见 CONTEXT.md）。复盘看板 = 盘面数据（DailyReview）。
 export const router = createBrowserRouter([
@@ -39,7 +36,4 @@ export const router = createBrowserRouter([
   },
   // 🔵 原型路由：**故意放在 Layout 之外** —— 旧外壳的玻璃/暖橙正是要换掉的东西，
   // 拿它当背景板会让评审误判「新风格还是丑」。看完即删。
-  { path: "/proto/review", element: <ProtoReview /> },
-  { path: "/proto/shell", element: <ProtoShell /> },
-  { path: "/proto/app", element: <ProtoApp /> },
 ], { basename: import.meta.env.BASE_URL });
