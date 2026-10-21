@@ -144,12 +144,24 @@ pnpm --prefix apps/web build
 
 ## Agent 协作约定
 
-派发 subagent 时**必须显式指定 magpie 的模型**，不要用默认模型：
+**派发 subagent 时显式指定模型，用本地环境实际可用的 provider，不要用默认值。**
+
+本机 `pi --list-models` 里可用的 provider 有 `deepseek` / `magpie`（32 个模型）等。
+默认的 `openrouter/z-ai/*` 在本机不可用，指定它会挂住不动、白等十几分钟。
+
+原则：**不要钉死某一个模型**，按任务挑同 provider 下的合适型号 ——
+`pi --list-models` 是唯一权威，选当前可用的。
+
+| 任务类型 | 建议 |
+|---|---|
+| 机械改代码、批量重命名、跟随明确指令 | 轻量快模型（如 `magpie/workbuddy/glm-5.3-flash`） |
+| 需要读多文件再判断、写测试、设计取舍 | 强模型（如 `magpie/workbuddy/glm-5.3`） |
+| 纯侦察、找文件、梳理调用链 | scout + 轻量模型即可 |
 
 ```
 agent: worker
-model: magpie/workbuddy/glm-5.3
+model: magpie/workbuddy/glm-5.3     # 具体型号按上表挑，不是固定值
 ```
 
-可用组合（实测）：`worker` / `scout` / `researcher` 均为 `magpie/workbuddy/glm-5.3`。
-默认的 `openrouter/z-ai/glm-5.3` 在本机会停滞，不要用。
+判断依据：派发前先跑 `pi --list-models` 确认该模型存在且 provider 可用。
+
