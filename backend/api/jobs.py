@@ -65,7 +65,9 @@ class JobQueue:
         self._ws = Path(workspace_root)
         self._streams: dict[str, _JobStream] = {}
         self._on_complete: dict[str, Any] = {}  # jid -> callable(run_dir)
+        self._on_failed: dict[str, Any] = {}  # jid -> callable(error)
         self._completed_runs: dict[str, str] = {}  # jid -> run_dir (若先完成后注册)
+        self._failed_errors: dict[str, str] = {}  # jid -> error (若先失败后注册)
 
     def on_complete(self, jid: str, cb) -> None:
         """注册 job 成功回调（run_dir -> None）。若 job 已完成则立即触发。"""
@@ -74,6 +76,18 @@ class JobQueue:
             cb(run_dir)
         else:
             self._on_complete[jid] = cb
+
+    def on_failed(self, jid: str, cb) -> None:
+        """注册 job 失败回调（error -> None）。若 job 已失败则立即触发。
+
+        与 on_complete 对称。缺了它，失败路径上没有任何人知道——
+        前端只能无限等待，比报错更糟。
+        """
+        err = self._failed_errors.get(jid)
+        if err is not None:
+            cb(err)
+        else:
+            self._on_failed[jid] = cb
 
     def _stream(self, jid: str) -> _JobStream:
         return self._streams.setdefault(jid, _JobStream())
@@ -104,10 +118,18 @@ class JobQueue:
             cb = self._on_complete.pop(jid, None)
             if cb is not None:
                 cb(run_dir)
+            # 成功路径不该再有失败回调
+            self._on_failed.pop(jid, None)
         except Exception as e:  # noqa: BLE001
             err = f"{type(e).__name__}: {e}"
             self._store.update_job(jid, status="failed", error=err)
             st.emit("failed", {"job_id": jid, "error": err})
+            self._failed_errors[jid] = err
+            cb_fail = self._on_failed.pop(jid, None)
+            if cb_fail is not None:
+                cb_fail(err)
+            # 失败时不该再等成功回调
+            self._on_complete.pop(jid, None)
 
     def _compute_and_write(self, jid: str, params: dict[str, Any]) -> dict[str, Any]:
         """跑回测 + 产净值/回撤图 artifact + manifest，返回 {run_id, metrics}。"""

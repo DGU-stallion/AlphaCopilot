@@ -126,12 +126,26 @@ class SessionManager:
             jids = self._jobs.ingest_job_requests(rt.workspace, session_id=session_id)
             for jid in jids:
                 rt._emit("job/submitted", {"job_id": jid})
+                # 成功/失败两条路都要发事件到**会话**流（不是 job 流）。
+                # 用户盯的是对话，不是某个 job id —— 只发 job/submitted 的话，
+                # artifact 到了界面上也不会刷新，用户干等着。
                 self._jobs.on_complete(
-                    jid, lambda run_dir, m=mid: self._ingest_job_artifacts(rt, run_dir, m)
+                    jid,
+                    lambda run_dir, m=mid, j=jid: self._ingest_job_artifacts(
+                        rt, run_dir, m, jid=j
+                    ),
+                )
+                self._jobs.on_failed(
+                    jid,
+                    lambda err, j=jid: rt._emit(
+                        "job/failed", {"job_id": j, "error": err}
+                    ),
                 )
         rt._emit("message/committed", {"message_id": mid, "content": text})
 
-    def _ingest_job_artifacts(self, rt: SessionRuntime, run_dir: str, message_id: str) -> None:
+    def _ingest_job_artifacts(
+        self, rt: SessionRuntime, run_dir: str, message_id: str, *, jid: str = ""
+    ) -> None:
         """job 成功后：把其 run_dir 的 manifest 摄取为 artifact 挂到消息，并发事件。
 
         `server_stamped=True`：这个 run_dir 是 **JobQueue 自己跑出来的**
@@ -148,6 +162,7 @@ class SessionManager:
             aids = ingest_run(self._store, run_dir, message_id, server_stamped=True)
         except ManifestError as e:
             rt._emit("artifact/rejected", {"run": str(run_dir), "error": str(e)})
+            rt._emit("job/failed", {"job_id": jid, "error": str(e)})
             return
         for aid in aids:
             art = self._store.get_artifact(aid)
@@ -156,6 +171,8 @@ class SessionManager:
                 "kind": art["kind"] if art else None,
                 "title": art["title"] if art else "",
             })
+        # job 完成的标志事件：带 artifact id，前端可据此刷新而不是全量重拉。
+        rt._emit("job/completed", {"job_id": jid, "artifact_ids": aids})
 
     def _ingest_new_artifacts(self, rt: SessionRuntime, message_id: str) -> None:
         """扫描该会话 workspace 下未入库的 run 目录，校验 manifest 后落库并挂消息。
