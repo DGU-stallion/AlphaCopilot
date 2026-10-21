@@ -310,6 +310,19 @@ def _tencent_kline(code: str, category: int = 4, offset: int = 60) -> list[dict]
     return out
 
 
+class DataUnavailable(RuntimeError):
+    """数据源不可用（网络被禁、上游变更、协议失败）。
+
+    与「查询成功但没有数据」**必须区分开**：
+    - 不可用：抛这个 → 调用方/agent 知道「这个环境取不到数」，可以换方式或如实说明
+    - 没有数据：返回 [] → 退市/停牌/代码错，是查询结果本身
+
+    为什么这条区分重要：两者都变成 [] 时，模型会以为「数据源挂了」，
+    于是改用 bash 自己 curl、自己用 numpy 算指标，绕开 alpha.*
+    并违反「数字只来自确定性函数」。整条链路不报错，只是行为悄悄变差。
+    """
+
+
 def kline(code: str, category: int = 4, offset: int = 60) -> list[dict]:
     """K线：category 4=日 5=周 6=月 11=60分钟。
 
@@ -324,13 +337,18 @@ def kline(code: str, category: int = 4, offset: int = 60) -> list[dict]:
             return rows
     except Exception:  # noqa: BLE001  mootdx 不可达/依赖缺失 → 回退
         pass
-    # 回退：分钟线 gtimg 不支持，返回空；日/周/月走 gtimg。
+    # 回退：分钟线 gtimg 不支持。
     if category == 11:
-        return []
+        raise DataUnavailable(
+            "60 分钟线依赖 mootdx，本环境不可达；gtimg 回退源不支持分钟线"
+        )
     try:
         return _tencent_kline(code, category=category, offset=offset)
-    except Exception:  # noqa: BLE001  回退源也失败 → 空
-        return []
+    except Exception as e:  # noqa: BLE001
+        # 不吞异常。吞掉会让调用方把「取不到」当成「没有」，进而自行造数。
+        raise DataUnavailable(
+            f"K 线取数失败（mootdx 与 gtimg 均不可用）: {type(e).__name__}: {e}"
+        ) from e
 
 
 def finance(code: str) -> dict:
