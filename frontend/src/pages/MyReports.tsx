@@ -3,7 +3,6 @@ import { FileText, Trash2, Loader2, FolderOpen, Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Disclaimer } from "@/components/ui/Disclaimer";
-import { AskAiButton } from "@/components/ui/AskAiButton";
 import { useCachedResource, dropCache } from "@/lib/cache";
 import { listReports, addReport, deleteReport, type ResearchReport } from "@/lib/research";
 import { ApiError } from "@/lib/api";
@@ -51,7 +50,6 @@ export function MyReports() {
       <PageHeader
         title="我的研报"
         subtitle="归档研报结论与要点到本地研报库；后续可被 Agent 检索引用（S5）"
-        actions={<AskAiButton context="研报库检索" label="问 AI" />}
       />
 
       {/* 录入 */}

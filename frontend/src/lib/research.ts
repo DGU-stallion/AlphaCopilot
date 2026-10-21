@@ -1,4 +1,4 @@
-// Vibe-Research 系 4 页的后端客户端。对接 AlphaCopilot FastAPI（/api，vite 代理到 8900）：
+// 复盘/量化系 4 页的后端客户端。对接 AlphaCopilot FastAPI（/api，vite 代理到 8900）：
 //   回测 / 相关性 → POST /api/pages/{slug}/render（白名单分析函数产 ECharts option）
 //   模拟组合     → /api/portfolios CRUD + rebalance + nav
 //   我的研报     → /api/reports（复用 doc 表）list/add/delete

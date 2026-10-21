@@ -1,4 +1,4 @@
-// 对话气泡区 + 输入条（S5，移植自 Vibe-Research core/ai/AiMessages）。
+// 对话气泡区 + 输入条（S5，移植自上游项目的 core/ai/AiMessages）。
 // 回答按 markdown 渲染（模型答的是带 **加粗**/列表/表格的正文），提问按纯文本。
 
 import { useEffect, useRef } from "react";

@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils";
 import { api, type BacktestData, type SampleStats, type SampleDay } from "@/lib/api";
 import { useCachedResource } from "@/lib/cache";
 
-// 涨停样本统计（缝合搬运自 vibe-astock Backtest.tsx）。确定性统计，非 AI。
+// 涨停样本统计（缝合搬运自上游项目的 Backtest.tsx）。确定性统计，非 AI。
 // 定位改造：接 useCachedResource（按天数缓存，切页不重取，刷新按钮 POST 重算）；
-// vibe-astock 专有的 ArchiveNote/DriftNote（依赖 /api/archive /api/drift 端点）本仓库
+// 上游专有的 ArchiveNote/DriftNote（依赖 /api/archive /api/drift 端点）本仓库
 // 暂无，先不搬；分情绪环境 RegimeRow 依赖 emotion 缓存层，MVP 暂不展示。
 // ⚠️ CAVEAT / DISCLAIMER 原文风险提示不得删、不得弱化。
 

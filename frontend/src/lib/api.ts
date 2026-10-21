@@ -37,21 +37,6 @@ export interface MyReport {
   id: string; name: string; industry: string; size: number; ext: string; ts: number;
 }
 
-// 下载/预览研报：带鉴权头 fetch → blob → 触发浏览器下载（<a download> 无法带 Authorization，故走 blob）。
-export async function downloadReport(id: string, name: string): Promise<void> {
-  const resp = await fetch(apiUrl(`/api/myreports/file/${id}`), { headers: authHeaders() });
-  if (!resp.ok) throw new ApiError(`下载失败 HTTP ${resp.status}`, resp.status);
-  const blob = await resp.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
 async function request<T>(path: string, method: "GET" | "POST" | "DELETE" = "GET", body?: unknown): Promise<T> {
   let resp: Response;
   const headers: Record<string, string> = { ...authHeaders() };
@@ -215,22 +200,6 @@ export interface RadarData {
   stats: { industries: number; total_sources: number; failed_sources?: number };
 }
 
-export interface Holding {
-  code: string; name: string; price: number; shares: number; cost: number;
-  market_value: number; pnl: number; pnl_pct: number;
-}
-export interface ClosedPosition {
-  code: string; name: string; date: string; price: number; shares: number; cost: number;
-  pnl: number; pnl_pct: number;
-}
-export interface PortfolioData {
-  holdings: Holding[];
-  totals: { market_value: number; cost: number; pnl: number; pnl_pct: number };
-  closed: ClosedPosition[];
-  realized_pnl: number;
-  updated: string; last_refresh: string | null;
-}
-
 // 资金面 / 筹码 / 信号（v3.3 并入，均为「用户查的那只股」的公开数据）
 export interface MarginRow { date: string; rzye: number; rzmre: number; rzche: number; rqye: number; rqmcl: number; rzrqye: number }
 export interface BlockTradeRow { date: string; price: number; close: number; premium_pct: number; vol: number; amount: number; buyer: string; seller: string }
@@ -380,13 +349,6 @@ export const api = {
   globalStock: (symbol: string) => get<GlobalStock>(`/global/stock?symbol=${encodeURIComponent(symbol)}`),
   radar: () => get<RadarData>("/radar"),
   radarRefresh: () => request<RadarData>("/radar/refresh", "POST"),
-  portfolio: () => get<PortfolioData>("/portfolio"),
-  addHolding: (code: string, shares: number, cost: number) => request<PortfolioData>("/portfolio/holding", "POST", { code, shares, cost }),
-  removeHolding: (code: string) => request<PortfolioData>(`/portfolio/holding?code=${code}`, "DELETE"),
-  refreshPortfolio: () => request<PortfolioData>("/portfolio/refresh", "POST"),
-  closePosition: (code: string, date: string, price: number, shares: number, cost: number) =>
-    request<PortfolioData>("/portfolio/close", "POST", { code, date, price, shares, cost }),
-  removeClosed: (index: number) => request<PortfolioData>(`/portfolio/close?index=${index}`, "DELETE"),
   valuation: (code: string) => get<Valuation>(`/valuation?code=${code}`),
   percentile: (code: string) => get<ValPercentile>(`/valuation/percentile?code=${code}`),
   financials: (code: string) => get<Financials>(`/financials?code=${code}`),
@@ -405,10 +367,10 @@ export const api = {
   hotConcepts: (code: string) => get<HotConcept[]>(`/hot-concepts?code=${code}`),
   investorQa: (code: string) => get<QaRow[]>(`/investor-qa?code=${code}`),
   industry: (top = 20) => get<IndustryData>(`/industry?top=${top}`),
-  myReports: () => get<MyReport[]>("/myreports"),
+  myReports: () => get<MyReport[]>("/reports"),
   uploadReport: (name: string, contentB64: string) =>
-    request<MyReport>("/myreports", "POST", { name, content_b64: contentB64 }),
-  deleteReport: (id: string) => request<{ ok: boolean }>(`/myreports/${id}`, "DELETE"),
+    request<MyReport>("/reports", "POST", { name, content_b64: contentB64 }),
+  deleteReport: (id: string) => request<{ ok: boolean }>(`/reports/${id}`, "DELETE"),
   // 股票池 CRUD
   stockPool: () => get<PoolItem[]>("/stock-pool"),
   addPool: (body: { code: string; name?: string; note?: string; tags?: string }) =>

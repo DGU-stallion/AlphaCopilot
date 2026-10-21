@@ -3,7 +3,6 @@ import { Play, RefreshCw, X, Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Disclaimer } from "@/components/ui/Disclaimer";
-import { AskAiButton } from "@/components/ui/AskAiButton";
 import { Caliber } from "@/components/ui/Caliber";
 import { EChart } from "@/components/ui/EChart";
 import { api } from "@/lib/api";
@@ -85,7 +84,6 @@ export function Correlation() {
       <PageHeader
         title="相关性分析"
         subtitle="多标的归一化叠加走势 + 日收益率相关矩阵 · 确定性计算"
-        actions={<AskAiButton context="相关性结果解读" label="问 AI" />}
       />
 
       <GlassCard>

@@ -1,17 +1,16 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { pctColor } from "@/lib/colors";
 import { Plus, X, RefreshCw, Star } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Disclaimer } from "@/components/ui/Disclaimer";
-import { AskAiButton } from "@/components/ui/AskAiButton";
 import { api, type Quote } from "@/lib/api";
 import { loadWatch, saveWatch, addCodes } from "@/lib/watchlist";
 import { useCachedResource, dropCache } from "@/lib/cache";
 import { cn } from "@/lib/utils";
 
-// 股票池（缝合搬运自 vibe-astock Watchlist.tsx）。
-// 定位改造：标题「自选股」→「股票池」；AskAiButton 占位（S5）；行情接 useCachedResource
+// 股票池（缝合搬运自上游项目的 Watchlist.tsx）。
+// 定位改造：标题「自选股」→「股票池」；行情接 useCachedResource
 // —— 切页复用不重取，只有点刷新 / 增删标的才重拉。代码本身只存本地 localStorage、不上传。
 
 const color = pctColor;   // 红涨绿跌口径见 lib/colors.ts
@@ -48,22 +47,6 @@ export function Watchlist() {
     setCodes(next); saveWatch(next); reloadFor();
   };
 
-  const aiContext = useMemo(
-    () =>
-      codes.length
-        ? "我的股票池（本地）：\n" +
-          codes
-            .map((c) => {
-              const q = quotes[c];
-              return q
-                ? `${q.name}(${c}) 现价${q.price} ${pct(q.change_pct)} PE(TTM)${q.pe_ttm ?? "—"} 换手${q.turnover_pct ?? "—"}%`
-                : `${c}（行情未取到）`;
-            })
-            .join("\n")
-        : "还没有股票。",
-    [codes, quotes],
-  );
-
   const loading = quotesRes.loading;
 
   return (
@@ -71,15 +54,6 @@ export function Watchlist() {
       <PageHeader
         title="股票池"
         subtitle="批量添加、一屏总览你关注的标的。代码只存本地、不上传。"
-        actions={
-          codes.length > 0 && (
-            <AskAiButton
-              context={aiContext}
-              label="让 AI 读股票池"
-              suggestions={["这几只里哪些估值偏高", "帮我按赛道分组看看", "各自最大的风险点是什么"]}
-            />
-          )
-        }
       />
 
       <GlassCard className="mb-4">

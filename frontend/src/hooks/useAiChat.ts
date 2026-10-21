@@ -1,4 +1,4 @@
-// useAiChat —— 一份对话的状态机（S5，移植自 Vibe-Research 的 core/ai/useAiChat）。
+// useAiChat —— 一份对话的状态机（S5，移植自上游项目的 core/ai/useAiChat）。
 //
 // 处理三类"看不出来但会出错"的坑：半截回答不落进下一轮、并发提交的竞态锁、
 // 换 key/关面板中止在跑的请求。对话按 key 分开；空回答不算回答。

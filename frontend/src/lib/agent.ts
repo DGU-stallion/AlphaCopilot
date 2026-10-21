@@ -1,24 +1,4 @@
-import { apiUrl } from "./base";
 // 复盘 agent 的前端类型 + 助手（后端默认 8910，vite 把全部 /api 代理过去）。
-
-export async function agentFetch<T>(path: string, method: "GET" | "POST" = "GET"): Promise<T> {
-  const r = await fetch(apiUrl(path), { method });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return (await r.json()) as T;
-}
-
-export async function agentPost<T>(path: string, body: unknown): Promise<T> {
-  const r = await fetch(apiUrl(path), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return (await r.json()) as T;
-}
-
-export interface ChatMsg { role: "user" | "assistant"; content: string; }
-
 
 export function safeArray<T>(v: unknown): T[] {
   return Array.isArray(v) ? (v as T[]) : [];
@@ -671,28 +651,6 @@ export interface BacktestStrategy {
   by_regime: Record<string, BacktestStats>;
   daily: BacktestDay[];
   final_equity: number;
-}
-export interface DeepDiveData {
-  code?: string;
-  name?: string;
-  trade_date?: string;
-  generated_at?: string;
-  verdict: StockVerdict | null;
-  verdict_md?: string;
-  reports?: { theme: string; capital: string; technical: string; risk: string };
-  debate?: { join: string; avoid: string };
-}
-export interface StockVerdict {
-  /** 仅部分 prompt 包会产出参与倾向（自带的 research 包只给客观画像）——渲染时必须判空 */
-  stance?: string;
-  one_liner: string;
-  theme: string;
-  capital: string;
-  technical: string;
-  /** 同上，可能不存在 */
-  watch_points?: string[];
-  risks: string[];
-  debate_takeaway: string;
 }
 
 // ---------- 当前持仓（positions.py：从交易日志聚合，不另存一份账）----------

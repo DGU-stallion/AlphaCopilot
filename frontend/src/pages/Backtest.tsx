@@ -3,7 +3,6 @@ import { Play, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Disclaimer } from "@/components/ui/Disclaimer";
-import { AskAiButton } from "@/components/ui/AskAiButton";
 import { Caliber } from "@/components/ui/Caliber";
 import { EChart } from "@/components/ui/EChart";
 import { api } from "@/lib/api";
@@ -82,7 +81,6 @@ export function Backtest() {
       <PageHeader
         title="回测"
         subtitle="双均线金叉策略净值 vs 买入持有 · 确定性计算，扣 A 股费用、无未来函数"
-        actions={<AskAiButton context="回测结果解读" label="问 AI" />}
       />
 
       <GlassCard>

@@ -3,7 +3,6 @@ import { Plus, Trash2, Loader2, X, CalendarClock } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Disclaimer } from "@/components/ui/Disclaimer";
-import { AskAiButton } from "@/components/ui/AskAiButton";
 import { Caliber } from "@/components/ui/Caliber";
 import { EChart } from "@/components/ui/EChart";
 import { useCachedResource, dropCache } from "@/lib/cache";
@@ -94,7 +93,6 @@ export function Portfolios() {
       <PageHeader
         title="模拟组合"
         subtitle="雪球式调仓事件驱动净值 · 组合净值 vs 沪深300 · 确定性计算"
-        actions={<AskAiButton context="模拟组合结构解读" label="问 AI" />}
       />
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">

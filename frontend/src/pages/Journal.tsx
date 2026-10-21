@@ -9,7 +9,7 @@ import { useCachedResource, dropCache } from "@/lib/cache";
 import { cn } from "@/lib/utils";
 
 // 交易日志 —— 基于 AlphaCopilot 已有 journal 后端（add/list/delete）新建的务实录入页。
-// 参考 vibe-astock Journal.tsx 的信息架构（录入 + 列表 + 基础盈亏），但不搬其 80KB 专有特性。
+// 参考上游项目 Journal.tsx 的信息架构（录入 + 列表 + 基础盈亏），但不搬其 80KB 专有特性。
 // 盈亏口径：按「现金流」算 —— 卖出所得 − 买入花费 − 费用。⚠️ 这是现金流口径，
 // 不是市值盯市（未卖出的持仓不折现价），标签写死避免误读。
 

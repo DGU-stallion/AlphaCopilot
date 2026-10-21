@@ -1,14 +1,12 @@
 import { useState, useEffect, Fragment } from "react";
 import { pctColor } from "@/lib/colors";
-import { Sparkles, Loader2, RefreshCw, Gauge, ArrowDownUp, TrendingUp, TrendingDown, X, Flame, BarChart3 } from "lucide-react";
+import { RefreshCw, Gauge, ArrowDownUp, TrendingUp, TrendingDown, Flame, BarChart3 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Caliber } from "@/components/ui/Caliber";
-import { AskAiButton } from "@/components/ui/AskAiButton";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { finite } from "@/lib/agent";
-import { api, type Quote, type MarketOverview, type ShortTermEmotion, type LianbanStock, type TurnoverTop, type MarketSession, type LiveEmotion } from "@/lib/api";
-import { useDeepDive, DeepDivePanel, RunAllButton, type DiveItem } from "@/components/ui/DeepDive";
+import { api, type Quote, type MarketOverview, type ShortTermEmotion, type TurnoverTop, type MarketSession, type LiveEmotion } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { getCache, setCache, hasCache } from "@/lib/cache";
 import { LimitUpStats } from "./LimitUpStats";
@@ -17,7 +15,7 @@ import { useAiPage } from "@/lib/ai-page";
 // A股红涨绿跌。全球市场（美股/港股指数）**也沿用红涨**——与整个看板及东财等中国平台一致，
 // A 股惯例：红涨绿跌。与国际绿涨惯例相反，是有意选择，全站必须一致，勿改。
 
-const AUTO_KEY = "vibe-astock-auto-refresh";
+const AUTO_KEY = "alphacopilot-auto-refresh";
 const LIVE_MS = 5_000;      // 轻量行情：腾讯批量，5 秒
 const HEAVY_MS = 60_000;    // 板块资金 / 成交额榜：东财+akshare，60 秒
 
@@ -124,30 +122,6 @@ export function DailyReview() {
       `涨停 ${overview.sentiment.zt ?? "—"}、跌停 ${overview.sentiment.dt ?? "—"}`
     : "（盘面数据未取到）";
 
-  // 连板股「AI 深入分析」（与首板分析页共用 DeepDive 单元；结果本地存档，跨加载复用）
-  const dd = useDeepDive("lianban", emotion?.date || "");
-  const lianbanPrompt = (s: LianbanStock) =>
-    `${emotion?.date || ""}（已收盘）A 股连板股「${s.name}（${s.code}）」的客观数据：\n` +
-    `该日收盘 ${s.price} 元、涨停 +${s.pct}%，已连续涨停 ${s.boards} 天（${s.boards} 连板），` +
-    // 表格里那两列是**今日实时**，prompt 也得给，否则模型只看到昨收、
-    // 会把"昨天的价"当成"现在的价"来讲
-    (finite(lianbanQuotes[s.code]?.change_pct) !== null
-      ? `今日最新 ${lianbanQuotes[s.code].price} 元（${lianbanQuotes[s.code].change_pct > 0 ? "+" : ""}${lianbanQuotes[s.code].change_pct}%，实时、非收盘），`
-      : "") +
-    `成交额 ${yi(s.amount)}，流通市值 ${yi(s.float_cap)}，所属概念/行业 ${s.industry || "未知"}，` +
-    `涨停原因题材：${s.reason || "（暂缺，需要自查）"}。\n\n` +
-    "请深入分析这只股票本轮连板的驱动：\n" +
-    "1. 先调用工具查询这只股票的近期新闻与研报，结合上面的题材串，说清本轮连板的核心驱动（消息面 / 题材面 / 资金面），以及走到第 " +
-    `${s.boards} 板的位置上驱动有没有变化；\n` +
-    "2. 就**这个题材板块整体**说清它的强度与所处阶段（情绪接力 / 有产业逻辑或业绩支撑，发酵期 / 分歧期），" +
-    "并给出依据 —— 只讲题材板块层面，不要由此推断这只个股接下来会怎样；\n" +
-    "3. 客观列出值得注意的点（连板高度、成交额是放大还是缩量、流通盘大小、题材扩散位置）。\n" +
-    "个股层面只陈述已经发生的客观数据与事实，方向与强弱判断做到题材板块层面为止：" +
-    "不预测个股涨跌、不给个股参与倾向、不推荐任何标的、不构成投资建议。" +
-    "输出用纯 Markdown（不要在表格或正文里使用 <br> 等 HTML 标签）。";
-  const lianbanCtx = (s: LianbanStock) => `连板股 ${s.name}(${s.code}) ${s.boards}连板 深入分析`;
-  const lianbanItem = (s: LianbanStock): DiveItem => ({ key: s.code, prompt: lianbanPrompt(s), context: lianbanCtx(s) });
-
   const sentiment = overview?.sentiment;
   const sectors = overview?.sectors || [];
   const sentCells = sentiment ? [
@@ -198,11 +172,6 @@ export function DailyReview() {
               <RefreshCw className={cn("h-3.5 w-3.5", autoRefresh && liveNow && "animate-spin")} />
               {autoRefresh ? (liveNow ? `每 ${LIVE_MS / 1000} 秒自动刷新` : "自动刷新（非交易时段暂停）") : "自动刷新"}
             </button>
-            <AskAiButton
-              context={`今日大盘数据：${dataSummary}`}
-              label="问 AI"
-              suggestions={["今天大盘怎么走", "哪些指数领涨领跌", "盘面有什么值得注意"]}
-            />
           </div>
         }
       />
@@ -376,13 +345,6 @@ export function DailyReview() {
             <div className="mt-3">
               <div className="mb-1.5 flex flex-wrap items-center gap-2">
                 <p className="text-[11px] text-muted-foreground">连板股（2 板以上连续涨停）· 客观公开榜单，非推荐 / 非预测</p>
-                <span className="ml-auto">
-                  <RunAllButton
-                    dd={dd}
-                    items={emotion.lianban_stocks.map(lianbanItem)}
-                    nameOf={(k) => emotion.lianban_stocks.find((s) => s.code === k)?.name || k}
-                  />
-                </span>
               </div>
               {emotion.lianban_stocks.length === 0 ? (
                 <p className="text-xs text-muted-foreground/50">今日无 2 板以上个股</p>
@@ -391,7 +353,7 @@ export function DailyReview() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
-                        {["名称", "连板", "现价（实时）", "今日涨跌（实时）", "昨日成交额", "流通市值", "涨停原因", "概念", ""].map((h) => (
+                        {["名称", "连板", "现价（实时）", "今日涨跌（实时）", "昨日成交额", "流通市值", "涨停原因", "概念"].map((h) => (
                           <th key={h} className="whitespace-nowrap px-2 py-2 font-medium">{h}</th>
                         ))}
                       </tr>
@@ -421,25 +383,7 @@ export function DailyReview() {
                               {s.reason ? <span className="text-foreground">{s.reason}</span> : <span className="text-muted-foreground/50">—</span>}
                             </td>
                             <td className="whitespace-nowrap px-2 py-2 text-xs text-muted-foreground">{s.industry}</td>
-                            <td className="whitespace-nowrap px-2 py-2 text-right">
-                              <button
-                                onClick={() => dd.toggle(lianbanItem(s))}
-                                className="inline-flex items-center gap-1 rounded-lg border border-primary/50 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
-                              >
-                                {dd.running === s.code ? <Loader2 className="h-3 w-3 animate-spin" /> : dd.open === s.code ? <X className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
-                                {dd.open === s.code ? "收起" : dd.analysis[s.code] ? "展开" : "深入分析"}
-                              </button>
-                            </td>
                           </tr>
-                          {dd.open === s.code && (
-                            <DeepDivePanel
-                              dd={dd}
-                              stockKey={s.code}
-                              colSpan={9}
-                              noteTitle={`连板深析 · ${s.name} ${s.boards}板`}
-                              onRerun={() => dd.rerun(lianbanItem(s))}
-                            />
-                          )}
                         </Fragment>
                       ))}
                     </tbody>
