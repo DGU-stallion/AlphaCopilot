@@ -5,7 +5,7 @@ import { Panel } from "@/components/ui/Panel";
 import { Num } from "@/components/Num";
 import { Button } from "@/components/ui/Form";
 import { Disclaimer } from "@/components/ui/Disclaimer";
-import { useCachedResource, dropCache } from "@/lib/cache";
+import { useCachedResource } from "@/lib/cache";
 import { useAiPage } from "@/lib/ai-page";
 import { useDataAsOf } from "@/lib/data-asof";
 import { runsApi, type RunRow, type RunDiff, type ViewRow } from "@/lib/api";
@@ -43,12 +43,13 @@ function metricKeys(a: RunRow | null, b: RunRow | null): string[] {
 }
 
 export function Runs() {
-  const [reload, setReload] = useState(0);
   const [picked, setPicked] = useState<string[]>([]);
   const [tab, setTab] = useState<"runs" | "views">("runs");
 
+  // 不用 `runs:${reload}` 做刷新：每点一次刷新就在缓存 Map 里永久多一条
+  // （旧 key 没人 drop）。缓存自带 refresh()，直接用它。
   const runsRes = useCachedResource<RunRow[]>(
-    `runs:${reload}`,
+    "runs",
     () => runsApi.runs({ limit: 50 }),
     { ttlMs: 5_000 },
   );
@@ -110,10 +111,9 @@ export function Runs() {
   };
 
   const refresh = () => {
-    dropCache(`runs:${reload}`);
-    dropCache("views");
-    dropCache("rundiff:none");
-    setReload((n) => n + 1);
+    // refresh() 走 force 路径，不产生新 key
+    runsRes.refresh();
+    viewsRes.refresh();
   };
 
   return (

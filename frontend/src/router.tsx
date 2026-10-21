@@ -34,6 +34,4 @@ export const router = createBrowserRouter([
       { path: "*", element: <Navigate to="/daily-review" replace /> },
     ],
   },
-  // 🔵 原型路由：**故意放在 Layout 之外** —— 旧外壳的玻璃/暖橙正是要换掉的东西，
-  // 拿它当背景板会让评审误判「新风格还是丑」。看完即删。
 ], { basename: import.meta.env.BASE_URL });

@@ -31,3 +31,16 @@ d22719e9deba2c6e7e783cccf53d59e3bb2d0e231296dc69fc613a2a8c152d61  tests/test_val
 `git diff --exit-code data-service/vendor/` 校验无本地改动。
 本地适配（loader / 缓存 / HTTP 暴露）写在 `data-service/src/` 内，
 保证同步脚本（M3-V6）可以无冲突覆盖整个本目录。
+
+## 2026-10-22 补录：README（M3-V4 需要）
+
+上游 `tests/test_v310_sources.py::test_section_references_point_at_the_defining_section`
+会用 README / README_en 校验 SKILL.md 里引用的章节号是否仍然存在。
+首次 vendor 只取了 SKILL.md + LICENSE + CHANGELOG + tests，漏了这两个，
+导致本地 `pytest vendor/a-stock-data/tests` 1 红（CI 只跑 backend/，所以 CI 是绿的
+—— 这是「CI 绿、本地红」的典型，不能靠 CI 掩盖）。
+
+    README.md    33b6f4a829571cf1fd4d3de127468cd0c59dace65ac77c8230b1b21fbaa4a9b9
+    README_en.md 523b3dfbca3265db8e00b5b19faace2ae87f8b40a02b2d5789693f6338787170
+
+补录后：179 passed / 4 skipped / 475 subtests（M3-V4 完成）。

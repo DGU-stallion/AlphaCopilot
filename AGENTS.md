@@ -48,8 +48,10 @@ Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共
 5. **每个 artifact 必须带 provenance**（ADR-0012）：
    `deterministic`（fn + params + dataAsOf）或 `agent`（runId + codeHash + dataAsOf）。
    缺失直接拒收。
-   > ⚠️ **本条目前未实现**（`artifact` 表无 provenance 列，manifest 校验不查）。
-   > M1-7 负责落地；在 M1-7 合入前不要假装它在守门。
+   > ✅ **已落地**（M1-7）：`artifact.provenance` 列 + `_validate_provenance` /
+   > `_stamp_provenance`；`deterministic` 只能由 `server_stamped=True` 铸造，
+   > agent manifest 里声称的 deterministic 一律改写为 `agent` 并记 `claimedKind`。
+   > 测试见 `backend/tests/test_provenance.py`。
 6. **可信数字的盖章权归服务端**（ADR-0012「已决 1」）。拆成两层，别混：
    - **行为层（建议，非硬约束）**：算回测指标/相关矩阵/因子 IC/敏感性/行情财务数值时，
      agent 应优先调用 `alpha.*` / `research.*`。这只是习惯，**不构成执法**。

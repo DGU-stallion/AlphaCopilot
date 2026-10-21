@@ -67,24 +67,11 @@ describe("缓存条目带取数时间", () => {
   });
 });
 
-describe("useCachedResource 不伪造 dataAsOf", () => {
-  it("数据源没给 as-of 时，返回空串而不是今天", async () => {
-    // 这条抓的是变异测试没抓到的洞：把 setCache(key, data, "") 改成
-    // setCache(key, data, today()) 会让界面显示「as-of 今天」，
-    // 而实际数据可能是昨天的。伪造时间戳比不显示更糟 —— 它会让人相信它。
-    const { renderHook, waitFor } = await import("@testing-library/react");
-    const { useCachedResource, _resetCache } = await import("@/lib/cache");
-    _resetCache();
-    const { result } = renderHook(() =>
-      useCachedResource("k-asof", () => Promise.resolve({ v: 1 })),
-    );
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.dataAsOf).toBe("");
-  });
-
-  it("真走 fetch 路径时，缓存里存的 dataAsOf 必须是空串（不伪造今天）", async () => {
-    // 上一条走的是「命中新鲜缓存」分支，碰不到 setCache。
-    // 变异测试发现必须专门覆盖 fetch 成功后写缓存的这一行。
+describe("缓存层不产生 as-of（那是页面的职责）", () => {
+  it("fetch 成功后写缓存时，dataAsOf 留空而不是伪造今天", async () => {
+    // 缓存层不知道数据是哪天的 —— 它只知道「什么时候取的」。
+    // 唯一知道数据时点的是页面（页面有接口返回的 date/as_of 字段），
+    // 所以由页面用 lib/data-asof 上报。缓存层若伪造，界面上的 as-of 就是假的。
     const { renderHook, waitFor } = await import("@testing-library/react");
     const { useCachedResource, getCacheEntry, _resetCache } = await import("@/lib/cache");
     _resetCache();
@@ -97,18 +84,14 @@ describe("useCachedResource 不伪造 dataAsOf", () => {
     expect(entry?.dataAsOf).toBe("");     // ← 变异点：改成 today() 这里就红
   });
 
-  it("缓存条目里的 dataAsOf 透出给调用方", async () => {
-    const { renderHook, waitFor } = await import("@testing-library/react");
-    const { useCachedResource, setCache, _resetCache } = await import("@/lib/cache");
+  it("CachedResource 不再暴露 dataAsOf（避免两套 as-of 真源）", async () => {
+    const { renderHook } = await import("@testing-library/react");
+    const { useCachedResource, _resetCache } = await import("@/lib/cache");
     _resetCache();
-    setCache("k-asof2", { v: 2 }, "2026-10-20");
     const { result } = renderHook(() =>
-      useCachedResource("k-asof2", () => Promise.resolve({ v: 3 })),
+      useCachedResource("k-nofield", () => Promise.resolve(1)),
     );
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    // 命中新鲜缓存，不该重新 fetch，as-of 应为缓存里的值
-    expect(result.current.data).toEqual({ v: 2 });
-    expect(result.current.dataAsOf).toBe("2026-10-20");
+    expect("dataAsOf" in result.current).toBe(false);
   });
 });
 
@@ -122,5 +105,34 @@ describe("判定过期后要真的重取", () => {
     expect(isFresh({ fetchedAt: at("2026-10-21T09:00:00"), dataAsOf: "2026-10-21" },
       at("2026-10-21T15:00:00"), 60_000)).toBe(false);
     vi.useRealTimers();
+  });
+});
+
+describe("key 变化时不能残留上一个 key 的数据", () => {
+  it("切到新 key 且无缓存时，data 必须先清空再拉", async () => {
+    // review 抓到的真 bug：useState 的初值只在首次渲染生效，
+    // key 变化时 state 不会重置 → 新请求进行中界面上还显示**上一个 key 的数据**。
+    // 在 Run 对比页表现为「标题是 C/D、数字还是 A/B」—— 数值审计场景下是致命的。
+    const { renderHook, waitFor } = await import("@testing-library/react");
+    const { useCachedResource, _resetCache } = await import("@/lib/cache");
+    _resetCache();
+
+    let resolveB: ((v: string) => void) | null = null;
+    const { result, rerender } = renderHook(
+      ({ k }: { k: string }) =>
+        useCachedResource<string>(k, () =>
+          k === "a" ? Promise.resolve("A-value")
+            : new Promise<string>((res) => { resolveB = res; })),
+      { initialProps: { k: "a" } },
+    );
+    await waitFor(() => expect(result.current.data).toBe("A-value"));
+
+    // 切到 key b：请求挂起中，不能还显示 A 的数据
+    rerender({ k: "b" });
+    await waitFor(() => expect(result.current.loading).toBe(true));
+    expect(result.current.data).toBeNull();   // ← 变异点
+
+    resolveB?.("B-value");
+    await waitFor(() => expect(result.current.data).toBe("B-value"));
   });
 });

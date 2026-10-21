@@ -104,14 +104,17 @@ export interface CachedResource<T> {
   data: T | null;
   loading: boolean;
   error: unknown;
-  /** 本次数据的截止日（给 M5-4 的 as-of 展示用）；空串表示未知。 */
-  dataAsOf: string;
   refresh: () => void;
 }
 
 /**
  * 首次挂载：缓存新鲜就直接用；过期或没有则拉一次。
  * refresh()：无视缓存重新 fetch。
+ *
+ * 注意这里**不**提供 dataAsOf：数据的时点由页面用 `lib/data-asof` 的
+ * `useDataAsOf` 上报（那才是唯一真源 —— 页面知道自己的数据是哪天的，
+ * 缓存层不知道）。曾经在这里放过一个 dataAsOf 字段，永远是空串且无人消费，
+ * 是「为假想需求留钩子」，删掉了（review 指出）。
  */
 export function useCachedResource<T>(
   key: string,
@@ -127,7 +130,23 @@ export function useCachedResource<T>(
     loading: usable === undefined,
     error: null,
   });
-  const [dataAsOf, setDataAsOf] = useState<string>(cached?.dataAsOf ?? "");
+
+  // ⚠️ key 变化时**必须重置 state**：useState 的初值只在首次渲染生效，
+  // 不会随 key 变。不重置的症状（review 抓到的真 bug）：
+  //   切到新 key、请求还在飞的时候，界面上显示的是**上一个 key 的数据**。
+  //   在 Run 对比页表现为「标题是 C/D、数字还是 A/B」——
+  //   数值审计场景里这是致命的，而且肉眼很难发现（数字看起来完全合理）。
+  // 用「上次渲染的 key」做判据，而不是把 key 塞进依赖后无脑 setState
+  // （后者会在每次渲染都 set，造成多余更新）。
+  const prevKey = useRef(key);
+  if (prevKey.current !== key) {
+    prevKey.current = key;
+    const c = store.get(key);
+    const ok = c && isFresh(c, now(), ttl) ? (c.value as T) : undefined;
+    if (state.data !== (ok ?? null)) {
+      setState({ data: ok ?? null, loading: ok === undefined, error: null });
+    }
+  }
 
   // fetcher 常是内联箭头函数（每次渲染新引用）。放进依赖会让 run 每次重建、
   // 进而触发 effect 重跑 —— 用 ref 拿最新的一份，依赖只留 key。
@@ -140,7 +159,6 @@ export function useCachedResource<T>(
       const ok = entry && isFresh(entry, now(), ttl);
       if (!force && ok) {
         setState({ data: entry.value as T, loading: false, error: null });
-        setDataAsOf(entry.dataAsOf);
         return Promise.resolve();
       }
       setState((s) => ({ ...s, loading: true, error: null }));
@@ -151,9 +169,7 @@ export function useCachedResource<T>(
       }
       return p
         .then((data) => {
-          // 数据源没给 dataAsOf 时留空 → setCache 不伪造
           setCache(key, data, "");
-          setDataAsOf("");
           setState({ data, loading: false, error: null });
         })
         .catch((error) => {
@@ -175,5 +191,5 @@ export function useCachedResource<T>(
     void run(true);
   }, [run]);
 
-  return { data: state.data, loading: state.loading, error: state.error, dataAsOf, refresh };
+  return { data: state.data, loading: state.loading, error: state.error, refresh };
 }

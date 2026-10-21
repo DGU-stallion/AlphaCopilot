@@ -113,7 +113,10 @@ export function EquityChart({ payload, height = 360 }: EquityChartProps) {
       if (s) s.setData(line.points as never);
     });
     const dd = toDrawdown(payload);
-    if (ddRef.current && dd.length) ddRef.current.setData(dd as never);
+    // 回撤为空时也要 setData([])，不能用 `if (dd.length)` 跳过 ——
+    // 跳过会让**上一个 payload 的回撤**留在 pane 里，于是净值和回撤
+    // 讲的是两个不同的时间区间（review 指出的残留问题）。
+    ddRef.current?.setData(dd as never);
   }, [payload, lineCount]);
 
   // ⑤ pane 高度随容器

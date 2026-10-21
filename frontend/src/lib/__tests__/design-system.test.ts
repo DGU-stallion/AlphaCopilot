@@ -39,7 +39,6 @@ describe("设计 token 单一真源", () => {
   it("颜色字面量只能出现在 theme/tokens.ts 里", () => {
     // 违反的后果：同一种蓝在 5 个文件里是 5 个略有差别的值，
     // 切主题时有的变了有的没变，观感失控。
-    // 例外：proto.css 里的原型 token（不参与生产）。
     const allowed = ["theme/tokens.ts", "lib/chart-theme.ts"];
     const offenders = prodFiles()
       .filter((f) => !allowed.includes(f.rel.replace(/\\/g, "/")))

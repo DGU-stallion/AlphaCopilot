@@ -32,6 +32,7 @@ from api.runs import build_runs_router
 from api.session_manager import SessionManager
 from api.store import Store
 from api.universes import build_universe_router  # M3-2：Universe as query
+from api.vendor import build_vendor_router
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -264,6 +265,10 @@ def create_app(
     # M3-1：Run registry + View API。注入 job 提交器以支持 Rerun（M3-4）——
     # 反过来让 runs.py import jobs 会形成双向依赖。
     app.include_router(build_runs_router(store, submit_backtest=jobs.submit_backtest))
+    # M3-V5：vendor 能力给 agent 用（页面继续走 curated 端点）。
+    # 未就绪时端点自己回 503，不影响 app 启动 ——
+    # 页面不该因为 vendor 没装而整体打不开。
+    app.include_router(build_vendor_router())
     app.include_router(build_market_router())
     app.include_router(build_universe_router())  # M3-2：Universes as query
     return app
