@@ -127,7 +127,7 @@ AI native 个人投研量化工作台。
 | M1-7 | **provenance 落地 + 盖章权** | **已完成**：`artifact.provenance` 列 + 校验拒收缺失 + **agent 交来的声明一律降级为 `agent` 并记 `claimedKind`**，deterministic 只能服务端铸造（job 走 `server_stamped=True`）。10 条测试，变异 5/5 变红 |
 | M1-8 | job 事件流接通 | **已完成**：补 `job/completed`（带 artifact_ids）与 `job/failed`，都发到**会话**流（用户盯对话不是 job id）。前端能渲染 job 结果 |
 | M1-9 | **skills 白名单**（ADR-0010 修订 §2） | **已完成**：源是 HKUDS/Vibe-Trading 的 90 个（实测 6.1k tokens），**选 12 个**（约 700 tokens）；剔除 15 个硬规则 10 禁止项；取数指引改到 `alpha.data`。18 条守门测试 |
-| M1-10 | 页面感知补到 11/11（`useAiPage` 现覆盖 4 页；删 `Placeholder` 后 10 页） | 每页都登记快照 |
+| M1-10 | 页面感知 | **已完成**：8 页登记真实快照（LimitUpStats 由 DailyReview 内嵌不重复登记，Settings 不需要）。**顺带补 `ai-page` 基础设施 7 条测试**（此前零覆盖），4 个变异全红 |
 
 **M1 的 DoD**：一句话说「分析白酒四家和沪深300 近一年相关性」→ 对话流出图 →
 点 Pin → 图进页面 → 刷新还在 → 杀掉 pi 进程重问，它还记得上文。
