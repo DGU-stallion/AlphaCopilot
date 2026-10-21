@@ -5,7 +5,10 @@ import { Panel } from "@/components/ui/Panel";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { Caliber } from "@/components/ui/Caliber";
 import { EquityChart, equityLegend } from "@/components/charts/EquityChart";
+import { PriceChart } from "@/components/charts/PriceChart";
+import { EChart } from "@/components/ui/EChart";
 import { usePalette } from "@/theme/usePalette";
+import { rendererOf } from "@/lib/research";
 import { api } from "@/lib/api";
 import { pctColor } from "@/lib/colors";
 import { cn } from "@/lib/utils";
@@ -75,11 +78,17 @@ export function Backtest() {
   const blocks = res.data?.blocks ?? [];
   const metric = blocks.find((b) => b.kind === "metric");
   const charts = blocks.filter((b) => b.kind === "chart");
+  // 除「净值+回撤」那一块之外，页面上还有 tearsheet（滚动 Sharpe / 月度热力图）
+  // 与归因块。这些必须渲染出来 —— 只画净值等于把后端算好的东西丢掉了
+  // （实测：加了 block 但页面只看 equity，其余全被静默忽略）。
+  const metrics = blocks.filter((b) => b.kind === "metric");
   // 净值与回撤在同一个实例的两个 pane（ADR-0014 §6）。优先取声明 lwc 的那块，
   // 老后端（无 renderer）时回退到第一块 chart —— 但那时没有 lwc 载荷，会提示无数据。
   // 后端有两个 lwc chart 块（净值 + 回撤）。回撤已在净值块的 payload.drawdown 里，
   // 所以只画「有 series 的那个」（净值块），避免同一段回撤画两遍。
   const equity = charts.find((b) => (b.lwc?.series?.length ?? 0) > 0);
+  const otherCharts = charts.filter((b) => b !== equity);
+  const otherMetrics = metrics.filter((b) => b !== metric);
   const legend = equityLegend(equity?.lwc ?? null, usePalette());
   const err = res.error;
 
@@ -186,7 +195,61 @@ export function Backtest() {
         </>
       )}
 
+          {/* 其余分析块（tearsheet / 归因）。按 renderer 分派：
+              lwc → PriceChart（折线），echarts → EChart。
+              不做「按 fn 名硬编码」——那会让加一个新图就要改一次页面。 */}
+          {otherMetrics.map((m, i) => m.metric && (
+            <Panel key={`m-${i}`}>
+              {m.title && <h3 className="mb-2 text-[13px] font-semibold">{m.title}</h3>}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {m.metric.items.map((it) => (
+                  <div key={it.label} className="rounded-[4px] border border-border px-3 py-2">
+                    <p className="truncate text-[11px] text-muted-foreground">{it.label}</p>
+                    <p className="mt-1 font-mono text-[15px]" style={{ fontVariantNumeric: "tabular-nums" }}>
+                      {String(it.value)}
+                    </p>
+                    {it.hint && <p className="mt-0.5 text-[10px] text-muted-foreground/50">{it.hint}</p>}
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          ))}
+
+          {otherCharts.length > 0 && (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {otherCharts.map((b, i) => (
+                <Panel key={`c-${i}`}>
+                  {b.title && <h3 className="mb-2 text-[13px] font-semibold">{b.title}</h3>}
+                  {rendererOf(b) === "lwc" ? (
+                    (b.lwc?.series?.length ?? 0) > 0
+                      ? <div className="h-[220px]"><PriceChart bars={lwcToBars(b)} mode="line" /></div>
+                      : <p className="py-8 text-center text-[12px] text-muted-foreground/60">无数据</p>
+                  ) : (
+                    // 剥掉 option 里的 title：Panel 已经用 h3 显示了标题，
+                    // ECharts 再画一遍就是同一句话出现两次（实测重复）。
+                    <EChart option={stripTitle(b.option)} height={220} />
+                  )}
+                </Panel>
+              ))}
+            </div>
+          )}
+
       <Disclaimer />
     </div>
   );
+}
+
+/** 把 lwc 载荷的 {time,value} 转成 PriceChart 需要的 bar 形状（line 模式只用 close）。 */
+function lwcToBars(b: { lwc?: { series?: { points?: { time: string; value: number }[] }[] } }) {
+  const pts = b.lwc?.series?.[0]?.points ?? [];
+  return pts.map((p) => ({
+    datetime: p.time, open: p.value, close: p.value, high: p.value, low: p.value, vol: 0,
+  }));
+}
+
+/** 去掉 ECharts option 里的 title（Panel 的 h3 已经显示标题）。 */
+function stripTitle(opt: Record<string, unknown> | null | undefined) {
+  if (!opt) return null;
+  const { title: _t, ...rest } = opt as Record<string, unknown>;
+  return rest;
 }

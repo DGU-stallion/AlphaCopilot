@@ -508,6 +508,17 @@ def tearsheet_drawdown(symbol: str, fast: int = 20, slow: int = 60,
     return chart.line(res.dates, {"回撤(%)": dd_pct}, title=f"{name} 回撤（tear sheet 口径）")
 
 
+def _y_axis(months: list[dict[str, Any]]) -> dict[str, Any]:
+    """y 轴只列**有值**的月份（降序：1 月在最下，读起来像日历）。
+
+    传全部月份（含 None）会让 12 行里只有 3–6 行有格子，
+    有效格子被压扁、数字标签互相压住（实测截图见过）。
+    """
+    used = sorted({int(m["month"]) for m in months if m.get("ret") is not None},
+                  reverse=True)
+    return {"data": [str(m) for m in used]}
+
+
 @register("tearsheet.monthly_heatmap", params=_PARAMS)
 def tearsheet_monthly_heatmap(symbol: str, fast: int = 20, slow: int = 60,
                               range: str = "1y") -> dict:
@@ -530,10 +541,13 @@ def tearsheet_monthly_heatmap(symbol: str, fast: int = 20, slow: int = 60,
         "grid": {"left": 60, "right": 24, "top": 48, "bottom": 80, "containLabel": True},
         "xAxis": {"type": "category", "data": [str(y) for y in years],
                   "splitArea": {"show": True}},
-        "yAxis": {"type": "category", "data": [str(i) for i in _range(1, _MONTHS + 1)],
-                  "splitArea": {"show": True}},
+        # y 轴只列**有数据的月份**。固定画 12 行时，只有 3 个月有值 →
+        # 有效格子被压成 1/4 高度、标签全挤在一起（实测截图）。
+        # 月份仍是类目值（不是索引），所以格子与月份的对应关系不会错。
+        "yAxis": {"type": "category", **_y_axis(months), "splitArea": {"show": True}},
         "visualMap": {"min": -bound, "max": bound, "calculable": True,
                       "orient": "horizontal", "left": "center", "bottom": 16},
         "series": [{"name": "月收益(%)", "type": "heatmap", "data": cells,
-                    "label": {"show": True}}],
+                    # 格子够宽时才显示数值，否则数字会互相压住（窄面板）
+                    "label": {"show": True, "fontSize": 10}}],
     })

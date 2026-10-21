@@ -12,6 +12,23 @@ interface Props {
 
 // 把设计系统的主题色注入后端产的 option：坐标轴/网格/文字/tooltip 用 CSS 变量色，
 // 图表才和玻璃暖橙风一致。只补样式，不改数据结构（series.data 原样）。
+/** 给带 semanticScale="pnl-bars" 的柱系列逐柱按正负上色。 */
+function retintBars(series: any, t: ReturnType<typeof getChartTheme>): any {
+  if (!Array.isArray(series)) return series;
+  return series.map((s: any) => {
+    if (!s || s.semanticScale !== "pnl-bars" || !Array.isArray(s.data)) return s;
+    const { semanticScale: _drop, ...rest } = s;
+    return {
+      ...rest,
+      data: s.data.map((v: any) => (
+        typeof v === "number"
+          ? { value: v, itemStyle: { color: v >= 0 ? t.upColor : t.downColor } }
+          : v
+      )),
+    };
+  });
+}
+
 /** 把带 semanticScale="pnl" 的 visualMap 用当前 palette 重上色。 */
 function retintPnl(vm: any, t: ReturnType<typeof getChartTheme>): any {
   const apply = (one: any) => {
@@ -55,6 +72,9 @@ function themed(option: Record<string, any>): Record<string, any> {
     // 不这样做的话：后端写死「涨=红」，用户切成国际口径后热力图还是红的 ——
     // 同一屏里数字绿了、热力图红着。
     visualMap: retintPnl(option.visualMap, t),
+    // 柱状图逐柱按正负上色（后端标 semanticScale: "pnl-bars"）。
+    // 不做的话「选股 +5%」和「择时 -12%」是一个颜色，归因图等于没读。
+    series: retintBars(option.series, t),
     xAxis: option.xAxis ? applyAxis(option.xAxis) : undefined,
     yAxis: option.yAxis ? applyAxis(option.yAxis) : undefined,
   };

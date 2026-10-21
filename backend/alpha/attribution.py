@@ -216,8 +216,16 @@ def attribution_split(symbol: str, fast: int = 20, slow: int = 60,
     def v(x: float | None) -> float | None:
         return None if x is None else round(x * 100, 4)
 
-    return chart.bar(
+    opt = chart.bar(
         ["选股（满仓基准）", "择时（进出场）"],
         {"贡献(%)": [v(tv["selection"]), v(tv["timing"])]},
         title="收益归因：选股 vs 择时",
     )
+    # 逐柱按正负上色。不给的话整个系列一个颜色（实测全橙），
+    # 「选股 +5% 和择时 -12%」看起来一样，归因就白做了。
+    # 用语义标记让前端按当前口径上色（同 param_scan 的做法）：
+    # 后端不定义颜色，只说「这一列要按正负着色」。
+    for s in opt.get("series", []):
+        if isinstance(s, dict) and s.get("type") == "bar":
+            s["semanticScale"] = "pnl-bars"
+    return opt
