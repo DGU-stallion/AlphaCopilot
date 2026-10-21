@@ -1,11 +1,11 @@
-"""AlphaCopilot MCP server —— 挂给 dsh 的模型可见工具（stdio transport）。
+"""AlphaCopilot MCP server —— 挂给 agent 运行时的模型可见工具（stdio transport）。
 
 工具：
   run_python  —— 沙箱执行 agent 代码（核心：对话即研究的执行面）
   get_quote   —— A 股实时行情快照（数据层直连）
 
 工具层零业务逻辑：校验 → 调 alpha.*/research.* / sandbox → JSON 化 → 截断。
-模型看到的工具名为 mcp__<serverName>__<rawName>（serverName 在 cordis.yml 里配为 research）。
+模型看到的工具名为 mcp__<serverName>__<rawName>（serverName 在 .pi/mcp.json 里配为 alphacopilot）。
 """
 
 from __future__ import annotations

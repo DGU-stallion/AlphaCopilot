@@ -3,7 +3,7 @@
 端点：
   POST /sessions                    -> {session_id}
   GET  /sessions                    -> [session...]
-  GET  /sessions/{id}/messages      -> [message...]（前端从我们的 DB 重建对话，不读 dsh JSONL）
+  GET  /sessions/{id}/messages      -> [message...]（前端从我们的 DB 重建对话，不读运行时会话文件）
   POST /sessions/{id}/messages      -> 落库 user + 触发 agent turn（后台流）
   GET  /sessions/{id}/stream        -> SSE：text_delta 等中立事件逐条推；支持 Last-Event-ID 重连
 """
@@ -22,7 +22,7 @@ from pydantic import BaseModel
 
 from agent.persona import system_prompt as _compliance_prompt
 from agent.provider import ProviderSpec
-from agent.providers.dsh import DshProvider
+from agent.providers.pi import PiProvider
 from api.builtin_pages import register_builtin_pages
 from api.business import build_business_router
 from api.jobs import JobQueue
@@ -65,7 +65,7 @@ def _default_provider_factory(workspace_root: Path, base_url=None, api_key=None,
             base_url=base_url,
             api_key=api_key,
         )
-        return DshProvider(spec), ws
+        return PiProvider(spec), ws
 
     return factory
 
@@ -76,16 +76,26 @@ def create_app(
     base_url: str | None = None,
     api_key: str | None = None,
     model: str | None = None,
+    provider_factory=None,
 ) -> FastAPI:
+    """构建 FastAPI 应用。
+
+    `provider_factory` 是**测试注入点**：签名 `(session_id) -> (AgentProvider, workspace)`。
+    生产不传，走 `_default_provider_factory`（真实 PiProvider）。
+
+    为什么需要它：测试要跑完整 turn 但不想启动真 pi + 真模型（慢、要凭据、不确定）。
+    原先 v1 用 mock HTTP 端点顶替，但 Pi 自己发模型请求，我们这一侧拦不到。
+    注入 provider 是同一个 seam（`AgentProvider`）上的更直接做法——
+    测的是 API + 会话编排，而 provider 的具体实现本来就不该被这些测试关心。
+    """
     store = Store(db_path)
     register_builtin_pages(store)
     ws_root = workspace_root or Path(tempfile.mkdtemp(prefix="alphacopilot-ws-"))
     jobs = JobQueue(store, ws_root)
-    manager = SessionManager(
-        store,
-        _default_provider_factory(ws_root, base_url=base_url, api_key=api_key, model=model),
-        jobs=jobs,
+    factory = provider_factory or _default_provider_factory(
+        ws_root, base_url=base_url, api_key=api_key, model=model
     )
+    manager = SessionManager(store, factory, jobs=jobs)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):

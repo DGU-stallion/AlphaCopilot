@@ -1,8 +1,8 @@
 // 「接入 AI」页（S5）—— AI 助手的运行说明 + 连通状态自检。
 //
-// 定位：AlphaCopilot 的 AI 助手由**后端**统一接入（dsh SDK + agnes 端点 + 项目专属
-// profile alphacopilot-prod），前端不配置、不持有模型 key。本页因此不是"填 key"的表单，
-// 而是：说明它怎么工作、做一次连通自检、讲清合规边界。
+// 定位：AlphaCopilot 的 AI 助手由**后端**统一接入（Pi 运行时子进程 RPC），
+// 前端不配置、不持有模型 key。本页因此不是"填 key"的表单，而是：说明它怎么工作、
+// 做一次连通自检、讲清合规边界。
 
 import { useState } from "react";
 import { Sparkles, CheckCircle2, XCircle, Loader2, ShieldCheck, MessageSquare } from "lucide-react";
@@ -49,10 +49,8 @@ export function Settings() {
         <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <Sparkles className="h-4 w-4 text-primary" /> 运行配置
         </h3>
-        <Row k="接入方式" v="dsh SDK（本地运行时）" />
-        <Row k="模型端点" v="agnes（apihub.agnes-ai.com）" />
-        <Row k="模型" v="agnes-2.5-flash" />
-        <Row k="Profile" v="alphacopilot-prod" />
+        <Row k="接入方式" v="Pi 运行时（本地子进程 · RPC）" />
+        <Row k="模型端点" v="由本机 Pi 配置决定" />
         <Row k="可用工具" v="run_python · get_quote · submit_backtest" />
         <p className="mt-3 text-xs text-muted-foreground">
           模型密钥由后端统一持有（不在浏览器保存、不经前端传输），因此本页无需填写任何 key。

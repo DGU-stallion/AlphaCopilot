@@ -11,7 +11,7 @@ agent 不直接写库（只写 workspace + 调副作用 MCP 工具，业务层�
 `Store` 保留为聚合面候（facade），方法委派到各 repo，向后兼容既有调用方与测试。
 
 五张表：
-  session   —— 一条对话（前端意义上的会话；映射见 T27，dsh session_id 每次进程运行新分配）
+  session   —— 一条对话（前端意义上的会话；映射见 T27，运行时 session_id 每次进程运行新分配）
   message   —— 对话里的一条消息（user / assistant）
   artifact  —— agent 产出物（chart / table / markdown / metric / image）
   page      —— 展示页 spec（kind builtin/user；status draft/published）

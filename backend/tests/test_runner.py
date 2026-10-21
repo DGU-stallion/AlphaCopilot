@@ -1,6 +1,12 @@
-"""T33 run_python 沙箱执行器测试（复用 G3 边界，落到生产执行器）。
+"""run_python 记录式执行器的测试（原 T33，M1-6 随 sandbox→runner 改名）。
 
-DoD：沙箱内执行、artifact 写入 runs/<run_id>/、超时/输出截断契约；读敏感目录被拒。
+覆盖：执行 + artifact 落 runs/<run_id>/、import alpha、超时被杀、输出截断、
+以及**本通道自身**的限权（读敏感目录被拒）。
+
+⚠️ 重要口径（ADR-0012「已决 2」）：这些断言只证明**这条通道**的限制生效，
+**不证明 agent 整体受限**。agent 有完整 bash，同样的事它绕得过去。
+把本文件当成「我们有沙箱保护」是误读——它不是安全边界。
+
 （macOS 专属：用 /usr/bin/sandbox-exec。）
 """
 
@@ -10,10 +16,10 @@ from pathlib import Path
 
 import pytest
 
-from mcpserver.sandbox import run_python
+from mcpserver.runner import run_python
 
 pytestmark = pytest.mark.skipif(
-    sys.platform != "darwin", reason="run_python 沙箱依赖 macOS sandbox-exec"
+    sys.platform != "darwin", reason="run_python 通道用 macOS sandbox-exec 做纵深防御"
 )
 
 
@@ -60,7 +66,13 @@ def test_output_truncated():
         assert len(r.stdout) <= 6000 + 64  # 截断提示尾巴
 
 
-def test_read_secret_denied():
+def test_read_secret_denied_by_this_channel():
+    """本通道拒绝读敏感目录。
+
+    ⚠️ 读这一条时不要得出「agent 读不到密钥」的结论：agent 用 bash 能直接 `cat`。
+    这条只保证「当 agent 选择走 run_python 时，我们不会替它开门」。
+    真正的防线是 prompt 层约束 + 人看着跑（ADR-0010 §3 显式接受的残余风险）。
+    """
     with tempfile.TemporaryDirectory(prefix="t33-sec-") as tmp:
         tmp = Path(tmp).resolve()
         ws = tmp / "ws"

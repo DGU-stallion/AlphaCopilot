@@ -1,8 +1,8 @@
 """Agent Provider 防腐层契约（ADR-0007）——**契约桩，签名已定稿，实现见 providers/**。
 
-这是业务层与具体 agent 运行时（dsh / 未来的 Claude Code 等）之间的唯一边界。
+这是业务层与具体 agent 运行时（当前是 Pi，未来可能是别的）之间的唯一边界。
 api 层只依赖本模块的 AgentEvent / AgentProvider / ProviderSpec 三个抽象，
-不得 import 任何 provider 具体实现，不得出现 dsh 私有词汇（cordis/session_root/
+不得 import 任何 provider 具体实现，不得出现任何运行时的私有词汇（如 cordis/session_root/
 text-delta/thinking 等）。
 
 替换 provider = 新增 providers/<name>.py 实现 AgentProvider，不改业务层。
@@ -56,10 +56,10 @@ class McpServerSpec:
 
 @dataclass
 class ProviderSpec:
-    """中立的运行参数。不含任何 provider 私有词汇（cordis/session_root/thinking）。
+    """中立的运行参数。不含任何 provider 私有词汇（如 cordis/session_root/thinking）。
 
-    provider 实现内部自行把这些映射到各自的配置（dsh 映射到 cordis.yml + env）。
-    模型私有调参（如 dsh 的 thinking/reasoningEffort）由 provider 内部按目标端点
+    provider 实现内部自行把这些映射到各自的配置（Pi 映射到命令行参数 + .pi/mcp.json）。
+    模型私有调参（如思考强度）由 provider 内部按目标端点
     能力决定是否启用，**不在本 spec 暴露**。
     """
 
@@ -68,6 +68,9 @@ class ProviderSpec:
     mcp_servers: list[McpServerSpec] = field(default_factory=list)
     skills_dir: Path | None = None
     model: str | None = None
+    # 下面两个字段**仅为向后兼容保留**，PiProvider 不使用它们：
+    # Pi 从 `~/.pi/agent/models.json` + `auth.json` 读端点与凭据，
+    # 传进来也不起作用。要换端点请改 models.json。
     base_url: str | None = None
     api_key: str | None = None
     request_timeout_seconds: float = 120.0

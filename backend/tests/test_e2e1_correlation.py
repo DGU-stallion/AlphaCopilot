@@ -1,33 +1,40 @@
-"""T36 E2E-1 相关性场景 —— keyless（mock 模型驱动真实 agent + run_python + artifact 投递）。
+"""E2E-1 相关性场景 —— artifact 摄取链路（无网络、无模型、无凭据）。
 
-M2 capstone。链路（全程无真实 key）：
-  用户「分析白酒板块与沪深300 相关性」
-   → mock 模型首轮返回 tool_call: mcp__research__run_python(code=用 alpha.chart.heatmap
-     产相关性热力图 chart.json + 写 manifest.json)
-   → dsh 真实执行我们的 run_python（Seatbelt 沙箱）→ 产出落 workspace/runs/<run_id>/
-   → tool 结果回流，mock 第二轮返回文字结论
-   → turn 结束：session_manager 扫描 runs/ 摄取 manifest → artifact 落库 + 挂消息 + 事件
-  验收：SSE 见 text_delta（结论）+ artifact/attached；GET messages 里 assistant 消息
-        挂着一个 kind=chart 的 artifact，payload 是 heatmap option（series[0].type=heatmap）。
+## 这条测试到底在验什么
 
-用真实 uvicorn（SSE 长驻流不能用 ASGITransport）。
+它验的是**业务层**这一段：agent 产出落到 `workspace/runs/<id>/` 之后，
+`session_manager` 会不会扫描、校验、把 artifact 落库、挂到消息、发事件。
+这是「对话即研究」的产品闭环里最容易出错的一环（漏扫、校验过严/过松、
+事件没发、挂错消息），而且出错时不会崩——只是界面上一片空白。
+
+## v1 → v2 的测法变化
+
+v1 用 mock OpenAI SSE 端点，让「模型」返回一个 `run_python` 的 tool_call，
+再真的执行。Pi 之后我们拦不到模型请求，也不该在业务层测试里跑真模型。
+
+所以现在直接注入一个假 provider：它收到 prompt 后**自己执行**agent 本该执行的
+那段代码（写 chart.json + manifest.json），然后吐结论文字。
+这样跳过的是「模型是否愿意调工具」这个不确定环节（那是模型能力问题，
+不该由 CI 断言），保留的是我们要守的确定性链路。
+
+真链路（真模型 → 真调 MCP 工具 → 真执行 → 真产物）在 M1-3 已用真 pi 验证过。
 """
+
+from __future__ import annotations
 
 import asyncio
 import json
 import socket
 import tempfile
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 import httpx
-import pytest
 import uvicorn
 
+from agent.provider import AgentEvent
 from api.app import create_app
 
-# agent 在沙箱里跑的代码：用 alpha.chart.heatmap 产相关性热力图 + 写 manifest.json。
+# agent 在 workspace 里跑的代码：用 alpha.chart.heatmap 产热力图 + 写 manifest.json。
 _AGENT_CODE = r"""
 import json
 from alpha import chart
@@ -64,134 +71,177 @@ _CONCLUSION = (
 )
 
 
-def _tool_call_chunks(call_id, name, arguments):
-    return [
-        {"choices": [{"delta": {"role": "assistant", "content": None}}]},
-        {"choices": [{"delta": {"tool_calls": [{
-            "index": 0, "id": call_id, "type": "function",
-            "function": {"name": name, "arguments": json.dumps(arguments)},
-        }]}}]},
-        {"choices": [{"delta": {"content": ""}, "finish_reason": "tool_calls"}]},
-    ]
+class _ProducingProvider:
+    """假 provider：在 workspace 里真实执行 _AGENT_CODE，然后吐结论。
+
+    「执行」这一步不省：artifact 摄取的前提就是 runs/<id>/ 下真有文件。
+    如果这里只 mock 出一条 tool_result 事件，测到的就只是「事件转发」，
+    而不是「产物被找到并校验落库」——后者才是这条 E2E 的意义。
+    """
+
+    def __init__(self, workspace: Path, code: str, conclusion: str) -> None:
+        self._workspace = workspace
+        self._code = code
+        self._conclusion = conclusion
+        self._closed = False
+
+    def start(self) -> None:
+        return
+
+    def abort(self, reason: str = "") -> None:
+        return
+
+    def close(self) -> None:
+        self._closed = True
+
+    def is_alive(self) -> bool:
+        return not self._closed
+
+    async def astream(self, prompt: str):
+        from agent.provider import EVENT_TEXT_DELTA, EVENT_TURN_END
+
+        run_dir = self._workspace / "runs" / "e2e1"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "code.py").write_text(self._code, encoding="utf-8")
+
+        proc = await asyncio.create_subprocess_exec(
+            __import__("sys").executable,
+            str(run_dir / "code.py"),
+            cwd=str(run_dir),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=_backend_env(),
+        )
+        stdout, stderr = await proc.communicate()
+        assert proc.returncode == 0, f"agent 代码执行失败: {stderr.decode()[:500]}"
+        assert b"HEATMAP_DONE" in stdout
+
+        for ch in self._conclusion:
+            yield AgentEvent(kind=EVENT_TEXT_DELTA, payload={"text": ch})
+        yield AgentEvent(
+            kind=EVENT_TURN_END,
+            payload={"final_text": self._conclusion, "finish_reason": "stop"},
+        )
 
 
-def _text_chunks(text):
-    chunks = [{"choices": [{"delta": {"role": "assistant", "content": None}}]}]
-    for piece in text:
-        chunks.append({"choices": [{"delta": {"content": piece}}]})
-    chunks.append({"choices": [{"delta": {"content": ""}, "finish_reason": "stop"}]})
-    return chunks
+def _backend_env() -> dict:
+    """让子进程能 import alpha/research。"""
+    import os
+    import sys
+
+    env = dict(os.environ)
+    backend = str(Path(__file__).resolve().parents[1])
+    env["PYTHONPATH"] = backend + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    env["PYTHON"] = sys.executable
+    return env
 
 
-def _mock_correlation_model():
-    """首轮 tool_call run_python；见到 tool 结果后返回文字结论。"""
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_POST(self):
-            n = int(self.headers.get("content-length", "0"))
-            body = json.loads(self.rfile.read(n))
-            messages = body.get("messages", [])
-            latest = messages[-1] if messages else {}
-            has_tool_result = any(
-                isinstance(m, dict) and m.get("role") == "tool" for m in messages
-            )
-            self.send_response(200)
-            self.send_header("content-type", "text/event-stream")
-            self.end_headers()
-            if has_tool_result or (isinstance(latest, dict) and latest.get("role") == "tool"):
-                chunks = _text_chunks(_CONCLUSION)
-            else:
-                chunks = _tool_call_chunks(
-                    "call-e2e1", "mcp__research__run_python", {"code": _AGENT_CODE}
-                )
-            for c in chunks:
-                self.wfile.write(f"data: {json.dumps(c)}\n\n".encode())
-            self.wfile.write(b"data: [DONE]\n\n")
-            self.wfile.flush()
-
-        def log_message(self, *_):
-            return
-
-    server = HTTPServer(("127.0.0.1", 0), Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    return server, f"http://127.0.0.1:{server.server_address[1]}/v1"
-
-
-def _free_port():
+def _free_port() -> int:
     s = socket.socket()
     s.bind(("127.0.0.1", 0))
-    p = s.getsockname()[1]
+    port = s.getsockname()[1]
     s.close()
-    return p
+    return port
 
 
-@pytest.mark.skipif(__import__("sys").platform != "darwin",
-                    reason="run_python 沙箱依赖 macOS sandbox-exec")
-@pytest.mark.xfail(
-    strict=True,
-    reason="依赖已消失的 deepseek_harness SDK；M1-2 换 PiProvider 后按新契约重写",
-)
 async def test_e2e1_correlation_heatmap_in_chat_stream():
-    server, base = _mock_correlation_model()
-    try:
-        with tempfile.TemporaryDirectory(prefix="e2e1-") as tmp:
-            app = create_app(db_path=":memory:", workspace_root=Path(tmp),
-                             base_url=base, api_key="sk-mock")
-            port = _free_port()
-            srv = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port,
-                                                log_level="error"))
-            task = asyncio.create_task(srv.serve())
-            for _ in range(100):
-                if srv.started:
-                    break
-                await asyncio.sleep(0.05)
+    """端到端：agent 产出热力图 → 摄取 → 挂到消息 → SSE 事件 → 前端可取到 option。"""
+    with tempfile.TemporaryDirectory(prefix="e2e1-") as tmp:
 
-            async with httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}",
-                                         trust_env=False) as client:
-                sid = (await client.post("/api/sessions")).json()["session_id"]
-                await client.post(
-                    f"/api/sessions/{sid}/messages",
-                    json={"content": "分析近一年白酒板块 5 只标的与沪深300 的相关性"},
-                )
+        def factory(session_id: str):
+            ws = Path(tmp) / session_id / "ws"
+            ws.mkdir(parents=True, exist_ok=True)
+            return _ProducingProvider(ws, _AGENT_CODE, _CONCLUSION), ws
 
-                # 收 SSE 到 message/committed；记录事件类型 + 结论文本 + 是否 artifact/attached
-                seen_types: set[str] = set()
-                deltas: list[str] = []
+        app = create_app(
+            db_path=":memory:", workspace_root=Path(tmp), provider_factory=factory
+        )
+        port = _free_port()
+        srv = uvicorn.Server(
+            uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
+        )
+        task = asyncio.create_task(srv.serve())
+        for _ in range(100):
+            if srv.started:
+                break
+            await asyncio.sleep(0.05)
 
-                async def read():
-                    async with client.stream("GET", f"/api/sessions/{sid}/stream") as resp:
-                        cur = None
-                        async for line in resp.aiter_lines():
-                            if line.startswith("event:"):
-                                cur = line.split("event:", 1)[1].strip()
-                                seen_types.add(cur)
-                            elif line.startswith("data:") and cur == "text_delta":
-                                d = json.loads(line[5:].strip())
-                                t = d.get("text")
-                                if isinstance(t, str):
-                                    deltas.append(t)
-                            if cur == "message/committed":
-                                break
+        async with httpx.AsyncClient(
+            base_url=f"http://127.0.0.1:{port}", trust_env=False
+        ) as client:
+            sid = (await client.post("/api/sessions")).json()["session_id"]
+            await client.post(
+                f"/api/sessions/{sid}/messages",
+                json={"content": "分析近一年白酒板块 5 只标的与沪深300 的相关性"},
+            )
 
-                await asyncio.wait_for(read(), timeout=90)
+            seen_types: set[str] = set()
+            deltas: list[str] = []
 
-                # 结论文字逐字出现
-                conclusion = "".join(deltas)
-                assert "相关性" in conclusion, f"结论未含相关性: {conclusion!r}"
-                assert "不构成投资建议" in conclusion  # 合规口径
-                # artifact 被摄取并挂载（事件）
-                assert "artifact/attached" in seen_types, f"事件: {seen_types}"
+            async def read():
+                async with client.stream("GET", f"/api/sessions/{sid}/stream") as resp:
+                    cur = None
+                    async for line in resp.aiter_lines():
+                        if line.startswith("event:"):
+                            cur = line.split("event:", 1)[1].strip()
+                            seen_types.add(cur)
+                        elif line.startswith("data:") and cur == "text_delta":
+                            d = json.loads(line[5:].strip())
+                            t = d.get("text")
+                            if isinstance(t, str):
+                                deltas.append(t)
+                        if cur == "message/committed":
+                            break
 
-                # GET messages：assistant 消息挂着 heatmap chart artifact
-                msgs = (await client.get(f"/api/sessions/{sid}/messages")).json()
-                assistant = [m for m in msgs if m["role"] == "assistant"][-1]
-                arts = assistant["artifacts"]
-                assert len(arts) >= 1
-                chart_art = next(a for a in arts if a["kind"] == "chart")
-                assert chart_art["payload"]["series"][0]["type"] == "heatmap"
+            await asyncio.wait_for(read(), timeout=90)
 
-            srv.should_exit = True
-            await task
-            app.state.manager.close_all()
-    finally:
-        server.shutdown()
+            conclusion = "".join(deltas)
+            assert "相关性" in conclusion, f"结论未含相关性: {conclusion!r}"
+            assert "不构成投资建议" in conclusion, "结论缺合规口径"
+
+            assert "artifact/attached" in seen_types, f"未发 artifact 事件，实际: {seen_types}"
+
+            msgs = (await client.get(f"/api/sessions/{sid}/messages")).json()
+            assistant = [m for m in msgs if m["role"] == "assistant"][-1]
+            arts = assistant["artifacts"]
+            assert len(arts) >= 1, f"assistant 消息没挂 artifact：{assistant}"
+
+            chart_art = next(a for a in arts if a["kind"] == "chart")
+            assert chart_art["payload"]["series"][0]["type"] == "heatmap", (
+                f"chart payload 不是 heatmap option：{str(chart_art['payload'])[:300]}"
+            )
+
+        srv.should_exit = True
+        await task
+        app.state.manager.close_all()
+
+
+def test_agent_code_produces_valid_manifest_on_its_own(tmp_path):
+    """单元：_AGENT_CODE 独立跑就能产出合法 manifest。
+
+    单独一条的理由：上面那条 E2E 失败时，很难分清是「agent 代码本身有问题」
+    还是「摄取链路有问题」。这条把第一个变量单独钉住。
+    """
+    run_dir = tmp_path / "runs" / "e2e1"
+    run_dir.mkdir(parents=True)
+    (run_dir / "code.py").write_text(_AGENT_CODE, encoding="utf-8")
+
+    import subprocess
+
+    r = subprocess.run(
+        [__import__("sys").executable, "code.py"],
+        cwd=run_dir,
+        capture_output=True,
+        text=True,
+        env=_backend_env(),
+        timeout=60,
+    )
+    assert r.returncode == 0, f"执行失败: {r.stderr[:500]}"
+    assert "HEATMAP_DONE" in r.stdout
+
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["run_id"] == "e2e1"
+    assert manifest["artifacts"][0]["kind"] == "chart"
+
+    option = json.loads((run_dir / "chart.json").read_text(encoding="utf-8"))
+    assert option["series"][0]["type"] == "heatmap"

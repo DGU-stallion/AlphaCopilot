@@ -7,7 +7,7 @@
 - SSE 断线重连：客户端带 Last-Event-ID，从 buffer 里补发之后的事件。
 
 零 provider 细节泄漏：只依赖 agent.provider 的 AgentProvider / AgentEvent 中立契约，
-不 import 任何具体 provider 实现，不出现 dsh 私有词汇。
+不 import 任何具体 provider 实现，不出现任何运行时的私有词汇。
 """
 
 from __future__ import annotations

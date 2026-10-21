@@ -1,15 +1,35 @@
-"""run_python 沙箱执行器（T33 基础设施，非业务逻辑）。
+"""run_python 记录式执行器（M1-6 重新定位；原 mcpserver/sandbox.py）。
 
-用 macOS sandbox-exec + Seatbelt profile（G3 验证过）包裹一个 Python 子进程执行 agent
-生成的代码。边界（G3 结论）：限写（仅 workspace）、拒读敏感目录、禁网络、wall-clock 超时。
+## 它是什么，不是什么
 
-约定：
-- 每次执行分配 run_id，建 workspace/runs/<run_id>/，代码原样存 code.py（可重跑/可提炼）。
-- 代码里可 `import alpha` / `import research`（执行器把 backend 注入 sys.path）。
-- stdout/stderr 截断到上限（默认 6000 字符），防止 agent 上下文被撑爆。
-- 超时 → 杀进程，返回 timed_out=True。
+**它是**：一个把 agent 写的 Python 代码跑起来、并顺手留档的通道。
+**它不是**：安全边界。ADR-0012「已决 2」已裁决，原先叫「沙箱」是误导。
 
-这是纯基础设施：不碰数据库、不校验产出内容（artifact 校验在业务层 T34）。
+为什么不再算安全边界：agent 现在有完整 bash（ADR-0010），可以写任意位置、
+读 `~/.ssh`、联网——下面这些 Seatbelt 限制全部绕得过去。把本模块当边界保护
+产品，是自我安慰。
+
+## 那为什么还留着
+
+三个与安全无关、但确实有用的性质：
+
+1. **自动留档** —— 每次执行分配 run_id、建 `workspace/runs/<run_id>/`、把代码
+   原样存成 `code.py`。这正是 provenance 里 `runId` / `codeHash` 的抓手
+   （走 bash 就得从 Pi session JSONL 反推）。
+2. **禁网络**（下面是刻意保留的）—— 让「取数走我们的数据层」成为默认习惯，
+   不绕过 as-of / 缓存 / 限流。
+3. **可复现** —— 半年后能翻出当时的代码重跑。
+
+Seatbelt profile（`run_python.sb`）只约束**这条通道自身**：限写（仅 workspace）、
+对已知密钥目录 deny 读、禁网、wall-clock 超时。这些限制是纵深防御的一层，
+**不代表 agent 整体受限**——见 ADR-0010 §3 的显式风险记录。
+
+## 约定
+
+- 代码里可 `import alpha` / `import research`（执行器把 backend 注入 sys.path）
+- stdout/stderr 截断到上限（默认 6000 字符），防止 agent 上下文被撑爆
+- 超时 → 杀进程，返回 timed_out=True
+- 不碰数据库、不校验产出内容（artifact 校验在业务层）
 """
 
 from __future__ import annotations

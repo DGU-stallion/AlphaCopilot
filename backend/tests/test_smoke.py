@@ -1,6 +1,6 @@
 """Smoke tests: research data-layer library imports cleanly without web framework deps.
 
-Legacy dsh-route modules (chat / cli_runtime / portfolio / myreports / caches) were
+Legacy route modules (chat / cli_runtime / portfolio / myreports / caches) were
 removed during the deterministic-platform cleanup. Only the live data layer remains:
 astock / gstock / market / newsradar / models.
 """

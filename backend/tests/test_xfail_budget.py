@@ -1,7 +1,8 @@
 """门禁：xfail 数量不得增加（M0-2）。
 
-背景：v2 重构期间有 8 个测试依赖已消失的 `deepseek_harness` SDK，暂时标为
-`xfail(strict=True)`，等 M1-2 换成 PiProvider 后按新契约重写。
+背景：v2 重构期间曾有 8 个测试依赖已消失的 `deepseek_harness` SDK，标为
+`xfail(strict=True)` 过渡。M1 换成 PiProvider 后它们已全部按新契约重写并转绿
+（2026-10-21），预算从 8 降到 0。
 
 风险：`xfail` 是一种**合法的静默**——测试不会红，CI 也不会叫。如果不设上限，
 重构过程中「这个测试太麻烦了，先 xfail 吧」会一点点把测试套件掏空，而没人察觉。
@@ -24,9 +25,10 @@ TESTS_DIR = Path(__file__).resolve().parent
 # 动态拼出标记，避免本文件的字面量把自己也统计进去（否则审计器自指）。
 _MARKER = "@pytest.mark." + "xfail("
 
-# 2026-10-21 基线：全部是 deepseek_harness 缺失导致，等 M1-2 处理后应逐个移除。
-# 只允许往下调，不允许往上调。下调后请同步更新这个数字。
-XFAIL_BUDGET = 8
+# 2026-10-21：已清零（M1-2/M1-6 换 Pi + 重写 mock 手法后全部转绿）。
+# 这个数字现在的作用是**禁止**再引入 xfail —— 有测试红了就修，不要藏。
+# 确有必要（例如某个上游接口已知会挂一段时间）时，先在这里显式加数并写清原因与排期。
+XFAIL_BUDGET = 0
 
 
 def _count_xfail_marks() -> dict[str, int]:
@@ -62,4 +64,17 @@ def test_xfail_budget_tracks_reality():
         f"实际 xfail 只有 {total} 个，但预算写着 {XFAIL_BUDGET}。\n"
         f"把 tests/test_xfail_budget.py 里的 XFAIL_BUDGET 改成 {total}，"
         "把腾出来的额度收回。"
+    )
+
+
+def test_no_xfail_at_all():
+    """预算为 0 时，不能有任何 xfail。
+
+    这条与上面那条冗余是故意的：预算 0 意味着「一个都不许」，
+    值得一条直说的断言，而不是让读者从「<= 0」自己推出来。
+    """
+    counts = _count_xfail_marks()
+    assert not counts, (
+        f"不应存在任何 xfail，实际分布：{counts}。\n"
+        "测试红了就修，不要用 xfail 掩盖。"
     )

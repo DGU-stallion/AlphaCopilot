@@ -212,11 +212,11 @@ class PiProvider:
         """
         env = dict(os.environ)
 
-        if self._spec.api_key:
-            env["PI_API_KEY"] = self._spec.api_key
-        if self._spec.base_url:
-            env["PI_BASE_URL"] = self._spec.base_url
-
+        # `base_url` / `api_key` 故意**不**映射成环境变量。
+        # Pi 不认 PI_BASE_URL / PI_API_KEY 这类约定（那是 dsh 的机制），
+        # 它从 `~/.pi/agent/models.json` 与 `auth.json` 读端点与凭据。
+        # 传了也不起作用，反而会让调用方以为「我配了端点」——
+        # 这种假配置比没有配置更糟。要换端点应当改 models.json。
         env.update(self._extra_env)
         return env
 
