@@ -1,6 +1,7 @@
 import { LineChart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { finite, plain, safeArray } from "@/lib/agent";
+import { Num } from "@/components/Num";
 import { Caliber } from "@/components/ui/Caliber";
 import type { Trend, TrendMetric } from "@/lib/agent";
 
@@ -37,18 +38,18 @@ function Spark({ m }: { m: TrendMetric }) {
   );
 }
 
-function fmt(v: number | null, kind?: string, unit?: string): string {
-  if (v == null) return "—";
-  if (kind === "rate") return `${Math.round(v * 100)}%`;
-  if (kind === "pct") return `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
-  return `${v}${unit || ""}`;
+/** 按 kind 渲染末值；pct/rate/plain 都走 <Num>（ADR-0014 §4），null 由 <Num> 统一为 — */
+function val(v: number | null, kind?: string, unit?: string): React.ReactNode {
+  if (kind === "pct") return <Num v={v} pct inheritColor />;
+  if (kind === "rate") return <Num v={v} rate inheritColor />;
+  return <Num v={v} digits={Number.isFinite(v ?? NaN) && Number.isInteger(v) ? 0 : 2} suffix={unit} inheritColor />;
 }
 
 export function TrendPanel({ t }: { t?: Trend }) {
   if (!t) return null;
   if (!t.available) {
     return (
-      <section className="glass rounded-2xl p-5">
+      <section className="rounded-[6px] border border-border bg-card p-5">
         <h3 className="flex items-center gap-1.5 text-sm font-bold">
           <LineChart className="h-4 w-4 text-primary" /> 最近几天怎么走的
         </h3>
@@ -60,7 +61,7 @@ export function TrendPanel({ t }: { t?: Trend }) {
   const metrics = safeArray<TrendMetric>(t.metrics);
 
   return (
-    <section className="glass rounded-2xl p-5">
+    <section className="rounded-[6px] border border-border bg-card p-5">
       <div className="mb-1 flex flex-wrap items-center gap-1.5">
         <LineChart className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-bold">最近几天怎么走的</h3>
@@ -94,7 +95,7 @@ export function TrendPanel({ t }: { t?: Trend }) {
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[12px] text-muted-foreground">{m.label}</span>
                 <span className="text-[13px] font-bold tabular-nums">
-                  {fmt(last, m.kind, m.unit)}
+                  {val(last, m.kind, m.unit)}
                   {delta != null && Math.abs(delta) > 1e-9 && (
                     <span className={cn("ml-1 text-[10px] font-normal",
                       // 只说方向，不判断好坏 —— 好坏要看 higher_is_hotter，交给用户

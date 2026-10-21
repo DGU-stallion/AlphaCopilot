@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { Sparkles, CheckCircle2, XCircle, Loader2, ShieldCheck, MessageSquare } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { GlassCard } from "@/components/ui/GlassCard";
+import { Panel } from "@/components/ui/Panel";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { apiUrl } from "@/lib/base";
 import { authHeaders } from "@/lib/api";
@@ -45,7 +45,7 @@ export function Settings() {
       />
 
       {/* 运行状态 */}
-      <GlassCard className="mb-4 p-5">
+      <Panel className="mb-4 p-5">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <Sparkles className="h-4 w-4 text-primary" /> 运行配置
         </h3>
@@ -55,10 +55,10 @@ export function Settings() {
         <p className="mt-3 text-xs text-muted-foreground">
           模型密钥由后端统一持有（不在浏览器保存、不经前端传输），因此本页无需填写任何 key。
         </p>
-      </GlassCard>
+      </Panel>
 
       {/* 连通自检 */}
-      <GlassCard className="mb-4 p-5">
+      <Panel className="mb-4 p-5">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <CheckCircle2 className="h-4 w-4 text-primary" /> 连通自检
         </h3>
@@ -82,10 +82,10 @@ export function Settings() {
             </span>
           )}
         </div>
-      </GlassCard>
+      </Panel>
 
       {/* 怎么用 */}
-      <GlassCard className="mb-4 p-5">
+      <Panel className="mb-4 p-5">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <MessageSquare className="h-4 w-4 text-primary" /> 怎么用
         </h3>
@@ -94,10 +94,10 @@ export function Settings() {
           <li>· 每页会把本页的确定性数据快照作为上下文，AI 就着当前页面的数据为你解释。</li>
           <li>· AI 可自主调用 run_python 在沙箱里做计算/画图、查行情、提交回测任务。</li>
         </ul>
-      </GlassCard>
+      </Panel>
 
       {/* 合规边界 */}
-      <GlassCard className="p-5">
+      <Panel className="p-5">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <ShieldCheck className="h-4 w-4 text-primary" /> 合规边界
         </h3>
@@ -105,7 +105,7 @@ export function Settings() {
           AI 助手只做信息整理与多视角分析：不推荐具体买卖、不预测涨跌与价位、不给买卖时机、
           不承诺收益、不打分排名。这条底线固化在后端 persona，模型对话始终受其约束。
         </p>
-      </GlassCard>
+      </Panel>
 
       <div className="mt-4">
         <Disclaimer />

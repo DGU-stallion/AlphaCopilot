@@ -1,5 +1,7 @@
 import type { Config } from "tailwindcss";
 
+import { FONT } from "./src/theme/tokens";
+
 export default {
   darkMode: "class",
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
@@ -20,8 +22,9 @@ export default {
         info: "hsl(var(--info))",
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+        // ADR-0014 §4：字体真源在 theme/tokens.ts，这里只引用，不重复维护字体栈
+        sans: [FONT.ui],
+        mono: [FONT.mono],
       },
       borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 4px)", sm: "calc(var(--radius) - 8px)" },
       boxShadow: {

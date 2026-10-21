@@ -33,7 +33,7 @@ export function AiMessages({ msgs, loading, err, notice, suggestions = [], onPic
       {msgs.map((m, i) => (
         <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
           <div className={cn(
-            "max-w-[85%] rounded-2xl px-3.5 py-2 leading-relaxed",
+            "max-w-[85%] rounded-[4px] px-3.5 py-2 leading-relaxed",
             m.role === "user" ? "bg-primary/20 text-foreground" : "bg-muted/40 text-foreground",
           )}>
             {m.role === "assistant" ? (

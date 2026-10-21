@@ -4,6 +4,12 @@ import { RouterProvider } from "react-router-dom";
 import { Toaster } from "sonner";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { router } from "./router";
+// 自托管字体（ADR-0014 §4）：Inter Variable 作 UI 文本，JetBrains Mono 作数字。
+// 不走 CDN —— 离线可用、无第三方请求。
+import "@fontsource-variable/inter";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/500.css";
+import "@fontsource/jetbrains-mono/700.css";
 import "./index.css";
 
 createRoot(document.getElementById("root")!).render(

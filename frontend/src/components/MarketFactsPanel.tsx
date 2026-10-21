@@ -5,7 +5,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Caliber } from "@/components/ui/Caliber";
-import { pctColor, countColor, strengthColor } from "@/lib/colors";
+import { Num } from "@/components/Num";
+import { countColor, strengthColor } from "@/lib/colors";
 import { finite, safeArray, safeRecord } from "@/lib/agent";
 import type {
   BoardStat, ByBoard, EventLedger, FeedbackCell, FeedbackMatrix,
@@ -13,25 +14,20 @@ import type {
   StatItem, StatsContext, ThemeNode, ThemeStructure, ThemeTree,
 } from "@/lib/agent";
 
-function rate(v?: number | null): string {
-  return v == null ? "—" : `${Math.round(v * 100)}%`;
-}
-function signed(v?: number | null): string {
-  return v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
-}
 function hhmm(t?: string | null): string {
   if (!t || t.length < 4) return "—";
   return `${t.slice(0, 2)}:${t.slice(2, 4)}`;
 }
 
-/** 统计读数按 kind 格式化。裸值直接印会让同一列里"家数=61"和"炸板率=0.23"并排，
+/** 统计读数按 kind 渲染成 <Num>。裸值直接印会让同一列里"家数=61"和"炸板率=0.23"并排，
  *  读者分不清哪个是百分比 —— 后端喂 AI 的文本一直是格式化过的，界面也该一致。
  *  kind/unit 每份复盘快照里都有，所以历史复盘也能一并显示对。 */
-function statVal(it: { kind?: string; unit?: string }, v?: number | null): string {
+function statVal(it: { kind?: string; unit?: string }, v?: number | null): React.ReactNode {
   if (v == null) return "—";
-  if (it.kind === "rate") return rate(v);
-  if (it.kind === "pct") return signed(v);
-  return `${v}${it.unit ?? ""}`;
+  if (it.kind === "rate") return <Num v={v} rate inheritColor />;
+  if (it.kind === "pct") return <Num v={v} pct inheritColor />;
+  // 纯计数：整数原样印，非整数给两位小数，单位跟在后边
+  return <Num v={v} digits={Number.isInteger(v) ? 0 : 2} suffix={it.unit} inheritColor />;
 }
 
 /** 只数 → 占样本的比例。原来这张卡三个数只有第一个给了占比，另两个只给只数，
@@ -48,7 +44,7 @@ export function Section({
   available?: boolean; reason?: string; children: React.ReactNode;
 }) {
   return (
-    <div className="glass rounded-2xl p-5">
+    <div className="rounded-[6px] border border-border bg-card p-5">
       <div className="mb-1 flex items-center gap-1.5">
         <Icon className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-bold">{title}</h3>
@@ -96,13 +92,13 @@ export function Matrix({ fm }: { fm?: FeedbackMatrix }) {
                 const c = matrix[t];
                 return (
                   <tr key={t} className="border-b border-border/50 last:border-0">
-                    <td className="py-1.5 font-semibold">{t}<span className="ml-1 text-muted-foreground">({c.合计})</span></td>
-                    <td className={cn("px-1.5 py-1.5 text-right", countColor("up"))}>{c.晋级涨停}</td>
-                    <td className="px-1.5 py-1.5 text-right">{c.收红}</td>
-                    <td className="px-1.5 py-1.5 text-right text-muted-foreground">{c.小跌}</td>
-                    <td className={cn("px-1.5 py-1.5 text-right", countColor("down"))}>{c["跌超5%"]}</td>
-                    <td className={cn("px-1.5 py-1.5 text-right font-bold", countColor("down"))}>{c.跌停}</td>
-                    <td className="px-1.5 py-1.5 text-right font-bold">{rate(c.晋级率)}</td>
+                    <td className="py-1.5 font-semibold">{t}<span className="ml-1 text-muted-foreground">(<Num v={c.合计} digits={0} inheritColor />)</span></td>
+                    <td className={cn("px-1.5 py-1.5 text-right", countColor("up"))}><Num v={c.晋级涨停} digits={0} inheritColor /></td>
+                    <td className="px-1.5 py-1.5 text-right"><Num v={c.收红} digits={0} inheritColor /></td>
+                    <td className="px-1.5 py-1.5 text-right text-muted-foreground"><Num v={c.小跌} digits={0} inheritColor /></td>
+                    <td className={cn("px-1.5 py-1.5 text-right", countColor("down"))}><Num v={c["跌超5%"]} digits={0} inheritColor /></td>
+                    <td className={cn("px-1.5 py-1.5 text-right font-bold", countColor("down"))}><Num v={c.跌停} digits={0} inheritColor /></td>
+                    <td className="px-1.5 py-1.5 text-right font-bold"><Num v={c.晋级率} rate inheritColor /></td>
                   </tr>
                 );
               })}
@@ -125,10 +121,7 @@ export function Matrix({ fm }: { fm?: FeedbackMatrix }) {
                     <td className="py-1 pr-2 font-semibold">{d.name}</td>
                     <td className="pr-2 text-muted-foreground">{d.code}</td>
                     <td className="pr-2 text-muted-foreground">{d.prev_tier}</td>
-                    <td className={cn("pr-2 font-bold",
-                      pctColor(d.ret))}>
-                      {d.ret > 0 ? "+" : ""}{d.ret}%
-                    </td>
+                    <td className="pr-2 font-bold"><Num v={d.ret} pct /></td>
                     <td className="pr-2">{d.result}</td>
                     <td className="truncate text-muted-foreground">{d.sector}</td>
                   </tr>
@@ -199,7 +192,7 @@ export function Themes({ ts }: { ts?: ThemeStructure }) {
       )}
       {ts?.concentration != null && (
         <p className="mt-2 text-[11px] text-muted-foreground">
-          共 {ts.theme_count} 个方向，头部占全市场涨停 <b className="text-foreground">{rate(ts.concentration)}</b>
+          共 <Num v={ts.theme_count} digits={0} inheritColor /> 个方向，头部占全市场涨停 <b className="text-foreground"><Num v={ts.concentration} rate inheritColor /></b>
           {ts.concentration >= 0.3 ? "（一枝独秀）" : ts.concentration <= 0.15 ? "（高度分散）" : ""}
         </p>
       )}
@@ -234,7 +227,7 @@ export function StatsView({ c }: { c?: StatsContext }) {
                     it.extreme ? (it.extreme === "偏热" ? "bg-danger" : "bg-info") : "bg-primary/60")}
                     style={{ width: `${Math.max(2, it.percentile * 100)}%` }} />
                 </span>
-                <span className="w-10 text-muted-foreground">{Math.round(it.percentile * 100)}%</span>
+                <span className="w-10 text-muted-foreground"><Num v={it.percentile} rate inheritColor /></span>
                 {it.extreme && (
                   <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold",
                     it.extreme === "偏热" ? "bg-danger/15 text-danger" : "bg-info/15 text-info")}>
@@ -247,16 +240,16 @@ export function StatsView({ c }: { c?: StatsContext }) {
               </>
             ) : (
               <span className="text-[11px] text-muted-foreground/60">
-                样本不足 {c?.min_samples ?? 10} 天，暂不给分位
+                样本不足 <Num v={c?.min_samples} digits={0} inheritColor /> 天，暂不给分位
               </span>
             )}
           </div>
         ))}
       </div>
       <p className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
-        对比近 <b className="text-foreground">{c?.sample_days ?? "—"}</b> 个交易日
+        对比近 <b className="text-foreground"><Num v={c?.sample_days} digits={0} inheritColor /></b> 个交易日
         {(c?.extreme_count ?? 0) > 0
-          ? ` · ${c?.extreme_count} 项处在两头`
+          ? <span> · <Num v={c?.extreme_count} digits={0} inheritColor /> 项处在两头</span>
           : " · 各项都不极端（今天是平淡的一天，这本身也是信息）"}
         {(c?.sample_days ?? 0) < 30 && "　⚠️ 样本随每天复盘自动变长，现在的分位仅供粗判"}
       </p>
@@ -343,11 +336,11 @@ export function ThemeTreeView({ t }: { t?: ThemeTree }) {
                   <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-bold",
                     STATE_TONE[n.state] || "bg-muted text-muted-foreground")}>{n.state}</span>
                   <span className="tabular-nums text-muted-foreground">
-                    涨停 <b className="text-foreground">{n.limit_up}</b>
-                    （首板{n.first_boards}/连板{n.consec_boards}）· 最高 <b className="text-foreground">{n.highest}</b> 板
+                    涨停 <b className="text-foreground"><Num v={n.limit_up} digits={0} inheritColor /></b>
+                    （首板<Num v={n.first_boards} digits={0} inheritColor />/连板<Num v={n.consec_boards} digits={0} inheritColor />）· 最高 <b className="text-foreground"><Num v={n.highest} digits={0} inheritColor /></b> 板
                   </span>
-                  {n.broken > 0 && <span className="text-[11px] text-warning">炸{n.broken}</span>}
-                  {n.limit_down > 0 && <span className={cn("text-[11px]", countColor("down"))}>跌停{n.limit_down}</span>}
+                  {n.broken > 0 && <span className="text-[11px] text-warning">炸<Num v={n.broken} digits={0} inheritColor /></span>}
+                  {n.limit_down > 0 && <span className={cn("text-[11px]", countColor("down"))}>跌停<Num v={n.limit_down} digits={0} inheritColor /></span>}
                 </div>
                 <div className="mt-0.5 flex flex-wrap gap-x-3 text-[11px] tabular-nums text-muted-foreground">
                   {n.first_seal && (
@@ -358,10 +351,10 @@ export function ThemeTreeView({ t }: { t?: ThemeTree }) {
                   )}
                   {n.prev_members > 0 && (
                     <span>
-                      昨日 {n.prev_members} 只 → 今仍涨停 <b className={
+                      昨日 <Num v={n.prev_members} digits={0} inheritColor /> 只 → 今仍涨停 <b className={
                         strengthColor((n.continuation_rate ?? 0) >= 0.5)
-                      }>{n.prev_still_up}</b>
-                      {n.continuation_rate != null && `（延续 ${rate(n.continuation_rate)}）`}
+                      }><Num v={n.prev_still_up} digits={0} inheritColor /></b>
+                      {n.continuation_rate != null && <span>（延续 <Num v={n.continuation_rate} rate inheritColor />）</span>}
                     </span>
                   )}
                   {safeArray<{ name: string; boards: number; label?: string }>(n.members).length > 0 && (
@@ -375,9 +368,9 @@ export function ThemeTreeView({ t }: { t?: ThemeTree }) {
             ))}
           </div>
           <p className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
-            共 {t?.tag_count} 个事件题材 · 题材串覆盖 {t?.covered}/{t?.total_limit_up} 只涨停
-            {t?.coverage_rate != null && `（${rate(t.coverage_rate)}）`}
-            {t?.concentration != null && ` · 头部占全市场涨停 ${rate(t.concentration)}`}
+            共 <Num v={t?.tag_count} digits={0} inheritColor /> 个事件题材 · 题材串覆盖 <Num v={t?.covered} digits={0} inheritColor />/<Num v={t?.total_limit_up} digits={0} inheritColor /> 只涨停
+            {t?.coverage_rate != null && <span>（<Num v={t.coverage_rate} rate inheritColor />）</span>}
+            {t?.concentration != null && <span> · 头部占全市场涨停 <Num v={t.concentration} rate inheritColor /></span>}
           </p>
         </>
       )}
@@ -411,8 +404,8 @@ export function Ledger({ el }: { el?: EventLedger }) {
         TAG_TONE[e.tag] || "bg-muted text-muted-foreground")}>{e.tag}</span>
       <span className="font-semibold">{e.name}</span>
       <span className="shrink-0 text-[10px] text-muted-foreground">{e.code}</span>
-      {e.boards > 0 && <span className="shrink-0 text-[11px] text-primary">{e.boards}板</span>}
-      <span className={cn("shrink-0 tabular-nums", pctColor(e.ret))}>{signed(e.ret)}</span>
+      {e.boards > 0 && <span className="shrink-0 text-[11px] text-primary"><Num v={e.boards} digits={0} inheritColor />板</span>}
+      <Num v={e.ret} pct className="shrink-0" />
       <span className="truncate text-[11px] text-muted-foreground">{e.sector} · {e.note}</span>
     </div>
   );
@@ -424,7 +417,7 @@ export function Ledger({ el }: { el?: EventLedger }) {
       <div className="mb-1 flex items-baseline gap-2">
         <span className="text-[12px] font-bold text-foreground">{title}</span>
         <span className="text-[11px] text-muted-foreground">{note}</span>
-        <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">{list.length} 起</span>
+        <span className="ml-auto text-[11px] tabular-nums text-muted-foreground"><Num v={list.length} digits={0} inheritColor /> 起</span>
       </div>
       <div className="max-h-56 space-y-1 overflow-y-auto">
         {list.length ? list.map((e, i) => <Row key={`${e.code}-${e.tag}-${i}`} e={e} />)
@@ -477,34 +470,34 @@ export function LossEffectSection({ le }: { le?: LossEffect }) {
     >
       <div className="grid grid-cols-3 gap-3 text-center">
         <div>
-          <div className={cn("text-xl font-extrabold tabular-nums", countColor("down"))}>{le?.deep_loss_5_count ?? "—"}</div>
-          <div className="text-[11px] text-muted-foreground">昨日涨停股跌超5% ({rate(le?.deep_loss_5_rate)})</div>
+          <div className={cn("text-xl font-extrabold tabular-nums", countColor("down"))}><Num v={le?.deep_loss_5_count} digits={0} inheritColor /></div>
+          <div className="text-[11px] text-muted-foreground">昨日涨停股跌超5% (<Num v={le?.deep_loss_5_rate} rate inheritColor />)</div>
         </div>
         <div>
-          <div className={cn("text-xl font-extrabold tabular-nums", countColor("down"))}>{le?.deep_loss_7_count ?? "—"}</div>
+          <div className={cn("text-xl font-extrabold tabular-nums", countColor("down"))}><Num v={le?.deep_loss_7_count} digits={0} inheritColor /></div>
           <div className="text-[11px] text-muted-foreground">
-            昨日涨停股跌超7% ({rate(ratioOf(le?.deep_loss_7_count, le?.sample))})
+            昨日涨停股跌超7% (<Num v={ratioOf(le?.deep_loss_7_count, le?.sample)} rate inheritColor />)
           </div>
         </div>
         <div>
-          <div className={cn("text-xl font-extrabold tabular-nums", countColor("down"))}>{le?.limit_down_count ?? "—"}</div>
+          <div className={cn("text-xl font-extrabold tabular-nums", countColor("down"))}><Num v={le?.limit_down_count} digits={0} inheritColor /></div>
           <div className="text-[11px] text-muted-foreground">
-            昨日涨停股今日跌停 ({rate(ratioOf(le?.limit_down_count, le?.sample))})
+            昨日涨停股今日跌停 (<Num v={ratioOf(le?.limit_down_count, le?.sample)} rate inheritColor />)
           </div>
         </div>
       </div>
       <div className="mt-3 space-y-0.5 border-t border-border pt-2.5 text-[11px] text-muted-foreground">
         <div>
-          样本 = 昨日涨停 <b className="text-foreground">{le?.sample ?? "—"}</b> 只 ·
-          其中最差 <b className={countColor("down")}>{signed(le?.worst)}</b>
+          样本 = 昨日涨停 <b className="text-foreground"><Num v={le?.sample} digits={0} inheritColor /></b> 只 ·
+          其中最差 <b className={countColor("down")}><Num v={le?.worst} pct inheritColor /></b>
         </div>
         {le?.market_limit_down != null && (
-          <div>作为对照，今日<b className="text-foreground">全市场</b>跌停 <b className={countColor("down")}>{le.market_limit_down}</b> 家</div>
+          <div>作为对照，今日<b className="text-foreground">全市场</b>跌停 <b className={countColor("down")}><Num v={le.market_limit_down} digits={0} inheritColor /></b> 家</div>
         )}
         {le?.prev_broken_recovery && (
           <div>
-            昨日炸板股今日均 <b className={pctColor(le.prev_broken_recovery.avg)}>{signed(le.prev_broken_recovery.avg)}</b>、
-            翻红 <b className="text-foreground">{rate(le.prev_broken_recovery.positive_rate)}</b>
+            昨日炸板股今日均 <b><Num v={le.prev_broken_recovery.avg} pct digits={2} /></b>、
+            翻红 <b className="text-foreground"><Num v={le.prev_broken_recovery.positive_rate} rate inheritColor /></b>
             <span className="ml-1 text-muted-foreground/70">← 试错代价高</span>
           </div>
         )}
@@ -530,28 +523,28 @@ export function SealQualitySection({ sq }: { sq?: SealQuality }) {
     >
       <div className="grid grid-cols-2 gap-3 text-center">
         <div>
-          <div className={cn("text-xl font-extrabold tabular-nums", strengthColor(true))}>{nb ?? "—"}</div>
-          <div className="text-[11px] text-muted-foreground">没炸过 ({rate(sq?.never_broken_rate)})</div>
+          <div className={cn("text-xl font-extrabold tabular-nums", strengthColor(true))}><Num v={nb} digits={0} inheritColor /></div>
+          <div className="text-[11px] text-muted-foreground">没炸过 (<Num v={sq?.never_broken_rate} rate inheritColor />)</div>
         </div>
         <div>
-          <div className="text-xl font-extrabold tabular-nums text-warning">{ro ?? "—"}</div>
+          <div className="text-xl font-extrabold tabular-nums text-warning"><Num v={ro} digits={0} inheritColor /></div>
           <div className="text-[11px] text-muted-foreground">炸后回封</div>
         </div>
       </div>
       {/* 显式写出这两个加起来就是全部 —— 省得用户自己去加、加错了怀疑数据 */}
       {nb != null && ro != null && tot != null && (
         <p className="mt-1.5 text-center text-[11px] text-muted-foreground/70">
-          {nb} + {ro} = 今日涨停 <b className="text-foreground">{tot}</b> 家（这两半互补）
+          <Num v={nb} digits={0} inheritColor /> + <Num v={ro} digits={0} inheritColor /> = 今日涨停 <b className="text-foreground"><Num v={tot} digits={0} inheritColor /></b> 家（这两半互补）
         </p>
       )}
       <div className="mt-3 border-t border-border pt-2.5 text-[11px] text-muted-foreground">
-        其中<b className="text-foreground"> 开盘秒板 {sq?.opening_seconds ?? "—"} </b>家、
-        <b className="text-foreground">14:30 后才封住 {sq?.late_seal ?? "—"}</b> 家
+        其中<b className="text-foreground"> 开盘秒板 <Num v={sq?.opening_seconds} digits={0} inheritColor /> </b>家、
+        <b className="text-foreground">14:30 后才封住 <Num v={sq?.late_seal} digits={0} inheritColor /></b> 家
         <span className="ml-1 text-muted-foreground/60">（首封时间口径，与上面两半交叉）</span>
         <div className="mt-0.5">
-          <b className="text-foreground">炸板率 {rate(sq?.broken_rate)}</b>
-          （炸板未回封 {sq?.broken_pool ?? "—"} 家 ÷（炸板未回封 {sq?.broken_pool ?? "—"} + 涨停 {tot ?? "—"}）家）·
-          平均炸板 <b className="text-foreground">{sq?.avg_broken_times ?? "—"}</b> 次
+          <b className="text-foreground">炸板率 <Num v={sq?.broken_rate} rate inheritColor /></b>
+          （炸板未回封 <Num v={sq?.broken_pool} digits={0} inheritColor /> 家 ÷（炸板未回封 <Num v={sq?.broken_pool} digits={0} inheritColor /> + 涨停 <Num v={tot} digits={0} inheritColor />）家）·
+          平均炸板 <b className="text-foreground"><Num v={sq?.avg_broken_times} digits={1} inheritColor /></b> 次
         </div>
       </div>
     </Section>
@@ -568,7 +561,7 @@ export function BoardSystemSection({ bb }: { bb?: ByBoard }) {
   if (!keys.length) return null;
 
   return (
-    <div className="glass rounded-2xl px-5 py-3">
+    <div className="rounded-[6px] border border-border bg-card px-5 py-3">
       <button type="button" onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-1.5 text-left">
         {open ? <ChevronDown className="h-4 w-4 text-primary" /> : <ChevronRight className="h-4 w-4 text-primary" />}
@@ -590,12 +583,12 @@ export function BoardSystemSection({ bb }: { bb?: ByBoard }) {
               <div key={k} className="min-w-[128px] flex-1 rounded-lg border border-border px-3 py-2">
                 <div className="text-[12px] font-bold">{k}</div>
                 <div className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">
-                  涨停 <b className="text-foreground">{g.limit_up}</b> · 最高 <b className="text-foreground">{g.highest}</b> 板
+                  涨停 <b className="text-foreground"><Num v={g.limit_up} digits={0} inheritColor /></b> · 最高 <b className="text-foreground"><Num v={g.highest} digits={0} inheritColor /></b> 板
                 </div>
                 <div className="text-[11px] tabular-nums text-muted-foreground">
-                  晋级率 <b className="text-foreground">{rate(g.promotion_rate)}</b>
-                  {(g.broken ?? 0) > 0 && <span className="text-warning"> · 炸{g.broken}</span>}
-                  {(g.limit_down ?? 0) > 0 && <span className={countColor("down")}> · 跌停{g.limit_down}</span>}
+                  晋级率 <b className="text-foreground"><Num v={g.promotion_rate} rate inheritColor /></b>
+                  {(g.broken ?? 0) > 0 && <span className="text-warning"> · 炸<Num v={g.broken} digits={0} inheritColor /></span>}
+                  {(g.limit_down ?? 0) > 0 && <span className={countColor("down")}> · 跌停<Num v={g.limit_down} digits={0} inheritColor /></span>}
                 </div>
                 {g.limit_up === 0 && (g.prev_base ?? 0) > 0 && (
                   <div className="mt-0.5 text-[10px] font-bold text-danger">

@@ -1,6 +1,7 @@
 import { Gauge, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { countColor, pctColor } from "@/lib/colors";
+import { countColor } from "@/lib/colors";
+import { Num } from "@/components/Num";
 import { finite, plain } from "@/lib/agent";
 import { Caliber } from "@/components/ui/Caliber";
 import type { Breadth } from "@/lib/agent";
@@ -10,7 +11,7 @@ export function BreadthPanel({ b, limitDown }: { b?: Breadth; limitDown?: number
 
   if (!b.available) {
     return (
-      <section className="glass rounded-2xl border-l-4 border-l-muted p-4">
+      <section className="rounded-[6px] border border-border border-l-4 border-l-muted bg-card p-4">
         <div className="flex items-center gap-1.5 text-sm font-bold">
           <Gauge className="h-4 w-4 text-muted-foreground" /> 今天好不好做
         </div>
@@ -47,7 +48,7 @@ export function BreadthPanel({ b, limitDown }: { b?: Breadth; limitDown?: number
         } />
       </div>
 
-      <div className="glass rounded-2xl p-5">
+      <div className="rounded-[6px] border border-border bg-card p-5">
         {!countsOk && (
           <p className="mb-2 rounded-lg bg-muted/50 px-2.5 py-1.5 text-[12px] text-muted-foreground">
             ⚠️ 涨跌家数没取全，宽度条与上涨占比本次不给 —— <b>缺的项不是 0</b>
@@ -69,19 +70,20 @@ export function BreadthPanel({ b, limitDown }: { b?: Breadth; limitDown?: number
         <div className="mt-2 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-[13px]">
           <span>
             上涨占比{" "}
-            <b className={cn("text-base tabular-nums", upRatio == null ? "" : pctColor(upRatio - 0.5))}>
-              {upRatio == null ? "—" : `${Math.round(upRatio * 100)}%`}
+            <b className={cn("text-base tabular-nums",
+              upRatio == null ? "text-muted-foreground" : upRatio > 0.5 ? "text-danger" : "text-success")}>
+              <Num v={upRatio} rate digits={0} inheritColor />
             </b>
           </span>
           <span className="text-muted-foreground">
-            <span className={countColor("up")}>{upN ?? "—"}</span> 涨 /{" "}
-            <span className={countColor("down")}>{downN ?? "—"}</span> 跌 / {flatN ?? "—"} 平
+            <span className={countColor("up")}><Num v={upN} digits={0} inheritColor /></span> 涨 /{" "}
+            <span className={countColor("down")}><Num v={downN} digits={0} inheritColor /></span> 跌 / <Num v={flatN} digits={0} inheritColor /> 平
             <span className="ml-1 text-[11px] text-muted-foreground/60">（{b.up_down_scope}）</span>
           </span>
           {}
           {finite(limitDown) != null && (
             <span className="text-muted-foreground">
-              跌停 <b className={countColor("down")}>{finite(limitDown)}</b> 家
+              跌停 <b className={countColor("down")}><Num v={finite(limitDown)} digits={0} inheritColor /></b> 家
             </span>
           )}
         </div>
@@ -92,7 +94,7 @@ export function BreadthPanel({ b, limitDown }: { b?: Breadth; limitDown?: number
               <Wallet className="h-3 w-3" /> 两市成交额
             </div>
             <div className="text-xl font-extrabold tabular-nums">
-              {finite(b.amount_yi) == null ? "—" : `${Math.round(b.amount_yi!).toLocaleString()} 亿`}
+              <Num v={b.amount_yi} digits={0} suffix=" 亿" inheritColor />
             </div>
           </div>
           {}

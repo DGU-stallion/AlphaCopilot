@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { RefreshCw, Globe, Fuel, Landmark, DollarSign, Bitcoin, TrendingUp } from "lucide-react";
-import { pctColor } from "@/lib/colors";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { GlassCard } from "@/components/ui/GlassCard";
+import { Panel } from "@/components/ui/Panel";
 import { Caliber } from "@/components/ui/Caliber";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import {
@@ -10,9 +9,10 @@ import {
   type MacroSnapshot, type MacroRates,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Num } from "@/components/Num";
 import { useAiPage } from "@/lib/ai-page";
 
-// A 股惯例：红涨绿跌（pctColor），全站一致，与国际绿涨相反是有意选择。
+// A 股惯例：红涨绿跌，全站一致，与国际绿涨相反是有意选择；界面经由 <Num> / palette，字符串快照用 pct()
 const pct = (v: number | null | undefined) =>
   v == null ? "—" : `${v > 0 ? "+" : ""}${v}%`;
 
@@ -21,16 +21,17 @@ function Quote({ name, price, change_pct, sub }: {
   name: string; price: number | null; change_pct: number | null; sub?: string;
 }) {
   return (
-    <GlassCard className="p-3">
+    <Panel className="p-3">
       <p className="truncate text-xs text-muted-foreground">
         {name}
         {sub && <span className="ml-1 font-mono text-[10px] text-muted-foreground/40">{sub}</span>}
       </p>
-      <p className={cn("mt-1 font-mono text-lg font-bold", pctColor(change_pct))}>
-        {price == null ? "—" : price}
+      <p className={cn("mt-1 text-lg font-bold",
+        change_pct == null || change_pct === 0 ? "text-muted-foreground" : change_pct > 0 ? "text-danger" : "text-success")}>
+        <Num v={price} digits={2} inheritColor />
       </p>
-      <p className={cn("text-xs", pctColor(change_pct))}>{pct(change_pct)}</p>
-    </GlassCard>
+      <p className="text-xs"><Num v={change_pct} pct /></p>
+    </Panel>
   );
 }
 
@@ -56,11 +57,11 @@ function Section({ icon: Icon, title, caliber, extra, children }: {
 /** 数据源不可用时的占位卡（降级如实展示，不伪造）。 */
 function Unavailable({ reason }: { reason?: string }) {
   return (
-    <GlassCard className="p-3">
+    <Panel className="p-3">
       <p className="text-xs text-muted-foreground/60">
         {reason || "暂不可用：数据源暂时取不到"}
       </p>
-    </GlassCard>
+    </Panel>
   );
 }
 
@@ -178,10 +179,10 @@ export function MacroDashboard() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {rates?.available
             ? (rates.items ?? []).map((r) => (
-                <GlassCard key={r.name} className="p-3">
+                <Panel key={r.name} className="p-3">
                   <p className="truncate text-xs text-muted-foreground">{r.name}</p>
                   <p className="mt-1 font-mono text-lg font-bold">{r.yield_pct}%</p>
-                </GlassCard>
+                </Panel>
               ))
             : <Unavailable reason={rates?.reason} />}
         </div>

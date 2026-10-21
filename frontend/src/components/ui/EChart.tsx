@@ -22,7 +22,7 @@ function themed(option: Record<string, any>): Record<string, any> {
   const applyAxis = (a: any) =>
     Array.isArray(a) ? a.map((x) => ({ ...axis, ...x })) : { ...axis, ...(a ?? {}) };
   return {
-    color: [t.warningColor, "#8b5cf6", t.infoColor, t.upColor, t.downColor, "#14b8a6"],
+    color: t.seriesColors,
     textStyle: { color: t.textColor },
     ...option,
     title: option.title ? { ...option.title, textStyle: { color: t.textColor } } : undefined,

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2, Loader2, X, CalendarClock } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { GlassCard } from "@/components/ui/GlassCard";
+import { Panel } from "@/components/ui/Panel";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { Caliber } from "@/components/ui/Caliber";
 import { EChart } from "@/components/ui/EChart";
+import { Num } from "@/components/Num";
 import { useCachedResource, dropCache } from "@/lib/cache";
 import { useAiPage } from "@/lib/ai-page";
 import {
@@ -117,7 +118,7 @@ export function Portfolios() {
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         {/* 左：组合列表 + 新建 */}
         <div className="space-y-4">
-          <GlassCard>
+          <Panel>
             <h3 className="mb-3 text-sm font-semibold">新建组合</h3>
             <div className="space-y-2">
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="组合名，如 白酒龙头"
@@ -127,13 +128,13 @@ export function Portfolios() {
               <input type="date" value={createdOn} onChange={(e) => setCreatedOn(e.target.value)}
                 className="w-full rounded-lg border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:border-primary/50" />
               <button onClick={create} disabled={creating}
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary/15 px-4 py-2 text-sm font-medium text-primary shadow-glow hover:bg-primary/25 disabled:opacity-50">
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary/15 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/25 disabled:opacity-50">
                 {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} 创建
               </button>
             </div>
-          </GlassCard>
+          </Panel>
 
-          <GlassCard>
+          <Panel>
             <h3 className="mb-2 text-sm font-semibold">我的组合</h3>
             {list.loading && portfolios.length === 0 ? (
               <p className="py-4 text-center text-sm text-muted-foreground/60">加载中…</p>
@@ -151,17 +152,17 @@ export function Portfolios() {
                 ))}
               </div>
             )}
-          </GlassCard>
+          </Panel>
         </div>
 
         {/* 右：净值曲线 + 调仓 */}
         <div className="space-y-4">
           {active ? <PortfolioDetail portfolio={active} onNavSummary={setNavSummary} /> : (
-            <GlassCard><p className="py-16 text-center text-sm text-muted-foreground/60">选择或新建一个组合查看净值曲线。</p></GlassCard>
+            <Panel><p className="py-16 text-center text-sm text-muted-foreground/60">选择或新建一个组合查看净值曲线。</p></Panel>
           )}
 
           {active && (
-            <GlassCard>
+            <Panel>
               <div className="mb-3 flex items-center gap-2">
                 <h3 className="text-sm font-semibold">添加调仓事件</h3>
                 <Caliber text={"调仓在生效日按当日收盘价换算虚拟持股数；事件之间持股不变、权重随价格漂移。权重和不足 1 的部分视为现金。"} />
@@ -187,11 +188,11 @@ export function Portfolios() {
               <div className="mt-3 flex items-center gap-2">
                 <button onClick={() => setRows([...rows, { code: "", weight: "" }])} className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"><Plus className="h-3.5 w-3.5" /> 加一行</button>
                 <button onClick={submitRebalance} disabled={rebalancing}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-4 py-1.5 text-sm font-medium text-primary shadow-glow hover:bg-primary/25 disabled:opacity-50">
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-4 py-1.5 text-sm font-medium text-primary hover:bg-primary/25 disabled:opacity-50">
                   {rebalancing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />} 提交调仓
                 </button>
               </div>
-            </GlassCard>
+            </Panel>
           )}
         </div>
       </div>
@@ -236,7 +237,7 @@ function PortfolioDetail({ portfolio, onNavSummary }: { portfolio: Portfolio; on
 
   return (
     <>
-      <GlassCard glow>
+      <Panel>
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-semibold">{portfolio.name} · 净值曲线</h3>
           <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[11px] text-muted-foreground">基准 {portfolio.benchmark}</span>
@@ -248,9 +249,9 @@ function PortfolioDetail({ portfolio, onNavSummary }: { portfolio: Portfolio; on
         ) : (
           <EChart option={option} height={360} />
         )}
-      </GlassCard>
+      </Panel>
 
-      <GlassCard>
+      <Panel>
         <h3 className="mb-2 text-sm font-semibold">调仓事件</h3>
         {portfolio.rebalances.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground/60">尚无调仓事件。用下方表单添加一次调仓，净值才会开始计算。</p>
@@ -261,14 +262,14 @@ function PortfolioDetail({ portfolio, onNavSummary }: { portfolio: Portfolio; on
                 <p className="font-mono text-xs text-muted-foreground">{rb.effective_on}</p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {Object.entries(rb.weights).map(([c, w]) => (
-                    <span key={c} className="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[11px] text-primary">{c} {(w * 100).toFixed(0)}%</span>
+                    <span key={c} className="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[11px] text-primary">{c} <Num v={w * 100} digits={0} inheritColor />%</span>
                   ))}
                 </div>
               </div>
             ))}
           </div>
         )}
-      </GlassCard>
+      </Panel>
     </>
   );
 }

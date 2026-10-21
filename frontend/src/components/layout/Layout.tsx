@@ -59,7 +59,7 @@ export function Layout() {
           "flex items-center rounded-lg text-sm transition-colors",
           collapsed ? "justify-center p-2.5" : "gap-2.5 px-3 py-2.5",
           active
-            ? "bg-primary/15 font-medium text-primary shadow-glow"
+            ? "bg-primary/15 font-medium text-primary"
             : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
         )}
       >
@@ -78,13 +78,13 @@ export function Layout() {
     <div className="flex h-screen">
       {/* Sidebar */}
       <aside className={cn(
-        "glass z-10 m-2 flex shrink-0 flex-col rounded-2xl transition-all duration-200",
+        "z-10 m-2 flex shrink-0 flex-col rounded-[6px] border border-border bg-card transition-all duration-200",
         collapsed ? "w-14" : "w-60",
       )}>
         {/* Brand */}
         <div className={cn("border-b border-border/50", collapsed ? "flex justify-center p-3" : "p-4")}>
           <Link to="/daily-review" className={cn("flex items-center", collapsed ? "justify-center" : "gap-2")}>
-            <CandlestickChart className="h-6 w-6 shrink-0 text-primary text-glow" />
+            <CandlestickChart className="h-6 w-6 shrink-0 text-primary" />
             {!collapsed && <span className="text-lg font-extrabold tracking-tight">Alpha<span className="text-primary">Copilot</span></span>}
           </Link>
           {!collapsed && <p className="mt-1 text-[11px] text-muted-foreground">个人量化投研工作台</p>}

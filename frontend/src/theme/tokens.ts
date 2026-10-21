@@ -19,6 +19,8 @@ export interface Palette {
   bg: string; panel: string; raised: string; border: string; borderStrong: string;
   text: string; textSecondary: string; textTertiary: string; textDisabled: string;
   accent: string; accentHover: string;
+  /** 图表多系列分类补位色：紫 / 青（> 5 系列时与语义色区分用，见 chart-theme.ts） */
+  catViolet: string; catTeal: string;
   up: string; down: string; warning: string; info: string;
 }
 
@@ -40,6 +42,10 @@ export const DARK: Palette = {
   // 强调：全站唯一，只给交互
   accent: "#3B82F6",
   accentHover: "#60A5FA",
+
+  // 分类补位（原 EChart.tsx 里的裸字面量，迁入本文件作唯一真源）
+  catViolet: "#8B5CF6",
+  catTeal: "#14B8A6",
 
   // 涨跌：降饱和 18%（TradingView 案例：观看时长 +23%）
   up: "#D9534F",
@@ -65,6 +71,10 @@ export const LIGHT: Palette = {
 
   accent: "#2563EB",
   accentHover: "#1D4ED8",
+
+  // 分类补位：亮色下降饱和度/加深一档保对比
+  catViolet: "#7C3AED",
+  catTeal: "#0D9488",
 
   up: "#C7423E",
   down: "#2E8F63",

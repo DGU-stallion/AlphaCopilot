@@ -1,6 +1,6 @@
 // 全局 AI 助手面板（S5）—— 右下浮标点开一块**可调整大小**的顶层对话面板。
 //
-// 样式/交互对齐上游产品的 AiConsole：玻璃暖橙、markdown 回答、拖拽改大小、
+// 样式/交互对齐上游产品的 AiConsole：实色面板、markdown 回答、拖拽改大小、
 // 尺寸持久化。作为页面最上层组件（fixed + 高 z-index），页面感知快照作对话上下文。
 //
 // 差异：上游那块是从底部把内容挤上去；这里按用户要求做成右下角
@@ -90,7 +90,7 @@ export function AiConsole() {
         onClick={() => setOpen((v) => !v)}
         aria-label="打开 AI 助手"
         title="AI 助手"
-        className="fixed bottom-5 right-5 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-glow ring-1 ring-primary/40 transition-transform hover:scale-105"
+        className="fixed bottom-5 right-5 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground ring-1 ring-primary/40 transition-transform hover:scale-105"
       >
         <Sparkles className="h-5 w-5" />
       </button>
@@ -98,7 +98,7 @@ export function AiConsole() {
       {open && (
         <aside
           style={{ width: size.w, height: size.h }}
-          className="glass fixed bottom-20 right-5 z-50 flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-primary/30"
+          className="fixed bottom-20 right-5 z-50 flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-[6px] border border-primary/30 bg-card"
         >
           {/* 左上角拖拽把手：改大小 */}
           <div
@@ -112,10 +112,10 @@ export function AiConsole() {
           {/* 头部：标题 + 当前页面 + 清空 + 关闭 */}
           <div className="flex items-center justify-between gap-2 border-b border-border/60 py-2.5 pl-6 pr-3.5">
             <div className="min-w-0">
-              <span className="flex items-center gap-2 text-sm font-semibold text-glow">
+              <span className="flex items-center gap-2 text-sm font-semibold">
                 <Sparkles className="h-4 w-4 shrink-0 text-primary" /> AI 助手
                 <span data-agent-runtime className="hidden items-center gap-1.5 rounded-full border border-success/20 bg-success/[0.07] px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex">
-                  <span className="h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_7px_hsl(var(--success)/0.65)]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-success" />
                   agnes · 本地运行
                 </span>
               </span>

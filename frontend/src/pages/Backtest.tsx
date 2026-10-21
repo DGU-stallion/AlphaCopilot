@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Play, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { GlassCard } from "@/components/ui/GlassCard";
+import { Panel } from "@/components/ui/Panel";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { Caliber } from "@/components/ui/Caliber";
 import { EChart } from "@/components/ui/EChart";
@@ -83,7 +83,7 @@ export function Backtest() {
         subtitle="双均线金叉策略净值 vs 买入持有 · 确定性计算，扣 A 股费用、无未来函数"
       />
 
-      <GlassCard>
+      <Panel>
         <div className="mb-2 flex items-center gap-2">
           <label className="text-xs text-muted-foreground">策略参数</label>
           <Caliber text={"双均线金叉：快线上穿慢线买入、下穿卖出。净值扣佣金/印花/过户；信号次日成交、涨跌停按前收，无未来函数。"} />
@@ -124,41 +124,41 @@ export function Backtest() {
             </select>
           </div>
           <button onClick={run} disabled={res.loading}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-4 py-2 text-sm font-medium text-primary shadow-glow hover:bg-primary/25 disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/25 disabled:opacity-50">
             {res.loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} 回测
           </button>
         </div>
         {inputErr && <p className="mt-2 text-xs text-destructive">{inputErr}</p>}
-      </GlassCard>
+      </Panel>
 
       {err ? (
-        <GlassCard><p className="py-8 text-center text-sm text-muted-foreground/60">回测暂不可用：{String((err as Error).message || err)}</p></GlassCard>
+        <Panel><p className="py-8 text-center text-sm text-muted-foreground/60">回测暂不可用：{String((err as Error).message || err)}</p></Panel>
       ) : res.loading && !res.data ? (
-        <GlassCard><p className="py-8 text-center text-sm text-muted-foreground/60">回测中…</p></GlassCard>
+        <Panel><p className="py-8 text-center text-sm text-muted-foreground/60">回测中…</p></Panel>
       ) : (
         <>
           {metric?.metric && (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {metric.metric.items.map((it) => (
-                <GlassCard key={it.label} className="p-3">
+                <Panel key={it.label} className="p-3">
                   <p className="truncate text-xs text-muted-foreground">{it.label}</p>
                   <p className={cn("mt-1 font-mono text-lg font-bold", toneCls(it.tone))}>{it.value}</p>
                   {it.hint && <p className="mt-0.5 text-[10px] text-muted-foreground/50">{it.hint}</p>}
-                </GlassCard>
+                </Panel>
               ))}
             </div>
           )}
           {equity && (
-            <GlassCard glow>
+            <Panel>
               {equity.title && <h3 className="mb-2 text-sm font-semibold">{equity.title}</h3>}
               <EChart option={equity.option ?? null} height={360} />
-            </GlassCard>
+            </Panel>
           )}
           {drawdown && (
-            <GlassCard>
+            <Panel>
               {drawdown.title && <h3 className="mb-2 text-sm font-semibold">{drawdown.title}</h3>}
               <EChart option={drawdown.option ?? null} height={280} />
-            </GlassCard>
+            </Panel>
           )}
         </>
       )}

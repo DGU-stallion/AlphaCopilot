@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Play, RefreshCw, X, Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { GlassCard } from "@/components/ui/GlassCard";
+import { Panel } from "@/components/ui/Panel";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { Caliber } from "@/components/ui/Caliber";
 import { EChart } from "@/components/ui/EChart";
@@ -86,7 +86,7 @@ export function Correlation() {
         subtitle="多标的归一化叠加走势 + 日收益率相关矩阵 · 确定性计算"
       />
 
-      <GlassCard>
+      <Panel>
         <div className="mb-2 flex items-center gap-2">
           <label className="text-xs text-muted-foreground">标的列表（2~{MAX} 个 A 股）</label>
           <Caliber text={"相关性基于对齐日期后的日收益率皮尔逊系数计算（非价格，避免伪高相关）。叠加走势归一化到起点=100。"} />
@@ -115,37 +115,37 @@ export function Correlation() {
               className="w-24 rounded-lg border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:border-primary/50" />
           </div>
           <button onClick={run} disabled={res.loading}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-4 py-2 text-sm font-medium text-primary shadow-glow hover:bg-primary/25 disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/25 disabled:opacity-50">
             {res.loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} 计算
           </button>
         </div>
         {inputErr && <p className="mt-2 text-xs text-destructive">{inputErr}</p>}
-      </GlassCard>
+      </Panel>
 
       {err ? (
-        <GlassCard><p className="py-8 text-center text-sm text-muted-foreground/60">相关性暂不可用：{String((err as Error).message || err)}</p></GlassCard>
+        <Panel><p className="py-8 text-center text-sm text-muted-foreground/60">相关性暂不可用：{String((err as Error).message || err)}</p></Panel>
       ) : res.loading && !res.data ? (
-        <GlassCard><p className="py-8 text-center text-sm text-muted-foreground/60">计算中…</p></GlassCard>
+        <Panel><p className="py-8 text-center text-sm text-muted-foreground/60">计算中…</p></Panel>
       ) : (
         <>
           {overlay && (
-            <GlassCard glow>
+            <Panel>
               {overlay.title && <h3 className="mb-2 text-sm font-semibold">{overlay.title}</h3>}
               <EChart option={overlay.option ?? null} height={360} />
-            </GlassCard>
+            </Panel>
           )}
           <div className="grid gap-3 lg:grid-cols-2">
             {matrix && (
-              <GlassCard>
+              <Panel>
                 {matrix.title && <h3 className="mb-2 text-sm font-semibold">{matrix.title}</h3>}
                 <EChart option={matrix.option ?? null} height={360} />
-              </GlassCard>
+              </Panel>
             )}
             {rolling && (
-              <GlassCard>
+              <Panel>
                 {rolling.title && <h3 className="mb-2 text-sm font-semibold">{rolling.title}</h3>}
                 <EChart option={rolling.option ?? null} height={360} />
-              </GlassCard>
+              </Panel>
             )}
           </div>
         </>

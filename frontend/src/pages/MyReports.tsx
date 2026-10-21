@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { FileText, Trash2, Loader2, FolderOpen, Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { GlassCard } from "@/components/ui/GlassCard";
+import { Panel } from "@/components/ui/Panel";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { useCachedResource, dropCache } from "@/lib/cache";
 import { useAiPage } from "@/lib/ai-page";
@@ -67,7 +67,7 @@ export function MyReports() {
       />
 
       {/* 录入 */}
-      <GlassCard className="mb-4">
+      <Panel className="mb-4">
         <h3 className="mb-3 text-sm font-semibold">归档一份研报</h3>
         <div className="space-y-2">
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="标题，如 白酒行业 2025 年报对比"
@@ -75,26 +75,26 @@ export function MyReports() {
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder="正文 / 结论要点（可选）"
             className="w-full resize-y rounded-lg border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:border-primary/50" />
           <button onClick={add} disabled={busy}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-4 py-2 text-sm font-medium text-primary shadow-glow hover:bg-primary/25 disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/25 disabled:opacity-50">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} 归档
           </button>
         </div>
-      </GlassCard>
+      </Panel>
 
       {err && <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{err}</div>}
 
       {/* 列表 */}
       {list.loading && reports.length === 0 ? (
-        <GlassCard><p className="py-8 text-center text-sm text-muted-foreground/60">加载中…</p></GlassCard>
+        <Panel><p className="py-8 text-center text-sm text-muted-foreground/60">加载中…</p></Panel>
       ) : reports.length === 0 ? (
-        <GlassCard>
+        <Panel>
           <div className="flex flex-col items-center gap-2 py-10 text-center text-sm text-muted-foreground">
             <FolderOpen className="h-8 w-8 text-muted-foreground/40" />
             还没有归档的研报。用上面的表单记一份结论或要点。
           </div>
-        </GlassCard>
+        </Panel>
       ) : (
-        <GlassCard glow>
+        <Panel>
           <div className="divide-y divide-border/30">
             {reports.map((r) => (
               <div key={r.id} className="flex items-center gap-3 py-2.5">
@@ -109,7 +109,7 @@ export function MyReports() {
               </div>
             ))}
           </div>
-        </GlassCard>
+        </Panel>
       )}
 
       <Disclaimer />

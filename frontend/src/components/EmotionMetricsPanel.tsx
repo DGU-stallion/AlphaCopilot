@@ -1,26 +1,12 @@
 import { Flame, TrendingUp, Layers, CalendarClock } from "lucide-react";
-import { pctColor, UP_TEXT, DOWN_TEXT } from "@/lib/colors";
+import { UP_TEXT, DOWN_TEXT } from "@/lib/colors";
 import { cn } from "@/lib/utils";
+import { Num } from "@/components/Num";
 import { Caliber } from "@/components/ui/Caliber";
 import { finite, plain, safeArray, safeRecord } from "@/lib/agent";
 import type {
   ConsecPremium, EmotionCycle, EmotionMetrics, LadderGap, MoneyEffect, Promotion,
 } from "@/lib/agent";
-
-/** 0~1 的比率 → 百分比文本 */
-function rate(v?: number | null): string {
-  const n = finite(v);
-  return n == null ? "—" : `${Math.round(n * 100)}%`;
-}
-/** 涨跌幅数字 → 带符号文本 */
-function signed(v?: number | null): string {
-  const n = finite(v);
-  return n == null ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
-}
-function tone(v?: number | null): string {
-  const n = finite(v);
-  return n == null ? "text-muted-foreground" : pctColor(n);
-}
 
 /** 指标卡外壳。`caliber` = 这个数到底怎么算的（见 Caliber 组件的说明）。 */
 export function Card({
@@ -30,7 +16,7 @@ export function Card({
   available?: boolean; reason?: string; children: React.ReactNode;
 }) {
   return (
-    <div className="glass rounded-2xl p-5">
+    <div className="rounded-[6px] border border-border bg-card p-5">
       <div className="mb-1 flex items-center gap-1.5">
         <Icon className="h-4 w-4 text-primary" />
         <h3 className="text-sm font-bold">{title}</h3>
@@ -44,8 +30,8 @@ export function Card({
   );
 }
 
-/** 一个读数：大字 + 说明 */
-export function Stat({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+/** 一个读数：大字 + 说明。value 可传 <Num>，数字渲染统一走它（ADR-0014 §4） */
+export function Stat({ label, value, valueClass }: { label: string; value: React.ReactNode; valueClass?: string }) {
   return (
     <div>
       <div className={cn("text-2xl font-extrabold tabular-nums", valueClass)}>{value}</div>
@@ -69,13 +55,13 @@ export function MoneyEffectCard({ me }: { me: MoneyEffect }) {
       available={me.available} reason={me.reason}
     >
       <div className="flex items-end gap-6">
-        <Stat label="中位数" value={signed(me.median)} valueClass={tone(me.median)} />
-        <Stat label="均值" value={signed(me.avg)} valueClass={tone(me.avg)} />
+        <Stat label="中位数" value={<Num v={me.median} pct />} />
+        <Stat label="均值" value={<Num v={me.avg} pct />} />
       </div>
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-dashed border-border pt-2 text-[12px] text-muted-foreground">
         <span>样本 {me.sample ?? "—"} 只</span>
-        <span>翻红率 <b className="text-foreground">{rate(me.positive_rate)}</b></span>
-        <span>再度涨停 <b className="text-foreground">{rate(me.limit_up_again_rate)}</b></span>
+        <span>翻红率 <b className="text-foreground"><Num v={me.positive_rate} rate inheritColor /></b></span>
+        <span>再度涨停 <b className="text-foreground"><Num v={me.limit_up_again_rate} rate inheritColor /></b></span>
       </div>
     </Card>
   );
@@ -94,7 +80,7 @@ export function PromotionCard({ pr }: { pr: Promotion }) {
         "⚠️「3板以上」是合并档 —— 4进5 和 6进7 难度不同，样本太少才合并，别当成同一件事。"}
       available={pr.available} reason={pr.reason}
     >
-      <Stat label="整体晋级率" value={rate(pr.overall?.rate)} />
+      <Stat label="整体晋级率" value={<Num v={pr.overall?.rate} rate />} />
       <div className="mt-3 space-y-1.5 border-t border-dashed border-border pt-2">
         {Object.entries(tiers)
           .filter(([, t]) => t && (finite(t.base) ?? 0) > 0)
@@ -109,7 +95,7 @@ export function PromotionCard({ pr }: { pr: Promotion }) {
               )}
             </div>
             <span className="w-20 shrink-0 text-right tabular-nums">
-              {t.promoted}/{t.base}（{rate(t.rate)}）
+              {t.promoted}/{t.base}（<Num v={t.rate} rate inheritColor />）
             </span>
           </div>
         ))}
@@ -129,12 +115,12 @@ export function ConsecPremiumCard({ cp }: { cp: ConsecPremium }) {
       available={cp.available} reason={cp.reason}
     >
       <div className="flex items-end gap-6">
-        <Stat label="中位数" value={signed(cp.median)} valueClass={tone(cp.median)} />
-        <Stat label="均值" value={signed(cp.avg)} valueClass={tone(cp.avg)} />
+        <Stat label="中位数" value={<Num v={cp.median} pct />} />
+        <Stat label="均值" value={<Num v={cp.avg} pct />} />
       </div>
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-dashed border-border pt-2 text-[12px] text-muted-foreground">
         <span>样本 {cp.sample ?? "—"} 只</span>
-        <span>翻红率 <b className="text-foreground">{rate(cp.positive_rate)}</b></span>
+        <span>翻红率 <b className="text-foreground"><Num v={cp.positive_rate} rate inheritColor /></b></span>
       </div>
     </Card>
   );
@@ -153,12 +139,12 @@ export function LadderCard({ lg }: { lg: LadderGap }) {
       <div className="flex flex-wrap items-end gap-2">
         {Object.entries(safeRecord<number>(lg.tiers)).map(([b, c]) => (
           <span key={b} className="rounded-lg bg-primary/10 px-2.5 py-1 text-[13px] font-semibold text-primary tabular-nums">
-            {b}板 × {c}
+            {b}板 × <Num v={c} digits={0} inheritColor />
           </span>
         ))}
         {safeArray<number>(lg.gaps).map((g) => (
           <span key={`gap${g}`} className="rounded-lg border border-dashed border-danger/50 px-2.5 py-1 text-[13px] font-semibold text-danger tabular-nums">
-            {g}板 缺
+            <Num v={g} digits={0} inheritColor />板 缺
           </span>
         ))}
         {!Object.keys(safeRecord<number>(lg.tiers)).length && <span className="text-[13px] text-muted-foreground">无 2 板以上</span>}
@@ -200,8 +186,8 @@ export function CycleCard({ cy }: { cy: EmotionCycle }) {
       available={cy.available} reason={cy.reason}
     >
       <div className="flex items-end gap-6">
-        <Stat label={`起点 ${cy.trough_date ?? "—"}`} value={`第 ${cy.day_n ?? "—"} 天`} />
-        <Stat label="当前情绪分" value={finite(cy.current_score) != null ? finite(cy.current_score)!.toFixed(2) : "—"}
+        <Stat label={`起点 ${cy.trough_date ?? "—"}`} value={<span>第 <Num v={cy.day_n} digits={0} inheritColor /> 天</span>} />
+        <Stat label="当前情绪分" value={<Num v={finite(cy.current_score)} inheritColor />}
           valueClass={
             cy.trend?.includes("走强") ? UP_TEXT
               : cy.trend?.includes("转弱") ? DOWN_TEXT : "text-foreground"
@@ -245,12 +231,12 @@ export function CycleCard({ cy }: { cy: EmotionCycle }) {
       </div>
       <p className="mt-1.5 text-[12px] text-muted-foreground">
         {}
-        近 {cy.window ?? "—"} 个交易日 · 距窗口低点第 {cy.day_n ?? "—"} 天
+        近 <Num v={cy.window} digits={0} inheritColor /> 个交易日 · 距窗口低点第 <Num v={cy.day_n} digits={0} inheritColor /> 天
         {cy.trend && <> · <b className={
           cy.trend.includes("走强") ? UP_TEXT
             : cy.trend.includes("转弱") ? DOWN_TEXT : "text-foreground"
         }>{cy.trend}</b></>}
-        {finite(cy.pctile) != null && ` · 位于十日区间 ${Math.round(finite(cy.pctile)! * 100)}% 分位`}
+        {finite(cy.pctile) != null && <span> · 位于十日区间 <Num v={cy.pctile} rate inheritColor /> 分位</span>}
         <span className="ml-1.5 inline-block h-2 w-2 rounded-sm bg-danger align-middle" /> 起点
         <span className="ml-2 font-bold text-foreground">加粗</span> 复盘当日
       </p>

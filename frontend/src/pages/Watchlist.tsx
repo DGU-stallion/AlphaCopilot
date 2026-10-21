@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { pctColor } from "@/lib/colors";
 import { Plus, X, RefreshCw, Star } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { GlassCard } from "@/components/ui/GlassCard";
+import { Panel } from "@/components/ui/Panel";
+import { Num } from "@/components/Num";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { api, type Quote } from "@/lib/api";
 import { loadWatch, saveWatch, addCodes } from "@/lib/watchlist";
@@ -14,8 +14,7 @@ import { cn } from "@/lib/utils";
 // 定位改造：标题「自选股」→「股票池」；行情接 useCachedResource
 // —— 切页复用不重取，只有点刷新 / 增删标的才重拉。代码本身只存本地 localStorage、不上传。
 
-const color = pctColor;   // 红涨绿跌口径见 lib/colors.ts
-const pct = (v: number | undefined) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v}%`);
+const pct = (v: number | undefined) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v}%`);  // 字符串语境（AI 快照）专用；界面用 <Num>
 
 const CACHE_KEY = "pool:quotes";
 
@@ -73,7 +72,7 @@ export function Watchlist() {
         subtitle="批量添加、一屏总览你关注的标的。代码只存本地、不上传。"
       />
 
-      <GlassCard className="mb-4">
+      <Panel className="mb-4">
         <label className="mb-1.5 block text-xs text-muted-foreground">
           批量添加 —— 粘贴一串代码即可（逗号 / 空格 / 换行都行，自动识别 6 位 A 股代码）
         </label>
@@ -90,15 +89,15 @@ export function Watchlist() {
           />
           <button
             onClick={add}
-            className="inline-flex h-9 shrink-0 items-center gap-1.5 self-start rounded-lg bg-primary/15 px-4 text-sm font-medium text-primary shadow-glow hover:bg-primary/25"
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 self-start rounded-lg bg-primary/15 px-4 text-sm font-medium text-primary hover:bg-primary/25"
           >
             <Plus className="h-4 w-4" /> 添加
           </button>
         </div>
         {hint && <p className="mt-2 text-xs text-muted-foreground/70">{hint}</p>}
-      </GlassCard>
+      </Panel>
 
-      <GlassCard glow>
+      <Panel>
         <div className="mb-2 flex items-center justify-between">
           <h3 className="flex items-center gap-1.5 font-semibold">
             <Star className="h-4 w-4 text-primary" /> 股票池总览
@@ -136,11 +135,14 @@ export function Watchlist() {
                     <tr key={c} className="border-b border-border/30">
                       <td className="px-2 py-2.5 font-medium">{q?.name || "—"}</td>
                       <td className="px-2 py-2.5 font-mono text-xs text-muted-foreground">{c}</td>
-                      <td className={cn("px-2 py-2.5 font-mono", color(q?.change_pct))}>{q ? q.price : "—"}</td>
-                      <td className={cn("px-2 py-2.5 font-mono", color(q?.change_pct))}>{q ? pct(q.change_pct) : "—"}</td>
-                      <td className="px-2 py-2.5 font-mono text-muted-foreground">{q?.pe_ttm ?? "—"}</td>
-                      <td className="px-2 py-2.5 font-mono text-muted-foreground">{q?.pb ?? "—"}</td>
-                      <td className="px-2 py-2.5 font-mono text-muted-foreground">{q?.turnover_pct ?? "—"}</td>
+                      <td className="px-2 py-2.5">
+                        {q ? <Num v={q.price} digits={2} className={q.change_pct > 0 ? "text-danger" : q.change_pct < 0 ? "text-success" : "text-muted-foreground"} inheritColor />
+                          : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-2 py-2.5"><Num v={q?.change_pct ?? null} pct /></td>
+                      <td className="px-2 py-2.5 text-muted-foreground"><Num v={q?.pe_ttm ?? null} digits={2} inheritColor /></td>
+                      <td className="px-2 py-2.5 text-muted-foreground"><Num v={q?.pb ?? null} digits={2} inheritColor /></td>
+                      <td className="px-2 py-2.5 text-muted-foreground"><Num v={q?.turnover_pct ?? null} digits={2} suffix="%" inheritColor /></td>
                       <td className="px-2 py-2.5">
                         <button
                           onClick={() => remove(c)}
@@ -157,7 +159,7 @@ export function Watchlist() {
             </table>
           </div>
         )}
-      </GlassCard>
+      </Panel>
 
       <Disclaimer />
     </div>

@@ -1,8 +1,8 @@
 import { useState, useEffect, Fragment } from "react";
-import { pctColor } from "@/lib/colors";
+import { Num } from "@/components/Num";
 import { RefreshCw, Gauge, ArrowDownUp, TrendingUp, TrendingDown, Flame, BarChart3 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { GlassCard } from "@/components/ui/GlassCard";
+import { Panel } from "@/components/ui/Panel";
 import { Caliber } from "@/components/ui/Caliber";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { finite } from "@/lib/agent";
@@ -19,8 +19,7 @@ const AUTO_KEY = "alphacopilot-auto-refresh";
 const LIVE_MS = 5_000;      // 轻量行情：腾讯批量，5 秒
 const HEAVY_MS = 60_000;    // 板块资金 / 成交额榜：东财+akshare，60 秒
 
-const fmt = (v: number) => v.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
-const yi = (v: number | null) => (v == null ? "—" : `${fmt(v / 1e8)} 亿`); // 元 → 亿
+const yiV = (v: number | null | undefined) => (v == null ? null : v / 1e8); // 元 → 亿（供 <Num>）
 
 export function DailyReview() {
   const [overview, setOverview] = useState<MarketOverview | null>(() => getCache<MarketOverview>("dr:overview") ?? null);
@@ -132,7 +131,7 @@ export function DailyReview() {
     { k: "真实涨停", v: sentiment.zt_real, up: true },
     { k: "跌停", v: sentiment.dt, up: false },
     { k: "真实跌停", v: sentiment.dt_real, up: false },
-    { k: "活跃度", v: sentiment.active, up: null },
+    { k: "活跃度", v: sentiment.active == null ? null : Number(sentiment.active), up: null },
   ] : [];
 
   // 向全局 AI 浮标登记本页确定性数据快照（S5 接后端后用作对话上下文；现仅展示）
@@ -189,7 +188,7 @@ export function DailyReview() {
         } />
         {sentiment?.date && <span className="text-[11px] text-muted-foreground/50">{sentiment.date}</span>}
       </div>
-      <GlassCard className="mb-6">
+      <Panel className="mb-6">
         {!sentiment?.breadth ? (
           pending(ovDone)
         ) : (
@@ -210,13 +209,15 @@ export function DailyReview() {
               {sentCells.map((c) => (
                 <div key={c.k} className="rounded-lg bg-muted/20 p-2 text-center">
                   <p className="truncate text-[11px] text-muted-foreground">{c.k}</p>
-                  <p className={cn("mt-0.5 font-mono text-sm font-bold", c.up === null ? "text-foreground" : c.up ? "text-danger" : "text-success")}>{c.v}</p>
+                  <p className={cn("mt-0.5 font-mono text-sm font-bold", c.up === null ? "text-foreground" : c.up ? "text-danger" : "text-success")}>
+                    <Num v={c.v} digits={0} inheritColor />
+                  </p>
                 </div>
               ))}
             </div>
           </>
         )}
-      </GlassCard>
+      </Panel>
 
       {/* 4a. 今日实时打板情绪 —— 这页是盘面数据，得有今天的 */}
       {liveEmo && (
@@ -238,7 +239,7 @@ export function DailyReview() {
               <span className="text-[11px] text-muted-foreground/50">{liveEmo.reason}</span>
             )}
           </div>
-          <GlassCard className="mb-6">
+          <Panel className="mb-6">
             {!liveEmo.available ? (
               <p className="py-4 text-center text-sm text-muted-foreground/60">
                 {liveEmo.reason || "今日暂无数据"}
@@ -276,15 +277,15 @@ export function DailyReview() {
                     <p className={cn("mt-1 font-mono text-xl font-bold",
                                      (c.raw ?? c.v) == null ? "text-muted-foreground/40"
                                                             : c.up ? "text-danger" : "text-success")}>
-                      {c.raw != null ? c.raw
-                        : c.v != null ? `${(c.v * 100).toFixed(1)}%` : "—"}
+                      {c.raw != null ? <Num v={c.raw} digits={0} inheritColor />
+                        : <Num v={c.v} rate digits={1} inheritColor />}
                     </p>
                     <p className="mt-0.5 text-[10px] text-muted-foreground/50">{c.sub}</p>
                   </div>
                 ))}
               </div>
             )}
-          </GlassCard>
+          </Panel>
         </>
       )}
 
@@ -305,7 +306,7 @@ export function DailyReview() {
           </span>
         )}
       </div>
-      <GlassCard className="mb-6">
+      <Panel className="mb-6">
         {!emotion || emotion.zt_count === undefined ? (
           pending(emoDone)
         ) : (
@@ -313,14 +314,14 @@ export function DailyReview() {
             {/* 关键计数 */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {[
-                { k: "涨停", v: `${emotion.zt_count}`, cls: "text-danger" },
-                { k: "跌停", v: `${emotion.dt_count}`, cls: "text-success" },
-                { k: "最高连板", v: `${emotion.max_boards} 板`, cls: "text-primary" },
-                { k: "连板（2板+）", v: `${emotion.lianban_count} 家`, cls: "text-primary" },
+                { k: "涨停", v: <Num v={emotion.zt_count} digits={0} inheritColor className="text-danger" /> },
+                { k: "跌停", v: <Num v={emotion.dt_count} digits={0} inheritColor className="text-success" /> },
+                { k: "最高连板", v: <Num v={emotion.max_boards} digits={0} suffix=" 板" inheritColor className="text-primary" /> },
+                { k: "连板（2板+）", v: <Num v={emotion.lianban_count} digits={0} suffix=" 家" inheritColor className="text-primary" /> },
               ].map((c) => (
                 <div key={c.k} className="rounded-lg bg-muted/25 p-3 text-center">
                   <p className="text-[11px] text-muted-foreground">{c.k}</p>
-                  <p className={cn("mt-0.5 font-mono text-xl font-bold", c.cls)}>{c.v}</p>
+                  <p className="mt-0.5 font-mono text-xl font-bold">{c.v}</p>
                 </div>
               ))}
             </div>
@@ -335,7 +336,7 @@ export function DailyReview() {
                 <div key={c.k} className="rounded-lg bg-muted/20 p-2.5 text-center">
                   <p className="text-[11px] text-muted-foreground">{c.k}</p>
                   <p className={cn("mt-0.5 font-mono text-sm font-bold", c.strong ? "text-danger" : "text-success")}>
-                    {c.v == null ? "—" : `${(c.v * 100).toFixed(1)}%`}
+                    <Num v={c.v} rate digits={1} inheritColor />
                   </p>
                   <p className="mt-0.5 text-[10px] text-muted-foreground/50">{c.hint}</p>
                 </div>
@@ -363,22 +364,23 @@ export function DailyReview() {
                         <Fragment key={s.code}>
                           <tr className="border-b border-border/30">
                             <td className="px-2 py-2"><span className="font-medium">{s.name}</span> <span className="text-xs text-muted-foreground/50">{s.code}</span></td>
-                            <td className="whitespace-nowrap px-2 py-2 font-mono font-bold text-primary">{s.boards} 板</td>
-                            <td className="px-2 py-2 font-mono">
-                              {lianbanQuotes[s.code]?.price ?? (
-                                <span className="text-muted-foreground/50" title="实时行情未取到，显示昨收">
-                                  {s.price}
+                            <td className="whitespace-nowrap px-2 py-2 font-bold text-primary"><Num v={s.boards} digits={0} suffix=" 板" inheritColor /></td>
+                            <td className="px-2 py-2">
+                              {lianbanQuotes[s.code]?.price != null ? (
+                                <Num v={lianbanQuotes[s.code].price} />
+                              ) : (
+                                <span className="text-muted-foreground/50 font-mono" title="实时行情未取到，显示昨收">
+                                  <Num v={s.price} inheritColor />
                                 </span>
                               )}
                             </td>
-                            <td className={cn("px-2 py-2 font-mono",
-                                              pctColor(finite(lianbanQuotes[s.code]?.change_pct)))}>
+                            <td className="px-2 py-2">
                               {finite(lianbanQuotes[s.code]?.change_pct) !== null
-                                ? `${lianbanQuotes[s.code].change_pct > 0 ? "+" : ""}${lianbanQuotes[s.code].change_pct}%`
+                                ? <Num v={lianbanQuotes[s.code].change_pct} pct />
                                 : <span className="text-muted-foreground/50" title="实时行情未取到">—</span>}
                             </td>
-                            <td className="whitespace-nowrap px-2 py-2 font-mono text-muted-foreground">{yi(s.amount)}</td>
-                            <td className="whitespace-nowrap px-2 py-2 font-mono text-muted-foreground">{yi(s.float_cap)}</td>
+                            <td className="whitespace-nowrap px-2 py-2 text-muted-foreground"><Num v={yiV(s.amount)} digits={2} suffix=" 亿" inheritColor /></td>
+                            <td className="whitespace-nowrap px-2 py-2 text-muted-foreground"><Num v={yiV(s.float_cap)} digits={2} suffix=" 亿" inheritColor /></td>
                             <td className="max-w-56 px-2 py-2 text-xs">
                               {s.reason ? <span className="text-foreground">{s.reason}</span> : <span className="text-muted-foreground/50">—</span>}
                             </td>
@@ -393,7 +395,7 @@ export function DailyReview() {
             </div>
           </>
         )}
-      </GlassCard>
+      </Panel>
 
       {}
       <div className="mb-3 flex items-center gap-2">
@@ -406,7 +408,7 @@ export function DailyReview() {
         <span className="text-[11px] text-muted-foreground/50">客观公开榜单，非推荐 / 非预测 / 不构成投资建议</span>
         {turnover?.updated && <span className="ml-auto text-[11px] text-muted-foreground/50">更新于 {turnover.updated}</span>}
       </div>
-      <GlassCard className="mb-6">
+      <Panel className="mb-6">
         {!turnover || turnover.stocks.length === 0 ? (
           pending(toDone)
         ) : (
@@ -422,14 +424,14 @@ export function DailyReview() {
               <tbody>
                 {turnover.stocks.map((s, i) => (
                   <tr key={s.code} className="border-b border-border/30">
-                    <td className="px-2 py-2 font-mono text-xs text-muted-foreground/50">{i + 1}</td>
+                    <td className="px-2 py-2 text-xs text-muted-foreground/50"><Num v={i + 1} digits={0} inheritColor /></td>
                     <td className="px-2 py-2"><span className="font-medium">{s.name}</span> <span className="text-xs text-muted-foreground/50">{s.code}</span></td>
-                    <td className="px-2 py-2 font-mono">{s.price ?? "—"}</td>
-                    <td className={cn("px-2 py-2 font-mono", s.pct == null ? "text-muted-foreground" : pctColor(s.pct))}>
-                      {s.pct == null ? "—" : `${s.pct > 0 ? "+" : ""}${s.pct}%`}
+                    <td className="px-2 py-2"><Num v={s.price} /></td>
+                    <td className="px-2 py-2">
+                      <Num v={s.pct} pct />
                     </td>
-                    <td className="whitespace-nowrap px-2 py-2 font-mono">{yi(s.amount)}</td>
-                    <td className="whitespace-nowrap px-2 py-2 font-mono text-muted-foreground">{yi(s.mcap)}</td>
+                    <td className="whitespace-nowrap px-2 py-2"><Num v={yiV(s.amount)} digits={2} suffix=" 亿" /></td>
+                    <td className="whitespace-nowrap px-2 py-2 text-muted-foreground"><Num v={yiV(s.mcap)} digits={2} suffix=" 亿" inheritColor /></td>
                     <td className="whitespace-nowrap px-2 py-2 text-xs text-muted-foreground">{s.industry}</td>
                   </tr>
                 ))}
@@ -437,7 +439,7 @@ export function DailyReview() {
             </table>
           </div>
         )}
-      </GlassCard>
+      </Panel>
 
       {/* 5. 板块资金趋势榜（行业） */}
       <div className="mb-3 flex items-center gap-2">
@@ -449,7 +451,7 @@ export function DailyReview() {
         } />
         <span className="text-[11px] text-muted-foreground/50">行业 · 按今日净流入排序</span>
       </div>
-      <GlassCard className="mb-6">
+      <Panel className="mb-6">
         {sectors.length === 0 ? (
           pending(ovDone)
         ) : (
@@ -466,18 +468,18 @@ export function DailyReview() {
                 {sectors.slice(0, 15).map((s) => (
                   <tr key={s.name} className="border-b border-border/30">
                     <td className="px-2 py-2 font-medium">{s.name}</td>
-                    <td className={cn("px-2 py-2 font-mono", pctColor(s.pct))}>{s.pct > 0 ? "+" : ""}{s.pct}%</td>
-                    <td className={cn("px-2 py-2 font-mono", pctColor(s.net))}>{s.net > 0 ? "+" : ""}{fmt(s.net)} 亿</td>
-                    <td className="px-2 py-2 font-mono text-muted-foreground">{fmt(s.inflow)}</td>
-                    <td className="px-2 py-2 font-mono text-muted-foreground">{fmt(s.outflow)}</td>
-                    <td className="px-2 py-2 font-mono text-muted-foreground">{s.firms}</td>
+                    <td className="px-2 py-2"><Num v={s.pct} pct size="sm" /></td>
+                    <td className="px-2 py-2"><Num v={s.net} signed colorBySign digits={2} suffix=" 亿" size="sm" /></td>
+                    <td className="px-2 py-2 text-muted-foreground"><Num v={s.inflow} digits={2} size="sm" inheritColor /></td>
+                    <td className="px-2 py-2 text-muted-foreground"><Num v={s.outflow} digits={2} size="sm" inheritColor /></td>
+                    <td className="px-2 py-2 text-muted-foreground"><Num v={s.firms} digits={0} size="sm" inheritColor /></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-      </GlassCard>
+      </Panel>
 
       {/* 6. 资金轮动 */}
       <div className="mb-3 flex items-center gap-2">
@@ -503,7 +505,7 @@ export function DailyReview() {
             empty: "今日没有行业净流出",
           },
         ].map((col) => (
-          <GlassCard key={col.title}>
+          <Panel key={col.title}>
             <h4 className={cn("mb-3 flex items-center gap-1.5 text-sm font-semibold", col.color)}><col.icon className="h-4 w-4" /> {col.title}</h4>
             {col.rows.length === 0 ? (
               ovDone && sectors.length > 0
@@ -515,13 +517,13 @@ export function DailyReview() {
                   <div key={s.name} className="flex items-center gap-3 border-b border-border/30 pb-1.5 text-sm last:border-0">
                     <span className="w-5 text-xs text-muted-foreground/50">{i + 1}</span>
                     <span className="flex-1 truncate">{s.name}</span>
-                    <span className={cn("font-mono text-xs", pctColor(s.pct))}>{s.pct > 0 ? "+" : ""}{s.pct}%</span>
-                    <span className={cn("w-20 text-right font-mono text-xs", pctColor(s.net))}>{s.net > 0 ? "+" : ""}{fmt(s.net)} 亿</span>
+                    <Num v={s.pct} pct digits={2} size="sm" />
+                    <Num v={s.net} signed colorBySign digits={2} suffix=" 亿" size="sm" />
                   </div>
                 ))}
               </div>
             )}
-          </GlassCard>
+          </Panel>
         ))}
       </div>
 

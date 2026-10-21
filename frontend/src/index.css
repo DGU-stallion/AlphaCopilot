@@ -4,95 +4,83 @@
 
 @layer base {
   /* ============================================================
-     科技玻璃暖橙主题
-     默认呈现 = 暗色暖橙（数据密集、长时间看，暗底最护眼；橙红＝A股红盘气质，避开近绿的青色）。
-     .light 提供亮色备选。HSL 变量沿用 4 级 surface 架构。
+     主题 token（ADR-0014）
+
+     ⚠️ 颜色真源是 src/theme/tokens.ts，不是这里。
+     本文件只是把 palette 的 hex **镜像**成 Tailwind 需要的 "H S% L%" 三元组，
+     因为现有 23 个文件、496 处还在用 bg-card / text-muted-foreground 这类类名。
+     改颜色请改 tokens.ts，然后同步这里（M2-2 完成后两边由脚本对齐）。
+
+     数值对应关系：
+       --background  ← bg        --card        ← panel
+       --muted       ← raised    --border      ← border
+       --foreground  ← text      --muted-foreground ← textSecondary
+       --primary     ← accent    --danger      ← up    --success ← down
      ============================================================ */
   :root {
-    /* ---- 暗色暖橙（默认） ---- */
-    --background: 222 47% 6%;          /* 深蓝黑纵深底 */
-    --foreground: 210 30% 92%;
-    --card: 222 40% 9%;                /* 卡底（玻璃质感另用 .glass 叠加） */
-    --card-foreground: 210 30% 92%;
+    /* ---- 深色（默认） ---- */
+    --background: 220 29% 6%;          /* bg ← tokens.bg */
+    --foreground: 220 22% 92%;
+    --card: 222 27% 10%;                /* panel ← tokens.panel */
+    --card-foreground: 220 22% 92%;
 
-    --primary: 15 89% 56%;             /* 暖橙红主色（朱橙 ≈#F35D2B）—— A股红盘气质，替代原青光 */
-    --primary-foreground: 222 47% 6%;
-    --accent: 25 95% 58%;              /* 橙 · 强调/告警点缀 */
-    --accent-foreground: 222 47% 6%;
+    --primary: 217 91% 60%;             /* accent ← tokens.accent（蓝，全站唯一强调色，只给交互） */
+    --primary-foreground: 220 29% 6%;
+    --accent: 217 91% 60%;              /* accent 同一色，Tailwind 的 accent 槽位 */
+    --accent-foreground: 220 29% 6%;
 
-    --muted: 220 28% 15%;              /* surface-2 */
-    --muted-foreground: 215 18% 62%;
-    --destructive: 0 72% 58%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 210 30% 22%;             /* surface-3 边框 */
+    --muted: 222 25% 14%;              /* raised ← tokens.raised */
+    --muted-foreground: 221 14% 66%;
+    --destructive: 2 64% 58%;
+    --destructive-foreground: 220 22% 92%;
+    --border: 221 21% 17%;             /* border ← tokens.border */
     --radius: 1rem;
 
-    /* 语义色（涨跌配色由页面按 A股红涨绿跌自行选用 success/danger） */
-    --success: 145 62% 47%;
-    --danger: 0 74% 60%;
-    --warning: 38 92% 55%;
-    --info: 15 89% 56%;
-
-    /* 玻璃发丝边框 / 内高光（rgba，供 .glass 使用） */
-    --glass-fill-top: rgba(255, 255, 255, 0.055);
-    --glass-fill-bot: rgba(255, 255, 255, 0.012);
-    --glass-stroke: rgba(255, 232, 214, 0.10);
-    --glass-hi: rgba(255, 255, 255, 0.06);
+    /* 语义色：danger=涨(红) success=跌(绿)，A股口径。口径可切换（ADR-0014 §3） */
+    --success: 152 47% 46%;
+    --danger: 2 64% 58%;
+    --warning: 33 65% 58%;
+    --info: 220 82% 65%;
 
     /* Chart tokens */
-    --chart-grid: 220 20% 14%;
-    --chart-text: 215 15% 55%;
-    --chart-axis: 220 20% 24%;
+    --chart-grid: 221 21% 17%;
+    --chart-text: 222 11% 47%;
+    --chart-axis: 221 21% 24%;
   }
 
   .light {
-    --background: 210 30% 97%;
-    --foreground: 222 40% 12%;
+    --background: 210 33% 99%;
+    --foreground: 218 22% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 222 40% 12%;
+    --card-foreground: 218 22% 10%;
 
-    --primary: 15 82% 50%;             /* 暖橙红主色（亮色版，略深保对比） */
+    --primary: 221 83% 53%;             /* accent ← tokens.accent（浅色版，加深保对比） */
     --primary-foreground: 0 0% 100%;
-    --accent: 25 90% 50%;
+    --accent: 221 83% 53%;
     --accent-foreground: 0 0% 100%;
 
-    --muted: 210 20% 92%;
-    --muted-foreground: 215 16% 42%;
-    --destructive: 0 74% 55%;
+    --muted: 220 27% 96%;
+    --muted-foreground: 220 12% 40%;
+    --destructive: 2 55% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 20% 84%;
+    --border: 218 23% 91%;
 
-    --success: 145 62% 40%;
-    --danger: 0 74% 52%;
-    --warning: 38 92% 45%;
-    --info: 15 82% 50%;
+    --success: 153 51% 37%;
+    --danger: 2 55% 51%;
+    --warning: 33 60% 45%;
+    --info: 219 68% 54%;
 
-    --glass-fill-top: rgba(255, 255, 255, 0.7);
-    --glass-fill-bot: rgba(255, 255, 255, 0.35);
-    --glass-stroke: rgba(15, 40, 70, 0.10);
-    --glass-hi: rgba(255, 255, 255, 0.8);
-
-    --chart-grid: 214 20% 88%;
-    --chart-text: 215 16% 42%;
-    --chart-axis: 214 20% 78%;
+    --chart-grid: 218 23% 91%;
+    --chart-text: 221 12% 59%;
+    --chart-axis: 218 23% 84%;
   }
 
   * { @apply border-border; }
 
   body {
     @apply bg-background text-foreground;
-    /* 纵深暖冷双光晕（顶橙 + 右下冷蓝），别留死黑 */
+    /* v2：纯实色底，不再用光晕/渐变表达纵深（ADR-0014，层次靠灰阶与边框） */
     background-color: hsl(var(--background));
-    background-image:
-      radial-gradient(1100px 620px at 12% -12%, hsl(15 89% 56% / 0.11), transparent 60%),
-      radial-gradient(980px 720px at 108% 112%, hsl(220 60% 45% / 0.08), transparent 55%);
-    background-attachment: fixed;
-  }
-
-  .light body {
-    background-image:
-      radial-gradient(1100px 620px at 12% -12%, hsl(15 85% 55% / 0.08), transparent 60%),
-      radial-gradient(980px 720px at 108% 112%, hsl(220 65% 60% / 0.06), transparent 55%);
   }
 
   /* prose 表格 */
@@ -106,31 +94,6 @@
   ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
 }
 
-@layer components {
-  /* 玻璃卡：半透明填充 + 发丝边框 + 柔投影 + 顶部内高光（EP26 高级感配方） */
-  .glass {
-    background-image: linear-gradient(162deg, var(--glass-fill-top), var(--glass-fill-bot));
-    border: 1px solid var(--glass-stroke);
-    border-radius: var(--radius);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 var(--glass-hi);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-  }
-  .light .glass { box-shadow: 0 10px 26px rgba(30, 60, 100, 0.10), inset 0 1px 0 var(--glass-hi); }
-
-  /* 顶角暖橙光晕（配 .glass 用，装饰热点） */
-  .glass-glow { position: relative; overflow: hidden; }
-  .glass-glow::before {
-    content: "";
-    position: absolute; top: -40%; right: -20%;
-    width: 240px; height: 240px;
-    background: radial-gradient(circle, hsl(var(--primary) / 0.16), transparent 70%);
-    pointer-events: none;
-  }
-
-  /* 暖橙光文字 */
-  .text-glow { text-shadow: 0 0 18px hsl(var(--primary) / 0.45); }
-}
 
 /* prose 跟随主题。
  * @tailwindcss/typography 默认是浅色配色（bold 用 gray-900），暗色下加粗文字会
