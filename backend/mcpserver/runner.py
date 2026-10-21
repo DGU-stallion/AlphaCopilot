@@ -16,13 +16,18 @@
 1. **自动留档** —— 每次执行分配 run_id、建 `workspace/runs/<run_id>/`、把代码
    原样存成 `code.py`。这正是 provenance 里 `runId` / `codeHash` 的抓手
    （走 bash 就得从 Pi session JSONL 反推）。
-2. **禁网络**（下面是刻意保留的）—— 让「取数走我们的数据层」成为默认习惯，
-   不绕过 as-of / 缓存 / 限流。
+2. **工具一致性** —— 它和 MCP 的 `get_quote` 走同一套取数函数，
+   不会出现「这个工具能取、那个不能」的割裂。
 3. **可复现** —— 半年后能翻出当时的代码重跑。
 
 Seatbelt profile（`run_python.sb`）只约束**这条通道自身**：限写（仅 workspace）、
-对已知密钥目录 deny 读、禁网、wall-clock 超时。这些限制是纵深防御的一层，
+对已知密钥目录 deny 读、wall-clock 超时。这些限制是纵深防御的一层，
 **不代表 agent 整体受限**——见 ADR-0010 §3 的显式风险记录。
+
+**网络是放行的**（曾经 deny，已改）。原意是「让取数走数据层」，但实测证伪：
+agent 有 bash 与 web_fetch，禁网对它毫无约束力，唯一效果是把取数赶到
+bash + curl 那条无留档的路径上。放行后实测模型 1 次 run_python 完成
+（`alpha.data.kline` 取数），而禁网时是 10 次工具调用 + 自己实现指标。
 
 ## 约定
 

@@ -292,8 +292,26 @@ def _tencent_kline(code: str, category: int = 4, offset: int = 60) -> list[dict]
     )
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     raw = urllib.request.urlopen(req, timeout=12).read().decode("utf-8")  # noqa: S310
-    node = json.loads(raw)["data"][sym]
+    payload = json.loads(raw)
+    if payload.get("code") not in (0, None):
+        raise DataUnavailable(f"gtimg 返回错误 code={payload.get('code')} msg={payload.get('msg')!r}")
+    node = (payload.get("data") or {}).get(sym)
+    if node is None:
+        raise DataUnavailable(f"gtimg 响应里没有 {sym} 节点（代码可能不存在）")
+
     rows = node.get(f"qfq{scale}") or node.get(scale) or []
+    if not rows:
+        # 空数组有两种含义，必须区分：
+        #   · 代码无效（退市/不存在）→ qt 里该股票对应的是 []
+        #   · 代码有效但区间内无成交（停牌）→ qt 里有元数据
+        # 不区分的话，调用方只能拿到 []，无法判断该重试还是该换代码。
+        qt = node.get("qt") or {}
+        meta = qt.get(sym) if isinstance(qt, dict) else None
+        if not meta:
+            raise DataUnavailable(
+                f"{code} 无行情元数据（代码可能不存在或已退市）；"
+                "若确认代码正确，请检查是否停牌"
+            )
     out: list[dict] = []
     for r in rows:
         # gtimg 行：[date, open, close, high, low, volume, ...]

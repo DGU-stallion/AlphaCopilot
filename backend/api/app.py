@@ -54,6 +54,12 @@ class BacktestIn(BaseModel):
     dates: list[str] | None = None
 
 
+# 白名单 skills（ADR-0010 修订 §2）。12 个，description 合计约 700 tokens/轮。
+# 取自 HKUDS/Vibe-Trading（MIT），已剔除硬规则 10 禁止项、并把取数指引改到
+# alpha.data / research.astock。见 skills/ 下每个文件的头部注释。
+_SKILLS_DIR = _REPO_ROOT / "skills"
+
+
 def _default_provider_factory(workspace_root: Path, base_url=None, api_key=None, model=None):
     def factory(session_id: str):
         ws = workspace_root / session_id / "ws"
@@ -62,6 +68,8 @@ def _default_provider_factory(workspace_root: Path, base_url=None, api_key=None,
             workspace=ws,
             system_prompt=_compliance_prompt(),
             model=model,
+            # skills 目录是可选的：不存在时不挂载（Pi 侧会 --no-skills 全关）。
+            skills_dir=_SKILLS_DIR if _SKILLS_DIR.is_dir() else None,
             base_url=base_url,
             api_key=api_key,
         )

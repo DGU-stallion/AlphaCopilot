@@ -186,13 +186,16 @@ class PiProvider:
         if spec.system_prompt:
             argv += ["--append-system-prompt", spec.system_prompt]
 
-        # skills：显式挂载（不让 Pi 自动发现，避免加载仓库根的全部 skills）
+        # skills：**先禁自动发现，再显式挂载我们的目录**。
+        #
+        # 这两步都要做，不能二选一（实测：只给 --skill 不关自动发现，会连
+        # `~/.agents/skills`、`~/.pi/agent/*/skills` 里的用户级 skill 一起加载
+        # ——本机实测多出 15 个无关的，把别人的工作流塞进我们的 system prompt）。
+        #
+        # 加上 --no-skills 后实测正好是我们白名单的 12 个。
+        argv.append("--no-skills")
         if spec.skills_dir is not None:
             argv += ["--skill", str(spec.skills_dir)]
-        else:
-            # 不显式给 skills 时禁掉自动发现：仓库根有 88 个 SKILL.md，
-            # 全量加载的 description 合计约 5.9k tokens/轮（ADR-0010 修订 §2）。
-            argv.append("--no-skills")
 
         # MCP：Pi 从 agent dir 下的 mcp.json 读，不在这里传命令行
         return argv
