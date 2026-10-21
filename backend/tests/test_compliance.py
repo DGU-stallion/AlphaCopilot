@@ -14,6 +14,8 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
+import pytest
+
 from agent.persona import system_prompt as compliance_prompt
 from agent.provider import ProviderSpec
 from agent.providers.dsh import DshProvider
@@ -59,6 +61,10 @@ def test_persona_has_five_compliance_keywords():
         assert kw in sp
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="依赖已消失的 deepseek_harness SDK；M1-2 换 PiProvider 后按新契约重写",
+)
 async def test_compliance_prompt_visible_to_model():
     """集成：合规 persona 确实进了模型收到的 system prompt（keyless 捕获）。"""
     _CAPTURE.clear()
@@ -105,6 +111,7 @@ async def test_compliance_prompt_visible_to_model():
         for t in body.get("tools", []) if isinstance(t, dict)
     }
     skills_visible = "skill" in tool_names or any(
-        n in sys_text for n in ["skill", "candlestick", "technical", "fundamental", "risk", "sentiment"]
+        n in sys_text
+        for n in ["skill", "candlestick", "technical", "fundamental", "risk", "sentiment"]
     )
     assert skills_visible, f"skills 不可见。tools={tool_names}"

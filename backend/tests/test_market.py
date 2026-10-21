@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-
 # ---- 涨停原因映射（Bug A 回归：lianban_stocks[].reason 曾全为 None）----
 
 def test_emotion_fills_reason_from_source(monkeypatch):

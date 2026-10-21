@@ -38,6 +38,22 @@ class MessageIn(BaseModel):
     content: str
 
 
+class BacktestIn(BaseModel):
+    """POST /jobs/backtest 的请求体。
+
+    必须定义在模块级：Pydantic 在解析注解时按模块 globals 查找被引用的类，
+    函数体内定义的局部类不在其中，schema 生成会抛
+    `PydanticUserError: ForwardRef('BacktestIn')`，连带 /openapi.json 500。
+    见 tests/test_openapi.py。
+    """
+
+    closes: list[float]
+    fast: int = 20
+    slow: int = 60
+    symbol: str = ""
+    dates: list[str] | None = None
+
+
 def _default_provider_factory(workspace_root: Path, base_url=None, api_key=None, model=None):
     def factory(session_id: str):
         ws = workspace_root / session_id / "ws"
@@ -110,13 +126,6 @@ def create_app(
         if art is None:
             raise HTTPException(404, "artifact not found")
         return art
-
-    class BacktestIn(BaseModel):
-        closes: list[float]
-        fast: int = 20
-        slow: int = 60
-        symbol: str = ""
-        dates: list[str] | None = None
 
     @router.post("/jobs/backtest")
     async def submit_backtest_job(body: BacktestIn) -> dict:

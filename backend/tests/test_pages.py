@@ -111,8 +111,10 @@ def test_backtest_page_registered(client):
 
 def test_render_backtest_blocks(client):
     # client fixture 已 patch data.closes_with_dates 为确定性假数据（价格递增）。
-    blocks = client.post("/api/pages/backtest/render",
-                         json={"symbol": "600519", "fast": 5, "slow": 10, "range": "1y"}).json()["blocks"]
+    blocks = client.post(
+        "/api/pages/backtest/render",
+        json={"symbol": "600519", "fast": 5, "slow": 10, "range": "1y"},
+    ).json()["blocks"]
     kinds = [b["kind"] for b in blocks]
     assert kinds == ["metric", "chart", "chart"]
     # 指标卡含总收益/夏普

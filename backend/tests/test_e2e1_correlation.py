@@ -58,7 +58,10 @@ with open("manifest.json", "w", encoding="utf-8") as f:
 print("HEATMAP_DONE")
 """
 
-_CONCLUSION = "白酒板块内部相关性高（0.6~0.8），与沪深300 相关性中等（约0.5）。以上为客观数据，不构成投资建议。"
+_CONCLUSION = (
+    "白酒板块内部相关性高（0.6~0.8），与沪深300 相关性中等（约0.5）。"
+    "以上为客观数据，不构成投资建议。"
+)
 
 
 def _tool_call_chunks(call_id, name, arguments):
@@ -124,6 +127,10 @@ def _free_port():
 
 @pytest.mark.skipif(__import__("sys").platform != "darwin",
                     reason="run_python 沙箱依赖 macOS sandbox-exec")
+@pytest.mark.xfail(
+    strict=True,
+    reason="依赖已消失的 deepseek_harness SDK；M1-2 换 PiProvider 后按新契约重写",
+)
 async def test_e2e1_correlation_heatmap_in_chat_stream():
     server, base = _mock_correlation_model()
     try:

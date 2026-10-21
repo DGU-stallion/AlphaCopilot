@@ -104,6 +104,23 @@ pytest -q apps/server data-service          # 后端与数据层仍是 Python
 pnpm --prefix apps/web build
 ```
 
+## 数据层冻结（2026-10-21 起，M0-5）
+
+`backend/research/`、`backend/alpha/`、`backend/duanxian/` 在 **M3 数据层换代之前冻结**：
+
+- ✅ **可以**：修阻断性 bug（取数失败、算错、崩溃）
+- ✅ **可以**：加测试
+- ❌ **不可以**：新增数据源、新增指标函数、重构模块结构、改公开函数签名
+
+理由：这三层即将被 `data-service/vendor/a-stock-data`（上游 V3.10.2，我们落后 7 个版本）
+整体替换。在即将被丢弃的代码上加功能，等于把工作量扔进垃圾桶，而且会让 M3 的
+替换范围变大、对照变难。
+
+判断标准：**「这个改动，vendor 版会不会自带？」** 如果会，就不做，等 M3。
+
+涉及 `research/` 的改动如果有疑问，先看 `docs/research/a-stock-data-v3.10.md`
+（上游能力清单），大部分"想加的功能"上游已经有了。
+
 ## 环境依赖
 
 | 依赖 | 版本 | 用途 |
@@ -122,3 +139,15 @@ pnpm --prefix apps/web build
 
 密钥：只在 `~/.dsh/.credentials.yaml`（`AGNES_API_KEY` 等）。
 **不进仓库、不进 workspace、不写日志。**
+
+## Agent 协作约定
+
+派发 subagent 时**必须显式指定 magpie 的模型**，不要用默认模型：
+
+```
+agent: worker
+model: magpie/workbuddy/glm-5.3
+```
+
+可用组合（实测）：`worker` / `scout` / `researcher` 均为 `magpie/workbuddy/glm-5.3`。
+默认的 `openrouter/z-ai/glm-5.3` 在本机会停滞，不要用。

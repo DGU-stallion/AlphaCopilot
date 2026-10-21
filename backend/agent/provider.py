@@ -12,9 +12,10 @@ text-delta/thinking 等）。
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, AsyncIterator, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 # ---- 中立事件 kind（前端与 api 层只认这些字符串）----
 # text_delta   : 助手回复的增量文本（payload: {"text": str}）

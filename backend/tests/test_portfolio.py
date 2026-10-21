@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 from alpha import portfolio as pf
 from api.app import create_app
 
-
 # ---- 纯计算 fixture ----
 
 def test_compute_nav_single_stock_full_weight():

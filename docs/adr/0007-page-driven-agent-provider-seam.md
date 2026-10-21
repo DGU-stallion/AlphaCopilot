@@ -98,5 +98,7 @@ Page spec 增加 `params` 段与 `kind` 字段，使交互式分析页也能「�
   `~/.dsh/.credentials.yaml`（`AGNES_API_KEY`）或环境变量读，**不进仓库、不进 workspace**。
 - `store.py` 按聚合拆仓储（DDD 边界）；`page` 表 `spec` 内含新字段，走 migration。
 - 任务号从 **T41** 续编（T41–T50）。
+  > 2026-10-21：TASKS.md 里这批任务曾被重复编号，已重编为 **T61–T70**；
+  > 本 ADR 正文中的 T41–T50 是决策当时的原始编号。
 - 测试分层：纯函数单元 / 契约 / mock 集成（现 T36/T40 作管道回归）/ `@pytest.mark.live`
   真实 agnes（默认跳过，断言仅结构性）。

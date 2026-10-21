@@ -194,7 +194,8 @@ def build_business_router(store: Store) -> APIRouter:
     @router.get("/portfolios/{pid}/nav")
     def portfolio_nav(pid: str) -> dict:
         """组合净值曲线 vs 基准（ECharts line option）。数据源不可用时优雅降级。"""
-        from alpha import chart, data, portfolio as pf_calc
+        from alpha import chart, data
+        from alpha import portfolio as pf_calc
 
         pf = store.portfolio.get(pid)
         if pf is None:

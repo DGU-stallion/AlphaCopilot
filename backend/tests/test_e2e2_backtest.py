@@ -92,6 +92,10 @@ def _free_port():
 
 @pytest.mark.skipif(__import__("sys").platform != "darwin",
                     reason="agent turn 依赖 dsh runtime（macOS carrier）")
+@pytest.mark.xfail(
+    strict=True,
+    reason="依赖已消失的 deepseek_harness SDK；M1-2 换 PiProvider 后按新契约重写",
+)
 async def test_e2e2_backtest_job_attaches_equity_drawdown_metric():
     server, base = _mock_backtest_model()
     try:

@@ -13,8 +13,7 @@ from __future__ import annotations
 import csv
 import io
 import urllib.request
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import UTC, datetime
 
 _TENCENT = "http://qt.gtimg.cn/q="
 # 腾讯行情要 Referer 才稳定回数（实测主 agent 确认），沿用 overseas.py 的 UA 再加 Referer
@@ -52,7 +51,7 @@ _TREASURY_TENORS = (
 )
 
 
-def _num(v: str) -> Optional[float]:
+def _num(v: str) -> float | None:
     try:
         return float(v)
     except (TypeError, ValueError):
@@ -122,12 +121,12 @@ def forex() -> dict:
     return {"available": True, "items": rows}
 
 
-def _treasury_latest_row() -> Optional[dict]:
+def _treasury_latest_row() -> dict | None:
     """财政部每日收益率曲线 CSV，返回最新一日的行 dict（列名 '1 Mo'..'30 Yr','Date'）。
 
     CSV 首行即最新日；跨年首几天当年 CSV 可能还没数据 → 回退到去年。取不到返回 None。
     """
-    year = datetime.now(timezone.utc).year
+    year = datetime.now(UTC).year
     for y in (year, year - 1):
         url = (
             "https://home.treasury.gov/resource-center/data-chart-center/"

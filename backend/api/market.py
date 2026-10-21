@@ -57,7 +57,10 @@ def build_market_router() -> APIRouter:
 
     @router.get("/market/emotion")
     def market_emotion() -> dict:
-        """短线情绪：连板梯队 / 最高连板 / 炸板率 / 封板率 / 晋级率 / 涨跌停家数。全站共享缓存 5 分钟。"""
+        """短线情绪：连板梯队 / 最高连板 / 炸板率 / 封板率 / 晋级率 / 涨跌停家数。
+
+        全站共享缓存 5 分钟。
+        """
         try:
             return {"data": market.get_short_term_emotion()}
         except Exception as e:  # noqa: BLE001

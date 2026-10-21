@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 import httpx
+import pytest
 import uvicorn
 
 from api.app import create_app
@@ -134,6 +135,10 @@ async def _wait_turn(app, sid, timeout=40):
     await asyncio.wait_for(_w(), timeout=timeout)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="依赖已消失的 deepseek_harness SDK；M1-2 换 PiProvider 后按新契约重写",
+)
 async def test_message_persistence_and_sse_stream():
     server, base = _mock_model("白酒板块是消费板块龙头之一。")
     try:
@@ -171,6 +176,10 @@ async def test_message_persistence_and_sse_stream():
         server.shutdown()
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="依赖已消失的 deepseek_harness SDK；M1-2 换 PiProvider 后按新契约重写",
+)
 async def test_stream_reconnect_from_last_event_id():
     server, base = _mock_model("结论文本。")
     try:

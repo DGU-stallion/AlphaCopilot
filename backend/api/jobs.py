@@ -159,7 +159,9 @@ class JobQueue:
         self._stream(jid).unsubscribe(q)
 
     # ---- 扫描 agent 写的 job 请求文件（workspace/jobs/<id>.json）----
-    def ingest_job_requests(self, workspace: str | Path, session_id: str | None = None) -> list[str]:
+    def ingest_job_requests(
+        self, workspace: str | Path, session_id: str | None = None
+    ) -> list[str]:
         """扫描 <workspace>/jobs/*.json，登记为 job 并删除请求文件。返回 job_id 列表。
 
         请求文件形如 {"kind":"backtest","params":{...}}。这是 MCP 子进程与业务层之间

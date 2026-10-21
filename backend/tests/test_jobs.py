@@ -30,7 +30,7 @@ async def test_submit_backtest_runs_and_succeeds():
         for _ in range(20):
             try:
                 ev = await asyncio.wait_for(q.get(), timeout=10)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 break
             types.append(ev.type)
             if ev.type in ("succeeded", "failed"):
@@ -62,7 +62,7 @@ async def test_backtest_job_failure_path():
         for _ in range(20):
             try:
                 ev = await asyncio.wait_for(q.get(), timeout=10)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 break
             last = ev
             if ev.type in ("succeeded", "failed"):
@@ -94,7 +94,7 @@ async def test_ingest_job_requests_from_files():
         for _ in range(20):
             try:
                 ev = await asyncio.wait_for(q.get(), timeout=10)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 break
             if ev.type in ("succeeded", "failed"):
                 break
@@ -114,7 +114,7 @@ async def test_on_complete_fires_after_success():
         for _ in range(20):
             try:
                 ev = await asyncio.wait_for(q.get(), timeout=10)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 break
             if ev.type in ("succeeded", "failed"):
                 break
