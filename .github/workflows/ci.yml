@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    # macos-latest 是硬性要求：test_sandbox.py 与 E2E 测试依赖
+    # macOS 的 /usr/bin/sandbox-exec，ubuntu 上会被静默跳过
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Test (pytest)
+        shell: bash
+        run: |
+          set -o pipefail
+          pytest -q | tee pytest.log
+
+      - name: Test summary
+        if: always()
+        working-directory: backend
+        shell: bash
+        run: |
+          {
+            echo "## Backend test summary"
+            echo '```'
+            grep -E '[0-9]+ (passed|failed|error|skipped|xfailed|xpassed|warning)' pytest.log | tail -1 || echo "no pytest summary line found"
+            echo '```'
+            # 逐项提取，便于在 PR 页面快速发现 macOS 专属测试被跳过 / xfail 数量变化
+            for kind in passed failed error skipped xfailed xpassed deselected warning; do
+              n=$(sed -nE "s/.*(^| )([0-9]+) ${kind},?.*/\2/p" pytest.log | tail -1)
+              if [ -n "$n" ]; then
+                echo "- ${kind}: ${n}"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  frontend:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npx vitest --run
+
+      - name: Build
+        run: npx vite build
