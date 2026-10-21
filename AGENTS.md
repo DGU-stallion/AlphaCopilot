@@ -1,38 +1,124 @@
 # AGENTS.md — AlphaCopilot
 
-产品定位见 `docs/adr/0008-deterministic-first-fixed-pages.md`（确定性计算为主、
-AI 只解释、固定业务页面）。历史决策 ADR-0002/0004/0005/0006/0007 保留作轨迹。
-第一版策略：缝合 `AlphaTrading/` 下 vibe-astock、Vibe-Research 现成能力，能复用就不重写。
+> **当前状态：v2 重构中。** 开工前必读 [`docs/REFACTOR-PLAN.md`](docs/REFACTOR-PLAN.md)
+> 与 ADR-0010 ~ ADR-0013。下文描述的是**重构后的目标形态**；重构前的实现细节
+> 以 `main` 分支现状和 `docs/adr/0001`–`0009` 为准。
+>
+> **2026-10-21 修订**：后端保留 Python（不再写 TS）；skills 改为白名单；
+> Pi 用项目自持 agent 目录。详见 ADR-0011 §0 与 ADR-0010「修订」。
 
-## 结构速记
+产品定位：**AI native 的个人本地 A 股低频量化投研工作台**。
+确定性计算提供可信数字，agent 提供探索与表达；两者按 provenance 区分（ADR-0012）。
 
-- `backend/research/*.py`：数据层，纯函数，**禁加框架依赖**
-- `backend/alpha/*`：业务层库（data · chart · factor · backtest · report）
-- `backend/api/*`：FastAPI；`backend/agent/*`：dsh SDK 适配层（唯一耦合点）
-- `backend/mcpserver/*`：我们的 MCP server（run_python / get_quote / submit_backtest）
-- `frontend/`：React SPA；`workspace/`：agent 可写区（sandbox 根）
-- `docs/PLAN.md` 第一节是北极星；`docs/TASKS.md` 任务状态（改代码前先看，完工后更新）
+## 结构速记（目标形态，M3 完成后）
+
+```
+apps/
+  web/          React 19 + Vite + TS（Lightweight Charts + ECharts）
+  server/       Python 3.13 + FastAPI（session / artifact / view / page / job / SSE）
+data-service/   Python 3.13（research · duanxian · alpha），纯函数，不持状态
+workspace/      agent 可写区（pi 的 cwd）+ runs/<run_id>/
+  .pi-agent/    Pi 的项目自持 agent 目录（settings/mcp/models/skills）
+  .pi-sessions/ Pi session JSONL
+skills/         白名单内的 SKILL.md（约 30 个；不是 88 个全量）
+docs/           REFACTOR-PLAN.md · PLAN.md · TASKS.md · adr/ · research/
+```
+
+**后端是 Python，不是 TypeScript**（ADR-0011 §0，2026-10-21 修订）。
+Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共享类型层，
+也没有 `packages/shared`。
+
+**迁移期（M1–M2）目录名保持 `backend/` + `frontend/` 不变**，M3 才搬。
+
+分层职责：
+
+- `research/` `duanxian/` `alpha/`：纯函数数据与计算层，**禁加框架依赖**，不持状态
+- `apps/server`：唯一持有产品数据库的角色；唯一与 agent 运行时耦合的角色；
+  同进程直接调 `alpha.*` / `research.*`
+- `apps/web`：只读 API，不读 agent 会话文件
 
 ## 硬规则
 
-1. 开发从当前 `main`（阶段性可用版本）拉功能分支 `feat/<slug>` → squash PR，conventional commits
-2. **前端永不读取 dsh 的 session JSONL**；产品真源在我们自己的数据库
-3. **agent 不直接写数据库**：只写 workspace 文件 + 调副作用 MCP 工具，业务层校验后落库
-4. **重活不进 agent 的 turn**：长任务走 job 队列，agent 只「写代码 → 提交 job → 读结果」
-5. MCP 工具层零业务逻辑：校验 → 调 `alpha.*` → JSON 化 → 截断 ≤6000 字符
-6. **固定业务页**：前端为缝合的固定页组件（非旧 page-spec 动态渲染）；
-   回测/相关性仍走 `/api/pages/{slug}/render`，新增市场类页直连专用 REST 端点
-7. 颜色/主题只写在 `frontend/src/index.css` 的 token 与 `lib/chart-theme.ts` 两处
-8. 图表默认产 ECharts option JSON（可交互）；PNG 仅用于 helper 表达不了的图形
-9. **不给 agent bash**（SDK 闭包无 `bash-sandbox`，`bash-local` 不隔离）；
-   代码执行只经我们的 `run_python`（Seatbelt profile）
-10. 不引入实盘/live/channels/qveris/scheduled 相关任何代码
-11. LLM 输出合规底线：不荐股、不预测涨跌、不给买卖时机（prompt 片段已固化）
+1. 从 `main` 拉分支 `feat/<slug>` → squash PR，conventional commits
+2. **产品真源在我们的数据库**。agent 的 session 文件是它的内部记忆，前端永不读取；
+   `apps/server` 负责把消息与 artifact 落库
+3. **agent 不直接写数据库**：写库一律经 `apps/server` 校验（artifact manifest /
+   provenance / page spec 白名单）
+4. **重活不进 agent 的 turn**：长任务走 job 队列，agent「写代码 → 提交 job → 读结果」
+5. **每个 artifact 必须带 provenance**（ADR-0012）：
+   `deterministic`（fn + params + dataAsOf）或 `agent`（runId + codeHash + dataAsOf）。
+   缺失直接拒收。
+   > ⚠️ **本条目前未实现**（`artifact` 表无 provenance 列，manifest 校验不查）。
+   > M1-7 负责落地；在 M1-7 合入前不要假装它在守门。
+6. **可信数字的盖章权归服务端**（ADR-0012「已决 1」）。拆成两层，别混：
+   - **行为层（建议，非硬约束）**：算回测指标/相关矩阵/因子 IC/敏感性/行情财务数值时，
+     agent 应优先调用 `alpha.*` / `research.*`。这只是习惯，**不构成执法**。
+   - **展示层（硬约束，可测试）**：`provenance.kind = "deterministic"` 只能由服务端
+     调用 `alpha.registry` 铸造。**agent 在 manifest 里写的 provenance 一律不采信**，
+     强制改写为 `kind = "agent"`，前端显示 AI 角标。
+   - 后果：agent 用 bash 自己手算的数字照样能显示，但**带 AI 角标**，用户知道它不可信。
+     这就是本规则的全部效力——不再假装能审计 agent 的代码。
+7. **颜色/主题只写在 `index.css` 的 token 与 `lib/chart-theme.ts` 两处**，
+   双主题 + 涨跌双口径（ADR-0013）
+8. 图表分工：K 线/净值/回撤/买卖点 → **Lightweight Charts**；
+   热力图/分层/散点/归因 → **ECharts**。
+   block 必须带 `renderer` 判别符，不能只看 `kind: "chart"`
+9. **agent 拥有完整工具集（含 bash / read / write / edit）**（ADR-0010）。
+   这是显式接受的风险，不是疏忽：agent 以 OS 用户权限执行。
+   必须有：pi cwd = `workspace/`、`--no-context-files`、session 落 `workspace/.pi-sessions`、
+   **`PI_CODING_AGENT_DIR=workspace/.pi-agent` + `--approve`**
+   （不加后者，RPC 模式拿不到 project trust → MCP 与 skills 静默不加载，ADR-0010 修订 §1）
+10. 不引入实盘/live/channels/qveris/scheduled 相关任何代码。
+    **skills 也不得全量恢复**：`qveris` / crypto 系列（`okx-market` `ccxt` `perp-funding-basis`
+    `crypto-derivatives` `token-unlock` `stablecoin-flow` `onchain-analysis` `defi-yield`）/
+    `shadow-account` / `vnpy-export` / `mootdx` / `tushare` / `yfinance` 一律不迁移。
+    白名单见 ADR-0010 修订 §2。
+11. LLM 输出合规底线：不荐股、不预测涨跌、不给买卖时机（persona 固化）。
+    **这是 prompt 层约束，不是运行时限制**——agent 能力不受限，输出有底线
+
+## 反模式（重构中必须避免）
+
+- ❌ 给页面加「问 AI」占位按钮（旧 `AskAiButton`/`DeepDive` 已删）
+- ❌ 用 `glass` / `shadow-glow` / 渐变 / `rounded-2xl` 表达层次
+- ❌ 让 agent 生成前端代码或直接改 DOM（它只能产 View / artifact）
+- ❌ 在 `data-service` 里存应用状态（它必须无状态）
+- ❌ 新增只读分析页时先写 React 组件（先看能不能用确定性 View 组合出来）
+- ❌ 恢复 mootdx（K 线/盘口/逐笔 2026-09 起失效，本机连财务也取不到）
+- ❌ 直接把我们自己的取数逻辑写成第二套：`data-service/vendor/a-stock-data` 是唯一取数实现
+- ❌ 裁剪 vendor 的端点：保留全部 15 层（期货/期权/可转债以后会用）
+- ❌ 把 Pi 配置写进 `~/.pi/agent`（要项目自持 `workspace/.pi-agent`，否则污染本机其它 pi 使用）
+- ❌ 在 RPC 模式下依赖 project trust 自动生效（不会弹窗，只会静默不加载）
+- ❌ 「反正重写 TS 就能解决」——后端就是 Python（ADR-0011 §0）
+- ❌ 把 88 个 skills 一次性拷进 `skills/`（白名单，见硬规则 10）
 
 ## 命令
 
 ```bash
-cd backend && pytest          # Python 测试
-ruff check . && pyright       # lint / typecheck
-cd frontend && pnpm build && pnpm test
+# 重构期（M1–M2）：后端是 Python，没有第二套后端
+cd backend && pytest -q                    # Python 测试（含 PiProvider 契约测试）
+cd backend && ruff check .                 # lint
+cd frontend && npx tsc --noEmit && npx vitest --run && npx vite build
+
+# 目标形态（M3+）
+pytest -q apps/server data-service          # 后端与数据层仍是 Python
+pnpm --prefix apps/web build
 ```
+
+## 环境依赖
+
+| 依赖 | 版本 | 用途 |
+|---|---|---|
+| Node | ≥ 22.19 | 前端构建与 Pi（Pi 的 engines 要求；**不作为后端运行时**） |
+| pnpm | 11.x | 前端包管理 |
+| Python | 3.13 | 后端 + 数据层 |
+| akshare | ≥ 1.18 | 财务摘要 / 涨停池 / 日线（可选兜底；上游项目已改直连 HTTP） |
+| baostock | latest | 估值历史 / 上市退市日 / ST 名单（仅 Python，需安装） |
+| xlrd / openpyxl | latest | 读交易所 xls/xlsx（申万行业、社融、国证、两融） |
+| `@earendil-works/pi-coding-agent` | 1.3.0 | agent 运行时（Node 子进程） |
+| `lightweight-charts` | 5.x | 金融图表 |
+
+> `mootdx` **不从 pyproject 安装**（K 线/盘口/逐笔 2026-09 起失效），且它锁
+> `httpx<0.26` 与 `mcp>=1.9` 冲突。vendor 版若需要，放在 data-service 独立 venv。
+
+密钥：只在 `~/.dsh/.credentials.yaml`（`AGNES_API_KEY` 等）。
+**不进仓库、不进 workspace、不写日志。**
