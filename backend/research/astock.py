@@ -286,13 +286,26 @@ def _tencent_kline(code: str, category: int = 4, offset: int = 60) -> list[dict]
     scale = {4: "day", 5: "week", 6: "month"}.get(category, "day")
     prefix = _INDEX_PREFIX.get(code, get_prefix(code))  # 指数走显式映射，否则按个股前缀规则
     sym = f"{prefix}{code}"
-    url = (
-        f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
-        f"?param={sym},{scale},,,{offset},qfq"
-    )
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    raw = urllib.request.urlopen(req, timeout=12).read().decode("utf-8")  # noqa: S310
-    payload = json.loads(raw)
+    # 两个域名的行为会各自变化：2026-10-21 实测 `web.ifzq` 返回 501 而
+    # `ifzq` 正常。所以**依次尝试**而不是只认一个 —— 单点域名故障会让
+    # 整个 K 线功能挂掉，而它只是同一个服务的两个入口。
+    # 顺序上先 `ifzq`（实测可用），`web.ifzq` 留作回退。
+    payload = None
+    last_err: Exception | None = None
+    for host in ("ifzq.gtimg.cn", "web.ifzq.gtimg.cn"):
+        url = (
+            f"https://{host}/appstock/app/fqkline/get"
+            f"?param={sym},{scale},,,{offset},qfq"
+        )
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            raw = urllib.request.urlopen(req, timeout=12).read().decode("utf-8")  # noqa: S310
+            payload = json.loads(raw)
+            break
+        except Exception as e:  # noqa: BLE001 —— 换下一个域名
+            last_err = e
+    if payload is None:
+        raise DataUnavailable(f"gtimg K 线两个入口均不可用：{type(last_err).__name__}: {last_err}") from last_err
     if payload.get("code") not in (0, None):
         raise DataUnavailable(f"gtimg 返回错误 code={payload.get('code')} msg={payload.get('msg')!r}")
     node = (payload.get("data") or {}).get(sym)

@@ -128,3 +128,65 @@ def test_secret_read_still_denied_while_network_allowed(tmp_path):
         "放行网络后连密钥读也跟着放开了——这两条限制是独立的，不能一起松。\n"
         f"stdout={r.stdout[:300]!r}"
     )
+
+
+def test_gtimg_kline_tries_both_hosts(monkeypatch):
+    """K 线必须**依次尝试两个 gtimg 入口**，不能只认一个域名。
+
+    2026-10-21 实测：`web.ifzq.gtimg.cn` 返回 501，而 `ifzq.gtimg.cn` 正常。
+    只写一个域名时，上游一改行为整个 K 线功能就挂 —— 而它们只是同一个服务的
+    两个入口，没有任何理由只用一个。
+
+    这里让第一个域名失败，断言仍能拿到数据（即第二个域名被试过）。
+    """
+    from research import astock
+
+    calls: list[str] = []
+
+    class _Resp:
+        def __init__(self, body: bytes) -> None:
+            self._b = body
+
+        def read(self) -> bytes:
+            return self._b
+
+    payload = (
+        b'{"code":0,"msg":"","data":{"sh600519":{"qfqday":'
+        b'[["2026-10-20","100.0","101.0","102.0","99.0","1000"]]}}}'
+    )
+
+    def fake_urlopen(req, timeout=0):  # noqa: ANN001
+        url = req.full_url
+        calls.append(url)
+        if "web.ifzq" in url:
+            raise OSError("HTTP Error 501: Not Implemented")
+        return _Resp(payload)
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    rows = astock._tencent_kline("600519", category=4, offset=5)
+
+    assert rows, "第一个域名失败时，必须回退到第二个域名"
+    assert rows[0]["close"] == 101.0
+    assert len(calls) == 1, "第一个域名成功就不该再打第二个（避免无谓请求）"
+
+
+def test_gtimg_kline_reports_when_all_hosts_fail(monkeypatch):
+    """两个域名都失败时，必须抛出带原因的 DataUnavailable，而不是返回空。
+
+    返回空会让图表画成一条平线，看着像「今天没成交」，用户会误读。
+    """
+    from research import astock
+
+    def always_fail(req, timeout=0):  # noqa: ANN001
+        raise OSError("HTTP Error 501: Not Implemented")
+
+    monkeypatch.setattr("urllib.request.urlopen", always_fail)
+
+    try:
+        astock._tencent_kline("600519", category=4, offset=5)
+    except astock.DataUnavailable as e:
+        assert "均不可用" in str(e)
+        assert "501" in str(e), "错误信息必须带上游具体原因，否则无法判断该重试还是换源"
+    else:
+        raise AssertionError("两个域名都失败时必须抛 DataUnavailable")

@@ -45,6 +45,29 @@ def build_market_router() -> APIRouter:
         except Exception as e:  # noqa: BLE001  边界统一兜底
             raise HTTPException(502, f"行情源异常：{e}") from e
 
+    @router.get("/kline")
+    def kline(
+        code: str = Query(..., description="6 位代码"),
+        category: int = Query(4, description="4=日线 5=周线 6=月线"),
+        offset: int = Query(120, ge=1, le=800, description="取最近 N 根"),
+    ) -> dict:
+        """K 线（OHLCV）。前端图表用；数据源不可达时 **502 而非空数组**。
+
+        为什么不是返回空：空数组与「这只股票今天没成交」无法区分，图表会画成
+        一条平线，看着像数据正常。ADR-0012 要求数字可信，取不到就说取不到。
+        """
+        if not (code.isdigit() and len(code) == 6):
+            raise HTTPException(400, "code 必须是 6 位数字")
+        try:
+            bars = astock.kline(code, category=category, offset=offset)
+        except astock.DataUnavailable as e:
+            raise HTTPException(502, f"K 线数据源不可用：{e}") from e
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(502, f"K 线源异常：{e}") from e
+        if not bars:
+            raise HTTPException(502, f"{code} 未取到 K 线（代码可能无效或数据源缺该区间）")
+        return {"data": {"code": code, "bars": bars}}
+
     # ---- 市场情绪 / 板块资金 / 短线情绪 / 成交额榜 / 全球指数 ----
 
     @router.get("/market/overview")

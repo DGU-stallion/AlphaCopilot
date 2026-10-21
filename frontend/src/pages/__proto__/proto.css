@@ -1,0 +1,52 @@
+/* 🔵 原型专用 token —— 作用域限定在 .proto-shell 内，不影响生产 index.css。
+ *
+ * 这里是 ADR-0013 §2 的 token 值。原型用它来展示「终端风」的真实观感，
+ * 而不是在玻璃拟态上做微调（那样看不出差别）。
+ *
+ * 双主题 + 涨跌双口径都在这里，因为「切换时的观感」正是要评审的东西。
+ */
+
+.proto-shell {
+  /* 深色（默认） */
+  --p-bg: #0e1117;
+  --p-panel: #161a25;
+  --p-surface: #1c2230;
+  --p-border: #252a37;
+  --p-text: #d6dae3;
+  --p-muted: #8a90a0;
+  --p-faint: #5a6072;
+  --p-accent: #4c8dff;
+
+  /* 口径 A：A 股（红涨绿跌）—— 默认 */
+  --p-up: #f04438;
+  --p-down: #12b76a;
+
+  background: var(--p-bg);
+  color: var(--p-text);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* 浅色主题 */
+.proto-shell[data-theme="light"] {
+  --p-bg: #ffffff;
+  --p-panel: #f7f8fa;
+  --p-surface: #ffffff;
+  --p-border: #e3e6eb;
+  --p-text: #1a1d23;
+  --p-muted: #6b7280;
+  --p-faint: #9ca3af;
+  --p-accent: #2563eb;
+}
+
+/* 口径 B：国际（绿涨红跌） */
+.proto-shell[data-convention="intl"] {
+  --p-up: #12b76a;
+  --p-down: #f04438;
+}
+
+/* 全站强制等宽数字：表格里价格不跳动的前提 */
+.proto-shell .tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
