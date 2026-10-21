@@ -414,6 +414,8 @@ export interface RunRow {
   data_as_of: string;
   metrics: Record<string, number>;
   artifact_ids: string[];
+  /** 足以重跑的完整输入快照（含 closes）；早期版本产生的 Run 可能为空。 */
+  inputs: Record<string, unknown>;
   created_at: number;
 }
 
@@ -464,4 +466,9 @@ export const runsApi = {
     request<{ id: string; pinned: boolean }>(`/views/${encodeURIComponent(vid)}/pin`, "POST", { pinned }),
   deleteView: (vid: string) =>
     request<{ ok: boolean }>(`/views/${encodeURIComponent(vid)}`, "DELETE"),
+  /** M3-4：用同一条 Run 的输入快照重跑。409=无快照，501=未启用 job 队列。 */
+  rerun: (rid: string) =>
+    request<{ job_id: string; rerun_of: string }>(
+      `/runs/${encodeURIComponent(rid)}/rerun`, "POST",
+    ),
 };

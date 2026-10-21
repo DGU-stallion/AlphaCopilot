@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GitCompare, RefreshCw, Star, Trash2 } from "lucide-react";
+import { GitCompare, RefreshCw, RotateCcw, Star, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Num } from "@/components/Num";
@@ -94,6 +94,21 @@ export function Runs() {
     });
   };
 
+  // M3-4 Rerun：用同一条 Run 的输入快照再跑一次。
+  // 409/501 要如实说出来（「没有快照」「没启用队列」），不能静默失败。
+  const [rerunMsg, setRerunMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const doRerun = async (r: RunRow) => {
+    setRerunMsg(null);
+    try {
+      const res = await runsApi.rerun(r.id);
+      setRerunMsg({ ok: true, text: `已提交重跑（job ${res.job_id}）` });
+      // 数据会变 —— 重跑的意义就在于看「同样的输入、不同的结果」
+      setTimeout(refresh, 1500);
+    } catch (e) {
+      setRerunMsg({ ok: false, text: e instanceof Error ? e.message : "重跑失败" });
+    }
+  };
+
   const refresh = () => {
     dropCache(`runs:${reload}`);
     dropCache("views");
@@ -130,6 +145,17 @@ export function Runs() {
         ))}
       </div>
 
+      {rerunMsg && (
+        <div className={cn(
+          "mb-3 rounded-[4px] border px-3 py-1.5 text-[12px]",
+          rerunMsg.ok
+            ? "border-[hsl(var(--success))]/40 text-[hsl(var(--success))]"
+            : "border-[hsl(var(--danger))]/40 text-danger",
+        )}>
+          {rerunMsg.text}
+        </div>
+      )}
+
       {tab === "runs" ? (
         <>
           {runsRes.loading && runs.length === 0 ? (
@@ -152,6 +178,7 @@ export function Runs() {
                     <th className="px-2 py-1.5 font-medium">数据时点</th>
                     <th className="px-2 py-1.5 font-medium">代码指纹</th>
                     <th className="px-2 py-1.5 text-right font-medium">关键指标</th>
+                    <th className="w-10 px-2 py-1.5 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
@@ -191,6 +218,18 @@ export function Runs() {
                               {k} <Num v={v} digits={2} colorBySign />
                             </span>
                           ))}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); void doRerun(r); }}
+                            disabled={Object.keys(r.inputs ?? {}).length === 0}
+                            title={Object.keys(r.inputs ?? {}).length === 0
+                              ? "这条 Run 没有输入快照，无法重跑"
+                              : "用同样的输入重跑一次"}
+                            className="text-muted-foreground/60 hover:text-[hsl(var(--primary))] disabled:cursor-not-allowed disabled:opacity-30"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </button>
                         </td>
                       </tr>
                     );

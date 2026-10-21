@@ -106,6 +106,10 @@ CREATE TABLE IF NOT EXISTS run (
     data_as_of   TEXT NOT NULL DEFAULT '',
     metrics      TEXT NOT NULL DEFAULT '{}',    -- 指标 JSON（结构化，前端直接读）
     artifact_ids TEXT NOT NULL DEFAULT '[]',    -- 产出的 artifact id 列表 JSON
+    -- 足以**重跑**的完整输入快照（含 closes 这类调用方给的数据）。
+    -- params 只是「实验设计」（fast/slow/symbol），inputs 才是「原料」。
+    -- 少了它只能说「可比较」，不能说「可重跑」（M3-4）。
+    inputs       TEXT NOT NULL DEFAULT '{}',
     created_at   REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_run_created ON run(created_at DESC);
@@ -176,6 +180,13 @@ CREATE INDEX IF NOT EXISTS idx_rebalance_portfolio ON rebalance_event(portfolio_
 
 def _new_id(prefix: str) -> str:
     return f"{prefix}-{uuid.uuid4().hex[:12]}"
+
+
+def _migrate_run_inputs(conn: sqlite3.Connection) -> None:
+    """幂等迁移：老库 run 表缺 inputs 列时补列（默认 '{}'，老 Run 无法重跑但可读）。"""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(run)").fetchall()}
+    if cols and "inputs" not in cols:
+        conn.execute("ALTER TABLE run ADD COLUMN inputs TEXT NOT NULL DEFAULT '{}'")
 
 
 def _migrate_page_kind(conn: sqlite3.Connection) -> None:
@@ -514,18 +525,20 @@ class RunRepo:
         data_as_of: str = "",
         metrics: dict[str, Any] | None = None,
         artifact_ids: list[str] | None = None,
+        inputs: dict[str, Any] | None = None,
     ) -> str:
         rid = _new_id("run")
         self.conn.execute(
             "INSERT INTO run "
-            "(id, kind, params, code_hash, data_as_of, metrics, artifact_ids, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?)",
+            "(id, kind, params, code_hash, data_as_of, metrics, artifact_ids, inputs, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
             (
                 rid, kind,
                 json.dumps(params or {}, ensure_ascii=False),
                 code_hash, data_as_of,
                 json.dumps(metrics or {}, ensure_ascii=False),
                 json.dumps(artifact_ids or [], ensure_ascii=False),
+                json.dumps(inputs or {}, ensure_ascii=False),
                 time.time(),
             ),
         )
@@ -539,6 +552,7 @@ class RunRepo:
         d["params"] = json.loads(d.get("params") or "{}")
         d["metrics"] = json.loads(d.get("metrics") or "{}")
         d["artifact_ids"] = json.loads(d.get("artifact_ids") or "[]")
+        d["inputs"] = json.loads(d.get("inputs") or "{}")
         return d
 
     def get(self, rid: str) -> dict[str, Any] | None:
@@ -836,6 +850,7 @@ class Store:
         _migrate_page_kind(self.conn)
         _migrate_artifact_provenance(self.conn)
         _migrate_session_runtime_id(self.conn)
+        _migrate_run_inputs(self.conn)
         self.conn.commit()
 
     def close(self) -> None:

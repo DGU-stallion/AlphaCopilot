@@ -261,7 +261,9 @@ def create_app(
     app.include_router(router)
     app.include_router(build_pages_router(store))
     app.include_router(build_business_router(store))
-    app.include_router(build_runs_router(store))  # M3-1：Run registry + View API
+    # M3-1：Run registry + View API。注入 job 提交器以支持 Rerun（M3-4）——
+    # 反过来让 runs.py import jobs 会形成双向依赖。
+    app.include_router(build_runs_router(store, submit_backtest=jobs.submit_backtest))
     app.include_router(build_market_router())
     app.include_router(build_universe_router())  # M3-2：Universes as query
     return app

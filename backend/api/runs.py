@@ -11,6 +11,7 @@ store 由调用方传入（create_app 持有），**不建模块级单例**。
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -30,7 +31,17 @@ class PinViewIn(BaseModel):
     pinned: bool
 
 
-def build_runs_router(store: Store) -> APIRouter:
+def build_runs_router(
+    store: Store,
+    submit_backtest: Callable[[dict[str, Any]], str] | None = None,
+) -> APIRouter:
+    """Run / View 的 REST 接口。
+
+    submit_backtest 由调用方注入（app.py 传 jobs.submit_backtest 的包装）：
+    runs 模块不该 import jobs（jobs 已经够重，且会形成双向依赖）。
+    没注入时 /runs/{id}/rerun 返回 501 —— 明确「没这个能力」，
+    而不是返回 200 然后什么也没发生。
+    """
     router = APIRouter(prefix="/api")
 
     # ---------- Run registry ----------
@@ -47,6 +58,27 @@ def build_runs_router(store: Store) -> APIRouter:
     def list_runs(kind: str | None = None, data_as_of: str | None = None,
                   limit: int = 50) -> list:
         return store.runs.list_recent(kind=kind, data_as_of=data_as_of, limit=limit)
+
+    @router.post("/runs/{rid}/rerun")
+    def rerun(rid: str) -> dict:
+        """用同一个 Run 的输入快照重跑一次（M3-4「可重跑」）。
+
+        为什么值得单独做：数据会变。同一个策略隔一周重跑，
+        结果不同才是正常的 —— 前提是你能证明「除了数据，别的都一样」。
+        输入快照（inputs）就是那个证明。
+        """
+        r = store.runs.get(rid)
+        if r is None:
+            raise HTTPException(404, f"run not found: {rid}")
+        if submit_backtest is None:
+            raise HTTPException(501, "本进程未启用 job 队列，无法重跑")
+        inputs = r.get("inputs") or {}
+        if not inputs:
+            raise HTTPException(409, "这条 Run 没有输入快照（可能是早期版本产生），无法重跑")
+        if not inputs.get("closes"):
+            raise HTTPException(409, "输入快照里没有 closes，无法重跑")
+        jid = submit_backtest(inputs)
+        return {"job_id": jid, "rerun_of": rid}
 
     @router.get("/runs/{rid}")
     def get_run(rid: str) -> dict:

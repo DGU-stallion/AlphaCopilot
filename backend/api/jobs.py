@@ -242,6 +242,11 @@ class JobQueue:
             data_as_of=str(dates[-1]),
             metrics=res.metrics,
             artifact_ids=[a["id"] for a in manifest["artifacts"]],
+            # 完整输入快照（含 closes），让这次计算真的可以重跑（M3-4）
+            inputs={
+                "closes": closes, "fast": fast, "slow": slow,
+                "symbol": params.get("symbol", ""), "dates": dates,
+            },
         )
         return {
             "run_id": f"job-{jid}",

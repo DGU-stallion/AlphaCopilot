@@ -195,3 +195,87 @@ def test_run_records_real_dates_when_provided(tmp_path):
 
     with asyncio.Runner() as runner:
         runner.run(_run())
+
+
+def test_run_inputs_allow_rerun(tmp_path):
+    """M3-4 Rerun：Run 里必须存**足以重跑**的输入快照。
+
+    只存 {fast, slow, symbol} 是不够的 —— 重跑要重新喂 closes，
+    而 closes 是调用方给的（可能来自某个历史时点的取数）。
+    没有它就只能说「可比较」，不能说「可重跑」。
+    """
+    async def _go():
+        store = Store(":memory:")
+        jq = JobQueue(store, tmp_path)
+        closes = [10.0 + i for i in range(10)]
+        jid = jq.submit_backtest({"closes": closes, "fast": 2, "slow": 3})
+        q = jq.subscribe(jid)
+        for _ in range(30):
+            ev = await asyncio.wait_for(q.get(), timeout=10)
+            if ev.type in ("succeeded", "failed"):
+                break
+        runs = store.runs.list_recent(kind="backtest")
+        assert runs
+        inputs = runs[0]["inputs"]
+        assert inputs["closes"] == closes, "必须存全部 closes，否则无法重跑"
+        assert inputs["fast"] == 2 and inputs["slow"] == 3
+        store.close()
+
+    with asyncio.Runner() as runner:
+        runner.run(_go())
+
+
+class TestRerun:
+    """M3-4「可重跑」：用同一个输入快照再跑一次。"""
+
+    def _client(self, tmp_path, *, with_submit: bool = True):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from api.runs import build_runs_router
+
+        app = FastAPI()
+        store = Store(":memory:")
+        submitted: list[dict] = []
+
+        def fake_submit(params: dict) -> str:
+            submitted.append(params)
+            return "job-fake"
+
+        app.include_router(build_runs_router(
+            store, submit_backtest=fake_submit if with_submit else None,
+        ))
+        return TestClient(app), store, submitted
+
+    def test_rerun_submits_same_inputs(self, tmp_path):
+        client, store, submitted = self._client(tmp_path)
+        rid = store.runs.create(
+            kind="backtest", params={"fast": 2, "slow": 3},
+            inputs={"closes": [1.0, 2.0, 3.0], "fast": 2, "slow": 3},
+            data_as_of="2026-10-21",
+        )
+        r = client.post(f"/api/runs/{rid}/rerun")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["rerun_of"] == rid
+        assert submitted == [{"closes": [1.0, 2.0, 3.0], "fast": 2, "slow": 3}]
+
+    def test_rerun_without_inputs_is_409_not_silent_ok(self, tmp_path):
+        """老 Run（没有输入快照）不能假装重跑成功。"""
+        client, store, _ = self._client(tmp_path)
+        rid = store.runs.create(kind="backtest", params={}, data_as_of="2026-10-21")
+        r = client.post(f"/api/runs/{rid}/rerun")
+        assert r.status_code == 409
+
+    def test_rerun_missing_run_is_404(self, tmp_path):
+        client, _, _ = self._client(tmp_path)
+        assert client.post("/api/runs/nope/rerun").status_code == 404
+
+    def test_rerun_without_job_queue_is_501(self, tmp_path):
+        """没注入 job 队列时明确 501，而不是 200 然后什么也没发生。"""
+        client, store, _ = self._client(tmp_path, with_submit=False)
+        rid = store.runs.create(
+            kind="backtest", params={}, inputs={"closes": [1.0, 2.0]},
+            data_as_of="2026-10-21",
+        )
+        assert client.post(f"/api/runs/{rid}/rerun").status_code == 501
