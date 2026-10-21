@@ -22,7 +22,8 @@ agent 看起来「变笨了」，但没有任何测试会红。所以这里不�
 - `docs/rpc.md`（pi 1.3.0）：命令 `{"id","type":"prompt","message"}` →
   `{"id","type":"response","command":"prompt","success":true,"data":{"disposition":"started"}}`
 - `docs/json.md`：
-  - 文本增量：`{"type":"message_update","assistantMessageEvent":{"type":"text_delta","contentIndex":0,"delta":"..."}}`
+  - 文本增量：`{"type":"message_update","assistantMessageEvent":
+    {"type":"text_delta","contentIndex":0,"delta":"..."}}`
   - 工具开始：`{"type":"tool_execution_start","toolCallId","toolName","args"}`
   - 工具结束：`{"type":"tool_execution_end","toolCallId","toolName","result","isError"}`
   - 一轮结束：`{"type":"agent_settled","aborted":false}`
@@ -32,15 +33,12 @@ agent 看起来「变笨了」，但没有任何测试会红。所以这里不�
 
 from __future__ import annotations
 
-import os
 import sys
-import textwrap
 from pathlib import Path
 
 import pytest
 
 from agent.provider import (
-    EVENT_ERROR,
     EVENT_TEXT_DELTA,
     EVENT_TOOL_RESULT,
     EVENT_TOOL_STARTED,
@@ -50,7 +48,9 @@ from agent.provider import (
     ProviderSpec,
 )
 
-pytestmark = pytest.mark.asyncio
+# 只对 async 测试打 asyncio 标记：下面的配置契约测试是同步的，
+# 模块级 pytestmark 会让它们被误标（pytest 会警告）。
+_asyncio = pytest.mark.asyncio
 
 
 # --------------------------------------------------------------------------
@@ -58,7 +58,7 @@ pytestmark = pytest.mark.asyncio
 # --------------------------------------------------------------------------
 
 # 剧本通过环境变量传给假 pi，避免为每个场景生成一个文件。
-_SCRIPT_HEADER = '''\
+_SCRIPT_BODY = '''\
 import json, os, sys
 
 SCRIPT = json.loads(os.environ["FAKE_PI_SCRIPT"])
@@ -101,9 +101,14 @@ for line in sys.stdin:
 
 
 def _write_fake_pi(dirpath: Path, script: list[dict]) -> Path:
-    """把假 pi 写成可执行脚本，返回路径。"""
+    """把假 pi 写成可执行脚本，返回路径。
+
+    用当前解释器的绝对路径做 shebang 并 chmod +x：PiProvider 直接 exec 这个文件，
+    所以它必须真的可执行，而不是靠 `python3 script` 间接跑。
+    """
     path = dirpath / "fake_pi.py"
-    path.write_text(_SCRIPT_HEADER, encoding="utf-8")
+    path.write_text(f"#!{sys.executable}\n" + _SCRIPT_BODY, encoding="utf-8")
+    path.chmod(0o755)
     return path
 
 
@@ -165,6 +170,7 @@ _BASIC_SCRIPT = [
 # --------------------------------------------------------------------------
 
 
+@_asyncio
 async def test_text_delta_is_mapped_with_delta_text(tmp_path):
     """`message_update.assistantMessageEvent.delta` → `AgentEvent.payload["text"]`。
 
@@ -188,6 +194,7 @@ async def test_text_delta_is_mapped_with_delta_text(tmp_path):
     )
 
 
+@_asyncio
 async def test_tool_started_and_result_are_mapped(tmp_path):
     """`tool_execution_start/end` → `tool_started` / `tool_result`。
 
@@ -216,6 +223,7 @@ async def test_tool_started_and_result_are_mapped(tmp_path):
     assert "1331.88" in str(results[0].payload["result"])
 
 
+@_asyncio
 async def test_turn_end_carries_accumulated_final_text(tmp_path):
     """`agent_settled` → `turn_end`，且 `final_text` 是整轮文本的拼接。
 
@@ -243,6 +251,7 @@ async def test_turn_end_carries_accumulated_final_text(tmp_path):
     )
 
 
+@_asyncio
 async def test_agent_end_alone_does_not_finish_the_turn(tmp_path):
     """只发 `agent_end` 不发 `agent_settled` 时，不得提前收尾。
 
@@ -276,6 +285,7 @@ async def test_agent_end_alone_does_not_finish_the_turn(tmp_path):
     assert ends[0].payload["final_text"] == "前半后半"
 
 
+@_asyncio
 async def test_aborted_settle_reports_finish_reason(tmp_path):
     """`agent_settled.aborted = true` → `turn_end.finish_reason = "aborted"`。
 
@@ -310,6 +320,7 @@ async def test_aborted_settle_reports_finish_reason(tmp_path):
 # --------------------------------------------------------------------------
 
 
+@_asyncio
 async def test_close_is_idempotent_and_reaps_process(tmp_path):
     """close() 幂等；调用后 is_alive() 为 False（进程不泄漏）。"""
     spec, env = _spec(tmp_path, _write_fake_pi(tmp_path, _BASIC_SCRIPT), _BASIC_SCRIPT)
@@ -325,6 +336,7 @@ async def test_close_is_idempotent_and_reaps_process(tmp_path):
     assert p.is_alive() is False, "close 后应已回收"
 
 
+@_asyncio
 async def test_provider_satisfies_the_protocol(tmp_path):
     """PiProvider 必须满足 AgentProvider Protocol（业务层只认它）。"""
     spec, env = _spec(tmp_path, _write_fake_pi(tmp_path, _BASIC_SCRIPT), _BASIC_SCRIPT)
@@ -350,3 +362,82 @@ async def _collect_async_start(provider) -> None:
     import asyncio
 
     await asyncio.to_thread(provider.start)
+
+
+# --------------------------------------------------------------------------
+# 配置契约：两条来自实测的反直觉结论（被改坏不会红业务测试，只会让 AI「变笨」）
+# --------------------------------------------------------------------------
+
+
+def test_argv_contains_approve(tmp_path):
+    """`--approve` 必须在 argv 里。
+
+    实测依据：RPC 模式无法弹 project trust。带 `--approve` 时项目 `.pi/mcp.json`
+    里的 server 会被加载（系统 prompt 的 mcp_servers 段出现条目）；不带时为 null。
+    少了它**不会报错**，只会让 agent 一个工具都没有——这类静默失效必须由测试盯住。
+    """
+    spec, env = _spec(tmp_path, _write_fake_pi(tmp_path, _BASIC_SCRIPT), _BASIC_SCRIPT)
+    from agent.providers.pi import PiProvider
+
+    p = PiProvider(spec, executable=env["FAKE_PI_EXECUTABLE"], env=env)
+    argv = p._build_argv()
+
+    assert "--approve" in argv, f"argv 缺 --approve，项目 .pi 资源会被静默跳过：{argv}"
+
+
+def test_argv_disables_skill_autodiscovery_without_explicit_dir(tmp_path):
+    """未显式给 skills_dir 时必须带 `--no-skills`。
+
+    仓库根有 88 个 SKILL.md，全量加载的 description 合计约 5.9k tokens/轮
+    （ADR-0010 修订 §2）。而且其中含硬规则 10 点名禁止的类别（qveris/crypto/mootdx）。
+    """
+    spec, env = _spec(tmp_path, _write_fake_pi(tmp_path, _BASIC_SCRIPT), _BASIC_SCRIPT)
+    from agent.providers.pi import PiProvider
+
+    p = PiProvider(spec, executable=env["FAKE_PI_EXECUTABLE"], env=env)
+    argv = p._build_argv()
+
+    assert "--no-skills" in argv, f"未显式指定 skills 时应禁用自动发现：{argv}"
+
+
+def test_env_does_not_set_coding_agent_dir(tmp_path):
+    """**不得**设置 `PI_CODING_AGENT_DIR`。
+
+    实测：把它指向项目空目录，Pi 会丢掉 `~/.pi/agent` 下的 `models.json` 与
+    `auth.json`，表现为 `Unknown provider "magpie"` 或 `No models available`。
+    而把 auth.json 复制进 workspace 又违反「密钥不进 workspace」的硬约束。
+
+    这条断言防的是「有人出于好意把用户目录隔离掉」这个改动——它看起来更安全，
+    实际会让 agent 完全无法启动。
+    """
+    spec, env = _spec(tmp_path, _write_fake_pi(tmp_path, _BASIC_SCRIPT), _BASIC_SCRIPT)
+    from agent.providers.pi import PiProvider
+
+    p = PiProvider(spec, executable=env["FAKE_PI_EXECUTABLE"], env=env)
+    built = p._build_env()
+
+    assert "PI_CODING_AGENT_DIR" not in built, (
+        "设置 PI_CODING_AGENT_DIR 会让 Pi 丢失凭据与模型目录，agent 将无法启动"
+    )
+
+
+def test_model_is_split_into_provider_and_model_flags(tmp_path):
+    """`provider/id` 必须拆成 `--provider <p> --model <id>`。
+
+    实测：`--model magpie/commandcode-plan/z-ai/glm-5.3-flash` 会报
+    `Model not found`；拆开后正常。注意 id 自身含斜线，只能按第一个斜线切。
+    """
+    spec, env = _spec(
+        tmp_path,
+        _write_fake_pi(tmp_path, _BASIC_SCRIPT),
+        _BASIC_SCRIPT,
+        model="magpie/commandcode-plan/z-ai/glm-5.3-flash",
+    )
+    from agent.providers.pi import PiProvider
+
+    p = PiProvider(spec, executable=env["FAKE_PI_EXECUTABLE"], env=env)
+    argv = p._build_argv()
+
+    assert "--provider" in argv and "magpie" in argv, f"未拆出 provider：{argv}"
+    assert "--model" in argv
+    assert "commandcode-plan/z-ai/glm-5.3-flash" in argv, f"model id 被错误切割：{argv}"
