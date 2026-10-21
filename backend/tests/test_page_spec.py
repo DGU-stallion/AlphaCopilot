@@ -179,7 +179,20 @@ def test_registered_fn_without_renderer_mapping_rejected(unmapped_fn):
 
 
 def test_renderer_mapping_covers_all_chart_fns():
-    """映射表自身的一致性：每个映射里的 fn 必须已在 registry 注册（防映射漂移）。"""
+    """映射表自身的一致性：每个映射里的 fn 必须已在 registry 注册（防映射漂移）。
+
+    必须显式 import 各分析模块：它们的 fn 靠 import 副作用注册。
+    少了任何一个，这条测试就会红 —— 而那是**测试环境**缺 import，
+    不是映射真的漂移了。所以这里把「所有会往 RENDERER_BY_FN 里登记 fn 的
+    模块」都 import 齐。
+    """
+    import alpha.attribution  # noqa: F401
+    import alpha.backtest_page  # noqa: F401
+    import alpha.factor  # noqa: F401
+    import alpha.factor_lab  # noqa: F401
+    import alpha.param_scan  # noqa: F401 —— paramscan.heatmap（M4-3）
+    import alpha.tearsheet  # noqa: F401
+    import alpha.walkforward  # noqa: F401
     from alpha import registry
 
     for fn in RENDERER_BY_FN:

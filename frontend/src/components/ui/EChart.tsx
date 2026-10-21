@@ -12,6 +12,23 @@ interface Props {
 
 // 把设计系统的主题色注入后端产的 option：坐标轴/网格/文字/tooltip 用 CSS 变量色，
 // 图表才和玻璃暖橙风一致。只补样式，不改数据结构（series.data 原样）。
+/** 把带 semanticScale="pnl" 的 visualMap 用当前 palette 重上色。 */
+function retintPnl(vm: any, t: ReturnType<typeof getChartTheme>): any {
+  const apply = (one: any) => {
+    if (!one || one.semanticScale !== "pnl") return one;
+    const { semanticScale: _drop, ...rest } = one;   // 语义标记不传给 ECharts
+    return {
+      ...rest,
+      inRange: {
+        ...(one.inRange ?? {}),
+        // 跌色 → 中性 → 涨色。中性别用纯白（浅色主题下会刺眼），用 panel 色。
+        color: [t.downColor, t.tooltipBg, t.upColor],
+      },
+    };
+  };
+  return Array.isArray(vm) ? vm.map(apply) : apply(vm);
+}
+
 function themed(option: Record<string, any>): Record<string, any> {
   const t = getChartTheme();
   const axis = {
@@ -33,6 +50,11 @@ function themed(option: Record<string, any>): Record<string, any> {
       textStyle: { color: t.tooltipText },
     },
     legend: option.legend ? { ...option.legend, textStyle: { color: t.textColor } } : undefined,
+    // 后端产的热力图带 `semanticScale: "pnl"` 时，色阶必须用**当前 palette**
+    // 重上色（ADR-0014：颜色真源是 tokens.ts，后端只给语义标记）。
+    // 不这样做的话：后端写死「涨=红」，用户切成国际口径后热力图还是红的 ——
+    // 同一屏里数字绿了、热力图红着。
+    visualMap: retintPnl(option.visualMap, t),
     xAxis: option.xAxis ? applyAxis(option.xAxis) : undefined,
     yAxis: option.yAxis ? applyAxis(option.yAxis) : undefined,
   };

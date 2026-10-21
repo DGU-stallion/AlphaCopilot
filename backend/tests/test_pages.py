@@ -120,9 +120,12 @@ def test_render_backtest_blocks(client):
     # 所以是 1 metric + 4 chart。这里断言「指标在首位、其余都是 chart」，
     # 而不是写死块数 —— 写死个数会让每次加图都要改测试，
     # 而这条测试真正要守的是「指标卡在图前面 + 净值图有两条线」。
+    # backtest 页现在是：指标卡 → 净值/回撤/滚动Sharpe/月度热力图 → 归因指标 → 归因图。
+    # 断言「种类合法 + 首块是指标卡 + 图上必有净值」，而不是写死个数或顺序 ——
+    # 写死会让每次加图都要改测试，而这条测试真正要守的是「指标在前、净值图有两条线」。
     assert kinds[0] == "metric"
-    assert all(k == "chart" for k in kinds[1:])
-    assert len(kinds) >= 3                           # 至少净值 + 回撤
+    assert set(kinds) <= {"metric", "chart"}
+    assert kinds.count("chart") >= 3                  # 净值 + 回撤 + 至少一个分析图
     # 指标卡含总收益/夏普
     labels = [it["label"] for it in blocks[0]["metric"]["items"]]
     assert "总收益" in labels and "夏普" in labels

@@ -16,9 +16,11 @@ from __future__ import annotations
 
 from typing import Any
 
+import alpha.attribution  # noqa: F401 —— 触发 attribution.* 注册
 import alpha.backtest_page  # noqa: F401 —— 触发 backtest.* 注册
 import alpha.factor  # noqa: F401 —— 触发 correlation.* 注册
 import alpha.factor_lab  # noqa: F401 —— 触发 factorlab.* 注册
+import alpha.param_scan  # noqa: F401 —— 触发 paramscan.* 注册（M4-3）
 import alpha.tearsheet  # noqa: F401 —— 触发 tearsheet.* 注册（M4-2）
 from api.store import Store
 
@@ -78,6 +80,13 @@ BACKTEST_SPEC: dict[str, Any] = {
          "analysis_ref": {"fn": "tearsheet.rolling_sharpe"}},
         {"kind": "chart", "span": 1, "renderer": "echarts",
          "analysis_ref": {"fn": "tearsheet.monthly_heatmap"}},
+        # M4-5：收益归因（选股 vs 择时）。放在最后：先看总成绩（指标卡），
+        # 再看曲线（净值/回撤），最后才问「这些收益是靠什么赚的」——
+        # 归因是解释，不该抢在最前面。
+        {"kind": "metric", "span": 3,
+         "analysis_ref": {"fn": "attribution.summary"}},
+        {"kind": "chart", "span": 1, "renderer": "echarts",
+         "analysis_ref": {"fn": "attribution.split"}},
     ],
     "refresh": {"mode": "manual"},
 }

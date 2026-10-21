@@ -71,6 +71,12 @@ RENDERER_BY_FN: dict[str, str] = {
     "tearsheet.rolling_sharpe": RENDERER_LWC,        # 滚动 Sharpe 时间序列（金融时间轴）
     "tearsheet.drawdown": RENDERER_LWC,              # 回撤（净值域序列，同 backtest.drawdown）
     "tearsheet.monthly_heatmap": RENDERER_ECHARTS,   # 月度收益热力图（年份×月份二维聚合）
+    # M4-5 归因
+    "attribution.split": RENDERER_ECHARTS,           # 选股 vs 择时：两个并列量，柱状图
+    # M4-3 参数扫描
+    "paramscan.heatmap": RENDERER_ECHARTS,           # 参数网格热力图（fast×slow 二维聚合）
+    # M4-4 Walk-forward
+    "walkforward.oos_equity": RENDERER_LWC,          # 样本外拼接净值（金融时间轴）
 }
 
 

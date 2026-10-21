@@ -33,6 +33,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from alpha import chart
+from alpha.registry import ParamSpec, register
+
 
 def _r6(x: float | None) -> float | None:
     return None if x is None else round(x, 6)
@@ -134,3 +137,87 @@ def timing_vs_selection(
         "selection": _r6(full),
         "note": "",
     }
+
+
+# ════════ 注册为 page spec 可引用的 analysis fn ════════
+
+_PARAMS: list[ParamSpec] = [
+    ParamSpec("symbol", "str", default="600519", label="标的"),
+    ParamSpec("fast", "int", default=20, min=2, max=120, label="快线"),
+    ParamSpec("slow", "int", default=60, min=3, max=250, label="慢线"),
+    ParamSpec("range", "date_range", default="1y", label="区间"),
+]
+
+
+def _benchmark_closes(symbol: str, n: int) -> list[float] | None:
+    """标的自身收盘价（作为「全程满仓」的基准）。
+
+    这个基准必须来自**标的自己**，不能拿策略净值顶替 ——
+    策略净值里已经含空仓，用它当基准差值恒 0，归因会显示「择时为 0」，
+    看着漂亮、实际什么都没算。
+    """
+    try:
+        from alpha import data
+        rows = data.closes_with_dates(symbol, count=n)
+        return [float(c) for _, c in rows] if rows else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+@register("attribution.summary", params=_PARAMS)
+def attribution_summary(symbol: str, fast: int = 20, slow: int = 60,
+                        range: str = "1y") -> dict:
+    """归因汇总（metric 块用）。"""
+    from alpha.backtest_page import _run
+
+    res, reason = _run(symbol, fast, slow, range)
+    if res is None:
+        return {"items": [{"label": "归因", "value": "—", "hint": reason or "数据不可用"}]}
+
+    eq = list(res.equity)
+    bench = _benchmark_closes(symbol, len(eq))
+    tv = timing_vs_selection(eq, positions=res.positions, benchmark=bench)
+    exp = exposure_split(eq, positions=res.positions)
+
+    def pct(v: float | None) -> str:
+        return "—" if v is None else f"{v * 100:+.2f}%"
+
+    items = [
+        {"label": "总收益", "value": pct(tv["total"]),
+         "tone": "up" if (tv["total"] or 0) > 0 else "down"},
+        {"label": "选股（满仓基准）", "value": pct(tv["selection"]), "hint": "一次都不卖的收益"},
+        {"label": "择时（进出场）", "value": pct(tv["timing"]),
+         "hint": tv["note"] or "策略 − 满仓基准"},
+        {"label": "在场天数", "value": f"{exp['in_market_days']} 天",
+         "hint": f"空仓 {exp['out_market_days']} 天"},
+    ]
+    return {"items": items}
+
+
+@register("attribution.split", params=_PARAMS)
+def attribution_split(symbol: str, fast: int = 20, slow: int = 60,
+                      range: str = "1y") -> dict:
+    """择时 vs 选股的对比柱状图（echarts）。
+
+    为什么用柱状图而不是折线：这是**两个并列的量**（不是时间序列），
+    柱状图比较高低最直接；折线会暗示「它们之间有连续变化」，那是误导。
+    """
+    from alpha.backtest_page import _run
+
+    res, reason = _run(symbol, fast, slow, range)
+    if res is None:
+        return chart.bar(["选股", "择时"], {"贡献(%)": [None, None]},
+                         title=f"归因（{reason or '数据不可用'}）")
+
+    eq = list(res.equity)
+    bench = _benchmark_closes(symbol, len(eq))
+    tv = timing_vs_selection(eq, positions=res.positions, benchmark=bench)
+
+    def v(x: float | None) -> float | None:
+        return None if x is None else round(x * 100, 4)
+
+    return chart.bar(
+        ["选股（满仓基准）", "择时（进出场）"],
+        {"贡献(%)": [v(tv["selection"]), v(tv["timing"])]},
+        title="收益归因：选股 vs 择时",
+    )
