@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import {
   Moon, Sun, ChevronsLeft, ChevronsRight, CandlestickChart, Cog,
   Activity, Globe, Star, FileText, TrendingDown, GitCompare, Briefcase,
-  NotebookPen, Sparkles, PanelRightClose, ArrowUpDown, Clock3, History,
+  NotebookPen, Sparkles, PanelRightClose, ArrowUpDown, Clock3, History, GitBranch,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -45,6 +45,7 @@ const REVIEW_NAV = [
 ];
 const RESEARCH_NAV = [
   { to: "/watchlist", icon: Star, label: "股票池" },
+  { to: "/research", icon: GitBranch, label: "研究线" },
   { to: "/reports", icon: FileText, label: "我的研报" },
 ];
 const QUANT_NAV = [

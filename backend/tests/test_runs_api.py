@@ -279,3 +279,49 @@ class TestRerun:
             data_as_of="2026-10-21",
         )
         assert client.post(f"/api/runs/{rid}/rerun").status_code == 501
+
+
+class TestResearchThreadApi:
+    """M5-3 研究线的 REST（Note → Run → View）。"""
+
+    def _client(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from api.runs import build_runs_router
+
+        app = FastAPI()
+        store = Store(":memory:")
+        app.include_router(build_runs_router(store))
+        return TestClient(app), store
+
+    def test_create_note_and_get_thread(self):
+        client, _ = self._client()
+        r = client.post("/api/notes", json={"title": "白酒判断", "text": "理由"})
+        assert r.status_code == 200
+        did = r.json()["id"]
+
+        th = client.get(f"/api/notes/{did}/thread").json()
+        assert th["note"]["title"] == "白酒判断"
+        assert th["runs"] == [] and th["views"] == []
+
+    def test_thread_includes_runs_and_views(self):
+        client, store = self._client()
+        did = client.post("/api/notes", json={"title": "T"}).json()["id"]
+        store.runs.create(kind="backtest", params={}, note_id=did)
+        store.views.create(name="V", kind="correlation", params={}, note_id=did)
+
+        th = client.get(f"/api/notes/{did}/thread").json()
+        assert len(th["runs"]) == 1
+        assert len(th["views"]) == 1
+
+    def test_thread_missing_note_404(self):
+        client, _ = self._client()
+        assert client.get("/api/notes/nope/thread").status_code == 404
+
+    def test_notes_list(self):
+        client, _ = self._client()
+        client.post("/api/notes", json={"title": "A"})
+        client.post("/api/notes", json={"title": "B"})
+        rows = client.get("/api/notes").json()
+        assert {r["title"] for r in rows} == {"A", "B"}

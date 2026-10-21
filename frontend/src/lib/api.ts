@@ -446,6 +446,18 @@ export interface CreateViewIn {
   last_run_id?: string;
 }
 
+/** 研究笔记（复用后端 doc 表）。 */
+export interface NoteRow {
+  id: string; title: string; source_path: string; created_at: number;
+}
+
+/** 一条研究线：笔记 + 它的 Run + 它的 View（M5-3）。 */
+export interface NoteThread {
+  note: NoteRow & { text?: string };
+  runs: RunRow[];
+  views: ViewRow[];
+}
+
 export const runsApi = {
   runs: (opts?: { kind?: string; data_as_of?: string; limit?: number }) => {
     const q = new URLSearchParams();
@@ -466,6 +478,13 @@ export const runsApi = {
     request<{ id: string; pinned: boolean }>(`/views/${encodeURIComponent(vid)}/pin`, "POST", { pinned }),
   deleteView: (vid: string) =>
     request<{ ok: boolean }>(`/views/${encodeURIComponent(vid)}`, "DELETE"),
+  // ---------- 研究线（M5-3）：Note → Run → View → 复盘 ----------
+  notes: () => get<NoteRow[]>("/notes"),
+  createNote: (body: { title: string; text?: string }) =>
+    request<{ id: string }>("/notes", "POST", body),
+  noteThread: (did: string) =>
+    get<NoteThread>(`/notes/${encodeURIComponent(did)}/thread`),
+
   /** M3-4：用同一条 Run 的输入快照重跑。409=无快照，501=未启用 job 队列。 */
   rerun: (rid: string) =>
     request<{ job_id: string; rerun_of: string }>(

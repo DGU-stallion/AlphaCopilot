@@ -110,6 +110,9 @@ CREATE TABLE IF NOT EXISTS run (
     -- params 只是「实验设计」（fast/slow/symbol），inputs 才是「原料」。
     -- 少了它只能说「可比较」，不能说「可重跑」（M3-4）。
     inputs       TEXT NOT NULL DEFAULT '{}',
+    -- 研究线（M5-3）：这次计算是为了验证哪条判断。
+    -- 空串 = 随手跑的，不属于任何研究线（不强制 —— 强制会让人干脆不写笔记）。
+    note_id      TEXT NOT NULL DEFAULT '',
     created_at   REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_run_created ON run(created_at DESC);
@@ -123,6 +126,7 @@ CREATE TABLE IF NOT EXISTS view (
     params      TEXT NOT NULL DEFAULT '{}',
     pinned      INTEGER NOT NULL DEFAULT 0,     -- 0/1：Pin = 「我天天要看这个」
     last_run_id TEXT,                           -- 上次用这个 View 跑出的 Run（重跑/对比用）
+    note_id     TEXT NOT NULL DEFAULT '',       -- 研究线归属（M5-3）
     created_at  REAL NOT NULL,
     updated_at  REAL NOT NULL
 );
@@ -187,6 +191,14 @@ def _migrate_run_inputs(conn: sqlite3.Connection) -> None:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(run)").fetchall()}
     if cols and "inputs" not in cols:
         conn.execute("ALTER TABLE run ADD COLUMN inputs TEXT NOT NULL DEFAULT '{}'")
+
+
+def _migrate_note_links(conn: sqlite3.Connection) -> None:
+    """幂等迁移：run / view 补 note_id 列（研究线，M5-3）。"""
+    for table in ("run", "view"):
+        cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if cols and "note_id" not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN note_id TEXT NOT NULL DEFAULT ''")
 
 
 def _migrate_page_kind(conn: sqlite3.Connection) -> None:
@@ -526,12 +538,13 @@ class RunRepo:
         metrics: dict[str, Any] | None = None,
         artifact_ids: list[str] | None = None,
         inputs: dict[str, Any] | None = None,
+        note_id: str = "",
     ) -> str:
         rid = _new_id("run")
         self.conn.execute(
             "INSERT INTO run "
-            "(id, kind, params, code_hash, data_as_of, metrics, artifact_ids, inputs, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?)",
+            "(id, kind, params, code_hash, data_as_of, metrics, artifact_ids, inputs, "
+            "note_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
             (
                 rid, kind,
                 json.dumps(params or {}, ensure_ascii=False),
@@ -539,6 +552,7 @@ class RunRepo:
                 json.dumps(metrics or {}, ensure_ascii=False),
                 json.dumps(artifact_ids or [], ensure_ascii=False),
                 json.dumps(inputs or {}, ensure_ascii=False),
+                note_id,
                 time.time(),
             ),
         )
@@ -577,6 +591,13 @@ class RunRepo:
         args.append(limit)
         return [self._row(r) for r in self.conn.execute(sql, args).fetchall()]  # type: ignore[misc]
 
+    def list_by_note(self, note_id: str) -> list[dict[str, Any]]:
+        """某个研究判断下跑过的全部 Run（M5-3：这个判断我用什么验证过）。"""
+        rows = self.conn.execute(
+            "SELECT * FROM run WHERE note_id = ? ORDER BY created_at ASC", (note_id,)
+        ).fetchall()
+        return [self._row(r) for r in rows]  # type: ignore[misc]
+
     def diff(self, a_id: str, b_id: str) -> dict[str, Any]:
         """两个 Run 的差异（M3-4）：参数变化 + 指标 delta。
 
@@ -614,15 +635,16 @@ class ViewRepo:
 
     def create(
         self, *, name: str, kind: str, params: dict[str, Any] | None = None,
-        last_run_id: str | None = None,
+        last_run_id: str | None = None, note_id: str = "",
     ) -> str:
         vid = _new_id("view")
         now = time.time()
         self.conn.execute(
             "INSERT INTO view "
-            "(id, name, kind, params, pinned, last_run_id, created_at, updated_at) "
-            "VALUES (?,?,?,?,0,?,?,?)",
-            (vid, name, kind, json.dumps(params or {}, ensure_ascii=False), last_run_id, now, now),
+            "(id, name, kind, params, pinned, last_run_id, note_id, created_at, updated_at) "
+            "VALUES (?,?,?,?,0,?,?,?,?)",
+            (vid, name, kind, json.dumps(params or {}, ensure_ascii=False),
+             last_run_id, note_id, now, now),
         )
         self.conn.commit()
         return vid
@@ -684,6 +706,41 @@ class DocRepo:
             "SELECT id, title, source_path, created_at FROM doc ORDER BY created_at DESC"
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def thread(self, did: str) -> dict[str, Any]:
+        """一条研究线的完整视图（M5-3）：笔记本身 + 它的 Run + 它的 View。
+
+        为什么放在 DocRepo：调用方问的是「这条笔记的研究线」，
+        笔记是主语。让它去拼 runs/views 两个 repo 是合理的编排，
+        而反过来（RunRepo 提供 thread）语义是歪的。
+        """
+        note = self.get_doc(did)
+        runs = self.conn.execute(
+            "SELECT * FROM run WHERE note_id = ? ORDER BY created_at ASC", (did,)
+        ).fetchall()
+        views = self.conn.execute(
+            "SELECT * FROM view WHERE note_id = ? ORDER BY created_at ASC", (did,)
+        ).fetchall()
+
+        def _run(r: sqlite3.Row) -> dict[str, Any]:
+            d = dict(r)
+            d["params"] = json.loads(d.get("params") or "{}")
+            d["metrics"] = json.loads(d.get("metrics") or "{}")
+            d["artifact_ids"] = json.loads(d.get("artifact_ids") or "[]")
+            d["inputs"] = json.loads(d.get("inputs") or "{}")
+            return d
+
+        def _view(r: sqlite3.Row) -> dict[str, Any]:
+            d = dict(r)
+            d["params"] = json.loads(d.get("params") or "{}")
+            d["pinned"] = bool(d.get("pinned"))
+            return d
+
+        return {
+            "note": note,
+            "runs": [_run(r) for r in runs],
+            "views": [_view(v) for v in views],
+        }
 
     def delete_doc(self, did: str) -> bool:
         cur = self.conn.execute("DELETE FROM doc WHERE id=?", (did,))
@@ -851,6 +908,7 @@ class Store:
         _migrate_artifact_provenance(self.conn)
         _migrate_session_runtime_id(self.conn)
         _migrate_run_inputs(self.conn)
+        _migrate_note_links(self.conn)
         self.conn.commit()
 
     def close(self) -> None:

@@ -164,3 +164,49 @@ class TestIdempotentMigration:
         store.migrate()
         rid = store.runs.create(**_run_kwargs())
         assert store.runs.get(rid) is not None
+
+
+class TestResearchLine:
+    """M5-3 研究线：Note → Run → View → 复盘 Note。
+
+    要回答的问题是「半年前我为什么这么买、后来对了吗」。
+    这需要把当时的**判断（Note）**、**计算（Run）**、**看什么（View）**
+    串成一条链，而不是散落在三个页面里。
+    """
+
+    def test_run_can_link_to_note(self, store):
+        """Run 要知道自己是「为了验证哪个判断」跑出来的。"""
+        did = store.docs.add_doc(
+            title="白酒还有没有空间", source_path="", text="我的判断：估值已到底部",
+        )
+        rid = store.runs.create(**_run_kwargs(note_id=did))
+        assert store.runs.get(rid)["note_id"] == did
+
+    def test_note_can_list_its_runs(self, store):
+        """反过来也要能查：这个判断我用哪些计算验证过。"""
+        did = store.docs.add_doc(title="判断 A", source_path="", text="")
+        store.runs.create(**_run_kwargs(note_id=did))
+        store.runs.create(**_run_kwargs(note_id=did))
+        store.runs.create(**_run_kwargs())          # 不属于这个 note
+        assert len(store.runs.list_by_note(did)) == 2
+
+    def test_view_can_link_to_note_too(self, store):
+        """View 也是研究链上的节点（「我当时在看什么」）。"""
+        did = store.docs.add_doc(title="判断 A", source_path="", text="")
+        vid = store.views.create(name="白酒相关", kind="correlation", params={}, note_id=did)
+        assert store.views.get(vid)["note_id"] == did
+
+    def test_run_without_note_is_allowed(self, store):
+        """随手跑的回测不该被迫先写笔记 —— 强制会让人不写笔记。"""
+        rid = store.runs.create(**_run_kwargs())
+        assert store.runs.get(rid)["note_id"] == ""
+
+    def test_research_thread_assembles_whole_chain(self, store):
+        """一条研究线的完整视图：笔记 + 它的 Run + 它的 View。"""
+        did = store.docs.add_doc(title="白酒判断", source_path="", text="理由……")
+        rid = store.runs.create(**_run_kwargs(note_id=did))
+        vid = store.views.create(name="白酒池", kind="correlation", params={}, note_id=did)
+        thread = store.docs.thread(did)
+        assert thread["note"]["id"] == did
+        assert [r["id"] for r in thread["runs"]] == [rid]
+        assert [v["id"] for v in thread["views"]] == [vid]

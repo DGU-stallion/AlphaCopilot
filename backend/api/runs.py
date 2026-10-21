@@ -31,6 +31,11 @@ class PinViewIn(BaseModel):
     pinned: bool
 
 
+class NoteIn(BaseModel):
+    title: str
+    text: str = ""
+
+
 def build_runs_router(
     store: Store,
     submit_backtest: Callable[[dict[str, Any]], str] | None = None,
@@ -79,6 +84,30 @@ def build_runs_router(
             raise HTTPException(409, "输入快照里没有 closes，无法重跑")
         jid = submit_backtest(inputs)
         return {"job_id": jid, "rerun_of": rid}
+
+    # ---------- 研究线（M5-3）：Note → Run → View → 复盘 ----------
+
+    @router.get("/notes")
+    def list_notes() -> list:
+        """研究笔记列表（复用 doc 表）。"""
+        return store.docs.list_docs()
+
+    @router.post("/notes")
+    def create_note(body: NoteIn) -> dict:
+        did = store.docs.add_doc(title=body.title, source_path="", text=body.text)
+        return {"id": did}
+
+    @router.get("/notes/{did}/thread")
+    def note_thread(did: str) -> dict:
+        """一条研究线的完整视图：笔记 + 它的 Run + 它的 View。
+
+        这一条是「半年后能回答我为什么这么买」的全部数据来源：
+        当时写了什么（note）、用什么验证过（runs）、在看什么（views）。
+        """
+        thread = store.docs.thread(did)
+        if thread["note"] is None:
+            raise HTTPException(404, f"note not found: {did}")
+        return thread
 
     @router.get("/runs/{rid}")
     def get_run(rid: str) -> dict:
