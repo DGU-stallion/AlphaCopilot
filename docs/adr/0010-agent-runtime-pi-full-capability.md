@@ -205,7 +205,17 @@ skills 由 `--skill <dir>` 显式挂载；不给时加 `--no-skills` 禁用自�
 且代价未计：88 个 description 合计 **17,603 字符 ≈ 5.9k tokens**，
 每轮常驻 system prompt（最长单条 787 字符）。
 
-**决定**：按白名单加载，分三档。
+**决定（2026-10-21 实测后修正）**：按白名单加载，**选 12 个**（原计划 30 个）。
+
+> 实测：上游 `HKUDS/Vibe-Trading`（MIT）`agent/src/skills/` 下共 **90 个** SKILL.md，
+> description 合计 **18,330 字符 ≈ 6.1k tokens/轮**。这是**每轮常驻**的固定成本，
+> 不随使用量变化。从 30 个收缩到 12 个（约 700 tokens），理由：
+> 真正影响模型行为的是「会不会用 `alpha.*`」，而这由 **docstring 质量**决定
+> （`alpha/__init__.py` 自己就写着「docstring 即 LLM schema」），不是靠堆 skill 数量。
+>
+> 另外上游 15 个属硬规则 10 禁止类别，且多处写着 `pip install yfinance` ——
+> 模型照做会失败（上游写的是境外数据源），然后开始自己造数据。迁入时全部
+> 改写到 `alpha.data` / `research.astock`。
 
 | 档 | 处理 | 内容 |
 |---|---|---|

@@ -9,8 +9,9 @@
 > 2. **vendor a-stock-data 从 M0 移到 M3**（M0 只做真止血；依赖与主环境冲突）
 > 3. **M1-3 新增**：Pi 运行环境（`--approve` + 项目 `.pi/mcp.json`），
 >    否则 MCP/skills 静默不加载（ADR-0010 修订 §1，已按实测修正）
-> 4. **M1-9 改为 skills 白名单 30 个**，不再「全量恢复 88 个」（违反硬规则 10，
->    且 88 个 description ≈ 5.9k tokens/轮，ADR-0010 修订 §2）
+> 4. **M1-9 skills 白名单**：源是 HKUDS/Vibe-Trading 的 90 个（实测 description
+>    18,330 字符 ≈ 6.1k tokens/轮）。**选 12 个 ≈ 700 tokens**，剔除 15 个硬规则 10
+>    禁止项，取数指引改到 `alpha.data`（ADR-0010 修订 §2）
 > 5. **M1-7 补上 provenance 落地 + 盖章权**（ADR-0012 的硬规则目前无任何实现）：
 >    agent 交来的 provenance 一律不采信，`deterministic` 只能服务端铸造
 > 6. **M1-6 补 `sandbox.py` → `runner.py` 重新定位**（ADR-0012「已决 2」：
@@ -125,7 +126,7 @@ AI native 个人投研量化工作台。
 | M1-6 | 删 dsh 全部痕迹 + `sandbox.py` → `runner.py` 重新定位 | **已完成**：`grep dsh` 仅剩历史说明；**8 条 xfail 全部转绿**（mock 端点手法失效 → 改为注入假 provider）；`XFAIL_BUDGET` 8→0；全量 258s→8.7s |
 | M1-7 | **provenance 落地 + 盖章权**（ADR-0012「已决 1」）：① `artifact` 表加 `provenance` JSON 列；② manifest 校验**拒收缺失 provenance**；③ **agent 交来的 provenance 一律不采信，强制改写 `kind="agent"`**，`deterministic` 只能由服务端调 `alpha.registry` 铸造；④ 前端恢复四 block 渲染器 + AI 角标 | 缺 provenance 被拒；**伪造 manifest 声称 deterministic → 被改写为 agent**（有测试）；「画相关性热力图」能看到图且带 AI 角标 |
 | M1-8 | 接 job 订阅：`/api/jobs/{id}/stream` → 前端 | 「跑回测」能出净值+回撤图 |
-| M1-9 | **skills 白名单**（ADR-0010 修订 §2）：A 档约 30 个进 `skills/`，B 档留 `docs/research/skills-ref/`，C 档不迁移（含 `qveris`/crypto/`mootdx`，硬规则 10） | system prompt 快照里 description 总字符 < 8,000 |
+| M1-9 | **skills 白名单**（ADR-0010 修订 §2） | **已完成**：源是 HKUDS/Vibe-Trading 的 90 个（实测 6.1k tokens），**选 12 个**（约 700 tokens）；剔除 15 个硬规则 10 禁止项；取数指引改到 `alpha.data`。18 条守门测试 |
 | M1-10 | 页面感知补到 11/11（`useAiPage` 现覆盖 4 页；删 `Placeholder` 后 10 页） | 每页都登记快照 |
 
 **M1 的 DoD**：一句话说「分析白酒四家和沪深300 近一年相关性」→ 对话流出图 →
