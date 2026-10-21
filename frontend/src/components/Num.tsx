@@ -68,7 +68,10 @@ export function Num({
   const shown = rate ? v * 100 : v;
   // 用舍入后的值判符号：+0.004% 显示成 0.00，就不再带涨跌色
   const rounded = Number(shown.toFixed(d));
-  const plus = (pct || signed) && rounded > 0 ? "+" : "";
+  // 符号必须显式拼回去：正文用 Math.abs 格式化（千分位更干净），
+  // 所以负号**不能**指望 Intl 带出来。曾经漏了这一行，
+  // 结果 -1.67% 显示成 1.67%（跌看成涨，金融界面上是致命错误）。
+  const sign = rounded < 0 ? "-" : (pct || signed) && rounded > 0 ? "+" : "";
   const useSignColor = colorBySign || pct || rate;
   if (!inheritColor) {
     styleAll.color = useSignColor
@@ -83,7 +86,7 @@ export function Num({
 
   return (
     <span className={cn(className)} style={styleAll}>
-      {plus}
+      {sign}
       {prefix}
       {body}
       {pct || rate ? "%" : ""}

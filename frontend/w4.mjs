@@ -1,0 +1,13 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1600, height: 950 } });
+p.on('requestfailed', r => { if (r.url().includes('/api/')) console.log('FAILED', r.url(), r.failure()?.errorText); });
+p.on('response', r => { if (r.url().includes('/api/kline')) console.log('RESP', r.status(), r.url()); });
+await p.goto('http://127.0.0.1:5899/');
+await p.evaluate(() => localStorage.setItem('vr-watchlist', JSON.stringify(['600519'])));
+await p.goto('http://127.0.0.1:5899/watchlist', { waitUntil: 'networkidle' });
+await p.waitForTimeout(6000);
+const txt = await p.evaluate(() => document.body.innerText);
+console.log('包含"股票池总览":', txt.includes('股票池总览'), '| 含"（1）":', txt.includes('（1）'), '| 含 加载中:', txt.includes('加载中'));
+console.log(txt.slice(200, 700).replace(/\n+/g,' | ').slice(0,500));
+await b.close();

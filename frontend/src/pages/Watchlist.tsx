@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, X, RefreshCw, Star } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Num } from "@/components/Num";
 import { Disclaimer } from "@/components/ui/Disclaimer";
-import { api, type Quote } from "@/lib/api";
+import { api, type Quote, type KlineBar } from "@/lib/api";
+import { PriceChart } from "@/components/charts/PriceChart";
 import { loadWatch, saveWatch, addCodes } from "@/lib/watchlist";
 import { useCachedResource, dropCache } from "@/lib/cache";
 import { useAiPage } from "@/lib/ai-page";
@@ -22,6 +23,26 @@ export function Watchlist() {
   const [codes, setCodes] = useState<string[]>(loadWatch);
   const [input, setInput] = useState("");
   const [hint, setHint] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  // 选中标的的 K 线。默认跟股票池第一只走 —— 打开页面就该看到图，
+  // 而不是先看到一片空白再去找"点一下"。
+  const active = selected && codes.includes(selected) ? selected : codes[0] ?? null;
+  const [bars, setBars] = useState<KlineBar[]>([]);
+  const [barErr, setBarErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!active) { setBars([]); setBarErr(null); return; }
+    let alive = true;
+    setBarErr(null);
+    api.kline(active, 120)
+      .then((b) => { if (alive) setBars(b); })
+      .catch((e) => {
+        // 取不到就说取不到（后端 502 而非空数组）。静默画一条平线比报错更糟。
+        if (alive) { setBars([]); setBarErr(e instanceof Error ? e.message : "K 线取不到"); }
+      });
+    return () => { alive = false; };
+  }, [active]);
 
   // 行情按当前代码集缓存；切页复用，改动代码集时 dropCache 强制重取。
   const quotesRes = useCachedResource<Record<string, Quote>>(
@@ -132,7 +153,15 @@ export function Watchlist() {
                 {codes.map((c) => {
                   const q = quotes[c];
                   return (
-                    <tr key={c} className="border-b border-border/30">
+                    <tr
+                      key={c}
+                      onClick={() => setSelected(c)}
+                      title="点击查看 K 线"
+                      className={cn(
+                        "cursor-pointer border-b border-border/30 transition-colors hover:bg-[hsl(var(--muted))]",
+                        c === active && "bg-[hsl(var(--muted))]",
+                      )}
+                    >
                       <td className="px-2 py-2.5 font-medium">{q?.name || "—"}</td>
                       <td className="px-2 py-2.5 font-mono text-xs text-muted-foreground">{c}</td>
                       <td className="px-2 py-2.5">
@@ -157,6 +186,33 @@ export function Watchlist() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </Panel>
+
+      {/* K 线：与成交量同一个 chart 实例的两个 pane（ADR-0014 §6）。
+          高度用 flex 撑满剩余空间，页面不再有"空白浪费"。 */}
+      <Panel className="mt-4">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="flex items-center gap-1.5 font-semibold">
+            <span className="text-primary">▤</span> {active ? `${quotes[active]?.name || active} · 日线` : "K 线"}
+            {active && <span className="font-mono text-xs font-normal text-muted-foreground">{active}</span>}
+          </h3>
+          <span className="text-[11px] text-muted-foreground">前复权 · 近 120 个交易日</span>
+        </div>
+        {!active ? (
+          <p className="py-16 text-center text-sm text-muted-foreground/60">
+            股票池为空，添加标的后这里会显示 K 线。
+          </p>
+        ) : barErr ? (
+          <p className="py-16 text-center text-sm text-danger">K 线取不到：{barErr}</p>
+        ) : bars.length === 0 ? (
+          <p className="py-16 text-center text-sm text-muted-foreground/60">加载中…</p>
+        ) : (
+          // 固定高度而不是 flex-1：外层页面是普通文档流（高度由内容决定），
+          // flex-1 在"高度 auto"的父级里解析为 0，图表会整个消失。
+          <div className="h-[360px]">
+            <PriceChart bars={bars} />
           </div>
         )}
       </Panel>

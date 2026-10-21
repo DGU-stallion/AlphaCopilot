@@ -336,8 +336,18 @@ export interface BacktestData {
   strategies?: Record<string, SampleStrategy>;
 }
 
+/** K 线（/api/kline）。取不到时后端是 502，不是空数组。 */
+export interface KlineBar {
+  datetime: string; open: number; close: number; high: number; low: number; vol: number;
+}
+
 export const api = {
   health: () => get<{ ok: boolean }>("/health"),
+  // 注意 request() 已经解包了一层 payload.data，所以这里的泛型直接是 {code,bars}。
+  // 再取一次 .data 会得到 undefined（踩过：图表显示「K 线取不到」）。
+  kline: (code: string, offset = 120) =>
+    get<{ code: string; bars: KlineBar[] }>(`/kline?code=${code}&offset=${offset}`)
+      .then((r) => r.bars),
   indices: () => get<IndexQuote[]>("/indices"),
   marketSession: () => get<MarketSession>("/market/session"),
   overseas: () => get<OverseasSnapshot>("/market/overseas"),
