@@ -44,3 +44,19 @@ d22719e9deba2c6e7e783cccf53d59e3bb2d0e231296dc69fc613a2a8c152d61  tests/test_val
     README_en.md 523b3dfbca3265db8e00b5b19faace2ae87f8b40a02b2d5789693f6338787170
 
 补录后：179 passed / 4 skipped / 475 subtests（M3-V4 完成）。
+
+## 同步记录 2026-10-21T17:03:46Z
+
+来源: https://github.com/simonlin1212/a-stock-data/tree/29b07d2e3700
+下载校验（sha256）:
+    SKILL.md                                 d30aa90edb881a45168c397a6ca1ccfebc440a8d4c93b3d94d3123d27b260a1d
+    LICENSE                                  199bab40163ad21135c2c4d5db43bffdadb14ed80762b048f04931cc48700bbf
+    CHANGELOG.md                             0a159869af1abd002636bf793505dc5ea7bdb47ce85ff8e58461f4447484e615
+    README.md                                33b6f4a829571cf1fd4d3de127468cd0c59dace65ac77c8230b1b21fbaa4a9b9
+    README_en.md                             523b3dfbca3265db8e00b5b19faace2ae87f8b40a02b2d5789693f6338787170
+    tests/test_valuation.py                  d22719e9deba2c6e7e783cccf53d59e3bb2d0e231296dc69fc613a2a8c152d61
+    tests/test_official_data.py              f4c62fb65753dc68ce94fe613e96d44444ca358b33142535243067e5f8acf107
+    tests/test_v39_sources.py                70ee4f35e7bcbf9a838e7ef47f7fce4432d33d25c01011b64512b8b41669e62f
+    tests/test_v310_sources.py               91e2fbef650d17b5c1129367b81764edbcb68c36c2902f3265e77b3b2ecdb646
+
+上游测试: 通过（见步骤 3）
