@@ -91,7 +91,7 @@ AI native 个人投研量化工作台。
 
 | ID | 任务 | 验收 |
 |---|---|---|
-| M0-1 | 加回 CI（GitHub Actions）：`pytest` + `tsc` + `vitest` + `build` + `ruff`。**runner 必须 `macos-latest`**（`test_sandbox.py`（M1-6 后随 `runner.py` 改名）与两个 E2E 在非 darwin 上 `skipif`，ubuntu 上等于不跑） | PR 上能看到 red/green；CI 汇总行显示 skip 数 |
+| M0-1 | 加回 CI（GitHub Actions）：`pytest` + `tsc` + `vitest` + `build` + `ruff`。**runner 必须 `macos-latest`**（`test_runner.py`（原 `test_sandbox.py`）与两个 E2E 在非 darwin 上 `skipif`，ubuntu 上等于不跑） | PR 上能看到 red/green；CI 汇总行显示 skip 数 |
 | M0-2 | 8 个红测试标记 `xfail(strict=True, reason="M1 换 Pi 后重写")`，**同 PR 加门禁：xfail 数不得增加** | `pytest` 全绿；xfail 数写进 CI summary 且被断言 |
 | M0-3 | 修 `/openapi.json` 500：`api/app.py:114` 的 `class BacktestIn` 在函数内定义 → 挪到模块级 | `curl /openapi.json` 返回 200，且含 `/backtest` |
 | M0-4 | `ruff check .` 清零（36 个 `--fix`，14 个手工） | ruff exit 0 |
@@ -120,9 +120,9 @@ AI native 个人投研量化工作台。
 | M1-1 | **先写测试**：`PiProvider` 契约测试（假 pi 进程，无需真实模型），覆盖 5 类中立事件 | **已完成**：7 条红 → 绿，1.3s；变异测试 6 个注入 bug 全部被抓住 |
 | M1-2 | PiProvider 实现：`backend/agent/providers/pi.py`（RPC client）。事件映射逐字段对齐 `message_update.assistantMessageEvent.text_delta.delta` / `tool_execution_start\|end` / `agent_settled.aborted` | **已完成**：真 pi + 真模型端到端跑通；11 条测试（含 4 条配置契约） |
 | M1-3 | **Pi 运行环境就位**（ADR-0010 修订 §1，**已实现**）：`agent/pi_env.py` 生成 `<workspace>/.pi/mcp.json`（`exposure: "direct"`），`--approve` 启用项目信任，不设 `PI_CODING_AGENT_DIR` | 已验：真 pi + 真模型下模型自主调 `mcp__alphacopilot__get_quote` 拿到茅台 1313.29 |
-| M1-4 | `abort()` 接前端「停止生成」按钮 | 点击后 1s 内停止，`agent_settled.aborted=true` |
+| M1-4 | abort 能力（契约 + provider + HTTP 端点） | **已完成**（后端）；真 pi 验证：中止→`finish_reason=aborted`→进程存活→下一轮正常。前端按钮接通留 M2-7 |
 | M1-5 | **会话续接**：`_ensure_runtime` 在 provider 死掉时不能静默起空会话（DB 历史还在，agent 却失忆） | 杀掉 pi 子进程后继续对话，agent 仍知道前文 |
-| M1-6 | 删 dsh 全部痕迹：`providers/dsh.py` / `cordis.yml` / conftest sys.path / dev_keyless.sh；**`mcpserver/sandbox.py` → `runner.py` 重新定位**（ADR-0012「已决 2」：它不是安全边界，是「带留档的执行通道」——`run_id`/`code.py`/禁网络/可复现；docstring 与 `test_read_secret_denied` 的叙述一并改） | `grep -r "dsh\|deepseek_harness"` 为空；8 条测试从 xfail 转真绿；`runner.py` docstring 明写「不构成安全边界」 |
+| M1-6 | 删 dsh 全部痕迹 + `sandbox.py` → `runner.py` 重新定位 | **已完成**：`grep dsh` 仅剩历史说明；**8 条 xfail 全部转绿**（mock 端点手法失效 → 改为注入假 provider）；`XFAIL_BUDGET` 8→0；全量 258s→8.7s |
 | M1-7 | **provenance 落地 + 盖章权**（ADR-0012「已决 1」）：① `artifact` 表加 `provenance` JSON 列；② manifest 校验**拒收缺失 provenance**；③ **agent 交来的 provenance 一律不采信，强制改写 `kind="agent"`**，`deterministic` 只能由服务端调 `alpha.registry` 铸造；④ 前端恢复四 block 渲染器 + AI 角标 | 缺 provenance 被拒；**伪造 manifest 声称 deterministic → 被改写为 agent**（有测试）；「画相关性热力图」能看到图且带 AI 角标 |
 | M1-8 | 接 job 订阅：`/api/jobs/{id}/stream` → 前端 | 「跑回测」能出净值+回撤图 |
 | M1-9 | **skills 白名单**（ADR-0010 修订 §2）：A 档约 30 个进 `skills/`，B 档留 `docs/research/skills-ref/`，C 档不迁移（含 `qveris`/crypto/`mootdx`，硬规则 10） | system prompt 快照里 description 总字符 < 8,000 |
