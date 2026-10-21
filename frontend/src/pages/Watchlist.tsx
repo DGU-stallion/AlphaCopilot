@@ -7,6 +7,7 @@ import { Disclaimer } from "@/components/ui/Disclaimer";
 import { api, type Quote } from "@/lib/api";
 import { loadWatch, saveWatch, addCodes } from "@/lib/watchlist";
 import { useCachedResource, dropCache } from "@/lib/cache";
+import { useAiPage } from "@/lib/ai-page";
 import { cn } from "@/lib/utils";
 
 // 股票池（缝合搬运自上游项目的 Watchlist.tsx）。
@@ -29,6 +30,22 @@ export function Watchlist() {
     () => (codes.length ? api.quote(codes.join(",")) : Promise.resolve({})),
   );
   const quotes = quotesRes.data ?? {};
+
+  // 向全局 AI 浮标登记本页确定性数据快照，作对话上下文。行情未到时如实标「尚未加载」。
+  useAiPage({
+    key: `pool:${codes.join(",")}`,
+    title: "股票池",
+    context:
+      codes.length === 0 ? "股票池为空（本地 localStorage，未上传）"
+      : `自选股 ${codes.length} 只：\n` +
+        codes.map((c) => {
+          const q = quotes[c];
+          return q
+            ? `${c} ${q.name} 现价 ${q.price} 涨跌 ${pct(q.change_pct)} PE(TTM) ${q.pe_ttm ?? "—"} PB ${q.pb ?? "—"} 换手 ${q.turnover_pct ?? "—"}%`
+            : `${c} 行情尚未加载`;
+        }).join("\n"),
+    suggestions: ["帮我看看池子里的估值分布", "哪些标的今天涨幅居前", "池子里有什么明显的风险点"],
+  });
 
   const reloadFor = () => { dropCache(CACHE_KEY); quotesRes.refresh(); };
 

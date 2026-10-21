@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { useCachedResource, dropCache } from "@/lib/cache";
+import { useAiPage } from "@/lib/ai-page";
 import { listReports, addReport, deleteReport, type ResearchReport } from "@/lib/research";
 import { ApiError } from "@/lib/api";
 
@@ -22,6 +23,19 @@ export function MyReports() {
   const [err, setErr] = useState<string | null>(null);
 
   const reports = list.data ?? [];
+
+  // 向全局 AI 浮标登记本页确定性数据快照：只放元信息（标题/时间），不塞正文。
+  useAiPage({
+    key: `reports:${reports.length}:${reports[0]?.id ?? ""}`,
+    title: "我的研报",
+    context:
+      list.loading && reports.length === 0 ? "研报列表加载中…"
+      : reports.length === 0 ? "尚无归档研报"
+      : `已归档 ${reports.length} 份研报：\n` +
+        reports.slice(0, 8).map((r) => `· ${r.title}（${fmtDate(r.created_at)}）`).join("\n") +
+        (reports.length > 8 ? `\n…等共 ${reports.length} 份（仅列前 8 份标题，正文未附）` : ""),
+    suggestions: ["我归档过哪些研报", "研报库怎么用才高效", "帮我梳理研报结论的思路"],
+  });
 
   const reload = () => { dropCache("reports:list"); list.refresh(); };
 

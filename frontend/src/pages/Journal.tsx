@@ -6,6 +6,7 @@ import { Disclaimer } from "@/components/ui/Disclaimer";
 import { pctColor } from "@/lib/colors";
 import { api, type JournalRow } from "@/lib/api";
 import { useCachedResource, dropCache } from "@/lib/cache";
+import { useAiPage } from "@/lib/ai-page";
 import { cn } from "@/lib/utils";
 
 // 交易日志 —— 基于 AlphaCopilot 已有 journal 后端（add/list/delete）新建的务实录入页。
@@ -75,6 +76,27 @@ export function Journal() {
 
   const byCode = useMemo(() => cashflowByCode(rows), [rows]);
   const totalNet = useMemo(() => [...byCode.values()].reduce((s, v) => s + v.net, 0), [byCode]);
+
+  // 向全局 AI 浮标登记本页确定性数据快照，作对话上下文。
+  // 盈亏口径：现金流（卖出所得 − 买入花费 − 费用），不是市值盯市。未加载时如实说。
+  const aiContext = (() => {
+    if (res.loading && rows.length === 0) return "交易日志加载中…";
+    if (rows.length === 0) return "尚无成交记录";
+    const lines =
+      `共 ${rows.length} 笔成交；现金流盈亏合计 ${totalNet > 0 ? "+" : ""}${money(totalNet)}（口径：卖出所得 − 买入花费 − 费用，未卖持仓不折现）\n` +
+      (byCode.size > 0
+        ? `按标的盈亏：${[...byCode.entries()].map(([code, v]) => `${code} ${v.net > 0 ? "+" : ""}${money(v.net)}`).join("、")}\n`
+        : "");
+    const recent = rows.slice(0, 5).map((r) =>
+      `${r.traded_at || "未填日期"} ${r.side === "buy" ? "买入" : "卖出"} ${r.code}${r.name ? ` ${r.name}` : ""} @${r.price} × ${r.shares}`);
+    return lines + `最近几笔：\n` + recent.join("\n");
+  })();
+  useAiPage({
+    key: `journal:${rows.length}:${rows[0]?.id ?? ""}`,
+    title: "交易日志",
+    context: aiContext,
+    suggestions: ["帮我看看目前各标的的盈亏情况", "我的交易有什么明显问题", "现金流盈亏口径是什么意思"],
+  });
 
   const set = (k: keyof Form, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const inputCls = "rounded-lg border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:border-primary/50";

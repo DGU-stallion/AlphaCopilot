@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2, Loader2, X, CalendarClock } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -6,6 +6,7 @@ import { Disclaimer } from "@/components/ui/Disclaimer";
 import { Caliber } from "@/components/ui/Caliber";
 import { EChart } from "@/components/ui/EChart";
 import { useCachedResource, dropCache } from "@/lib/cache";
+import { useAiPage } from "@/lib/ai-page";
 import {
   listPortfolios, createPortfolio, deletePortfolio, addRebalance, portfolioNav,
   type Portfolio, type NavResult,
@@ -36,6 +37,24 @@ export function Portfolios() {
 
   const portfolios = list.data ?? [];
   const active = portfolios.find((p) => p.id === selected) ?? portfolios[0] ?? null;
+
+  // 向全局 AI 浮标登记本页确定性数据快照，作对话上下文。
+  // 净值数字由 PortfolioDetail 从同一缓存 key 读出后回填这里（同 key 不重复请求）。
+  const [navSummary, setNavSummary] = useState<string>("");
+  // 切组合/调仓后先清掉旧组合的净值汇总，避免新数据回来前快照里张冠李戴
+  useEffect(() => { setNavSummary(""); }, [active?.id, active?.rebalances.length]);
+  useAiPage({
+    key: `pf:${active?.id ?? "none"}:${active?.rebalances.length ?? 0}:${navSummary}`,
+    title: "模拟组合",
+    context:
+      list.loading && portfolios.length === 0 ? "组合列表加载中…"
+      : portfolios.length === 0 ? "尚无组合"
+      : `我的组合 ${portfolios.length} 个：${portfolios.map((p) => `${p.name}（${p.rebalances.length} 次调仓）`).join("、")}\n` +
+        (active
+          ? `当前查看：${active.name}，基准 ${active.benchmark}\n${navSummary || "净值计算中…"}`
+          : ""),
+    suggestions: ["当前组合的净值表现怎么解读", "调仓权重怎么设计更合理", "组合跑赢基准了吗"],
+  });
 
   const reloadList = useCallback(() => { dropCache("pf:list"); list.refresh(); }, [list]);
 
@@ -137,7 +156,7 @@ export function Portfolios() {
 
         {/* 右：净值曲线 + 调仓 */}
         <div className="space-y-4">
-          {active ? <PortfolioDetail portfolio={active} /> : (
+          {active ? <PortfolioDetail portfolio={active} onNavSummary={setNavSummary} /> : (
             <GlassCard><p className="py-16 text-center text-sm text-muted-foreground/60">选择或新建一个组合查看净值曲线。</p></GlassCard>
           )}
 
@@ -184,10 +203,36 @@ export function Portfolios() {
 }
 
 // 单组合详情：净值曲线（自带缓存，按 pid + 调仓次数 key，调仓后变 key 自然重取）+ 调仓事件列表。
-function PortfolioDetail({ portfolio }: { portfolio: Portfolio }) {
+// 同一 key 与父组件共享缓存：这里把最新的净值/累计收益率汇总回填给父组件的 AI 登记快照。
+function PortfolioDetail({ portfolio, onNavSummary }: { portfolio: Portfolio; onNavSummary: (s: string) => void }) {
   const key = `pf:nav:${portfolio.id}:${portfolio.rebalances.length}`;
   const nav = useCachedResource<NavResult>(key, () => portfolioNav(portfolio.id));
   const option = nav.data?.option ?? null;
+
+  useEffect(() => {
+    const seriesArr = Array.isArray((option as { series?: unknown })?.series)
+      ? ((option as { series: { name?: string; data?: number[] }[] }).series)
+      : [];
+    const dates = Array.isArray((option as { xAxis?: { data?: unknown } })?.xAxis?.data)
+      ? ((option as { xAxis: { data: string[] } }).xAxis.data)
+      : [];
+    if (!dates.length) { onNavSummary(""); return; }
+    const parts: string[] = [];
+    for (const s of seriesArr) {
+      const name = typeof s.name === "string" ? s.name : "";
+      const data = Array.isArray(s.data) ? s.data : [];
+      const first = data[0];
+      const last = data[data.length - 1];
+      if (typeof first === "number" && typeof last === "number") {
+        const ret = first !== 0 ? ((last - first) / first) * 100 : null;
+        parts.push(`${name || "系列"}：起点 ${first.toFixed(3)} → 最新 ${last.toFixed(3)}${ret != null ? `（区间 ${ret > 0 ? "+" : ""}${ret.toFixed(1)}%）` : ""}`);
+      }
+    }
+    onNavSummary(
+      `区间：${dates[0]} ~ ${dates[dates.length - 1]}\n` +
+      (parts.length ? parts.join("；") : "净值序列暂缺"),
+    );
+  }, [option, onNavSummary]);
 
   return (
     <>
