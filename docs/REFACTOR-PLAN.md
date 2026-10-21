@@ -1,13 +1,17 @@
 # AlphaCopilot v2 重构方案（REFACTOR PLAN）
 
 > 决策依据：ADR-0010（agent→pi）、ADR-0011（前端 TS + 后端/数据 Python）、
-> ADR-0012（双轨产物）、ADR-0013（UI 设计系统 v1）、**ADR-0014（UI 设计系统 v2，取代 0013 §1–3）**
+> ADR-0012（双轨产物）、ADR-0013（UI 设计系统 v1）、**ADR-0014（UI 设计系统 v2，取代 0013 §1–3）**、
+> **ADR-0015（M3 三处不做：monorepo 搬迁 / 删 astock / data-service 定位）**
 > 编写：2026-10-20 · 修订：**2026-10-21** · 基准 commit：`84198c5`（main）
 >
 > **2026-10-22 进度快照**：M0 ✅ M1 ✅ M2 ✅（11/11）·
 > M3 部分完成（1/2/3/4 后端、V1/V2/V3）· M4-1 ✅ · M5-4/M5-5 ✅。
-> 未做：M3-5 monorepo 搬迁、M3-4 的 Rerun、M3-V4/V5/V6/V7、
-> M4-2~M4-5、M5-1~M5-3。**vendor 已可加载（101 个函数），但尚未接进 REST**。
+> M3 完成（1/2/3/4 全部、V1~V6）；**M3-5 与 M3-7 已取消**（ADR-0015：
+> monorepo 无收益、astock 是语义封装不是重复实现）。
+> 未做：M4-2~M4-5（tear sheet / 参数扫描 / walk-forward / 归因）、
+> M5-1~M5-3（⌘K 命令栏 / Build 模式 / 研究线）。
+> vendor 经 `/api/v1/invoke` 可调 104 个能力（给 agent）。
 >
 > **2026-10-21 修订要点**（重要，先看这个）：
 > 1. **应用后端保留 Python**，不做 TS 重写（ADR-0011 §0）——M1/M3 任务表已同步
@@ -60,7 +64,7 @@ AI native 个人投研量化工作台。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ apps/web         React 19 + Vite 6 + TS                        │
+│ frontend/        React 19 + Vite 6 + TS                        │
 │                  Lightweight Charts（K线/净值/回撤）             │
 │                  ECharts（热力图/分层/散点）                     │
 │                  block 渲染器 ×4（带 renderer 判别符）           │
@@ -68,7 +72,7 @@ AI native 个人投研量化工作台。
 └────────────────────┬────────────────────────────────────────┘
                      │ HTTP + SSE
 ┌────────────────────▼────────────────────────────────────────┐
-│ apps/server      Python 3.13 + FastAPI（**原地保留，不重写**）   │
+│ backend/         Python 3.13 + FastAPI（**原地保留，不重写**）   │
 │                  · session / message / artifact / view / page   │
 │                  · job 队列（回测等长任务）                      │
 │                  · SSE 事件流（中立事件）                        │
@@ -191,15 +195,15 @@ AI native 个人投研量化工作台。
 | M3-1 | `Run` registry（参数 + codeHash + dataAsOf + 指标 + artifacts） | ✅ | 每次回测可比较、可复现 | |
 | M3-2 | `Universe` as query（不是 localStorage 代码串） | ✅ | 改条件重算；数据变了自动更新 | |
 | M3-3 | `View` / `Page` 模型（ADR-0012） | ✅ 后端 + 页面 | 页面 = 保存的 View 集合 | |
-| M3-4 | Pin / Rerun / Diff 交互 | ⚠️ Diff+Pin 已做，**Rerun 未做** | 两个 Run 可对比差异 | |
-| M3-5 ⬜ | 迁移到 monorepo 布局（`apps/web` + `apps/server` + `data-service`）。**纯目录搬迁**，同时修所有 `Path(__file__).parents[N]` 与 `sys.path.insert` | `git log --follow` 仍可追溯；`pytest` 与 `vite build` 均绿 |
+| M3-4 | Pin / Rerun / Diff 交互 | ✅ | 两个 Run 可对比差异；同输入可重跑 | |
+| M3-5 ❌ | ~~迁移到 monorepo 布局~~ **已取消（ADR-0015）**：monorepo 的收益是多包共享/独立发版，本项目都没有；代价是全路径改写 + 358 测试重验 | — |
 | **M3-V1** ✅ | **data-service 独立 venv**（vendor 依赖 `baostock`/`xlrd`/`openpyxl` 与主环境 `mcp>=1.9`→`httpx>=0.27`、`mootdx`→`httpx<0.26` 冲突，必须环境隔离）；**`mootdx` 不装**（ADR-0011 事实 1：连财务也拿不到） | vendor 测试能在独立 venv 里跑；主环境不需装 `mootdx` |
 | **M3-V2** ✅ | Vendor `SKILL.md`（V3.10.2 / commit `29b07d2e3700`）+ `LICENSE` + `CHANGELOG.md` + `tests/` + `NOTICE` 到 `data-service/vendor/a-stock-data/`，**按 [`research/a-stock-data-v3.10.md` §7.1](research/a-stock-data-v3.10.md) 的 curl 命令钉死 commit** | `SKILL.md` 7585 行 / 91 个 python 块 / sha256 记入 NOTICE |
 | **M3-V3** ✅ | 写 loader（骨架见 [§7.4](research/a-stock-data-v3.10.md)）：抽 91 块 → AST 去示例调用 → 同 namespace exec | `list_capabilities()` 列出 87 个端点；182 定义 / 181 唯一名 |
-| **M3-V4** ⬜ | 跑上游 `tests/`（179 条离线测试，从 SKILL.md 抽代码执行） | 179 条全绿，不联网 |
-| **M3-V5** ⬜ | 两层暴露：agent 走 `/v1/capabilities` + `/v1/invoke`（87 个），页面继续走现有 curated 端点，**不重复实现「第二套 REST」** | agent 能调任意 vendor 端点；页面无回归 |
-| **M3-V6** ⬜ | `scripts/vendor-a-stock-data.sh`：下载 → 跑测试 → 绿则更新 NOTICE，红则回滚；**`vendor/` 目录只读约定**（CI 校验无本地改动） | 一条命令完成同步；CI 里 `git diff --exit-code vendor/` 绿 |
-| M3-7 ⬜ | 删除旧移植 `backend/research/astock.py`（被 vendor 替代） | `grep -r "移植自 a-stock-data"` 为空 |
+| **M3-V4** ✅ | 跑上游 `tests/`（179 条离线测试，从 SKILL.md 抽代码执行） | 179 条全绿，不联网 |
+| **M3-V5** ✅ | 两层暴露：agent 走 `/v1/capabilities` + `/v1/invoke`（87 个），页面继续走现有 curated 端点，**不重复实现「第二套 REST」** | agent 能调任意 vendor 端点；页面无回归 |
+| **M3-V6** ✅ | `scripts/vendor-a-stock-data.sh`：下载 → 跑测试 → 绿则更新 NOTICE，红则回滚；**`vendor/` 目录只读约定**（CI 校验无本地改动） | 一条命令完成同步；CI 里 `git diff --exit-code vendor/` 绿 |
+| M3-7 ❌ | ~~删除 `backend/research/astock.py`~~ **已取消（ADR-0015）**：它是语义封装层（DataUnavailable / 域名兜底 / 多源尝试），不是第二套取数。实测 vendor 子进程 0.77s vs 直连 0.32s | — |
 
 ---
 

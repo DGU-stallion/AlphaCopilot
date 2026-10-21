@@ -10,19 +10,29 @@
 产品定位：**AI native 的个人本地 A 股低频量化投研工作台**。
 确定性计算提供可信数字，agent 提供探索与表达；两者按 provenance 区分（ADR-0012）。
 
-## 结构速记（目标形态，M3 完成后）
+## 结构速记（现状 = 最终形态，ADR-0015 已取消 monorepo 搬迁）
 
 ```
-apps/
-  web/          React 19 + Vite + TS（Lightweight Charts + ECharts）
-  server/       Python 3.13 + FastAPI（session / artifact / view / page / job / SSE）
-data-service/   Python 3.13（research · duanxian · alpha），纯函数，不持状态
+frontend/       React 19 + Vite + TS（Lightweight Charts + ECharts）
+backend/        Python 3.13 + FastAPI
+  api/          session / artifact / view / page / job / SSE / runs / vendor
+  agent/        AgentProvider 契约 + PiProvider
+  research/ duanxian/ alpha/   纯函数数据与计算层（不持状态、禁框架依赖）
+data-service/   **vendor 运行时宿主**（不是数据服务）：vendor/a-stock-data
+                + 独立 venv（vendored mootdx 要 httpx<0.26，与主环境冲突）
+  src/loader.py   把 SKILL.md 的 91 个 python 块加载成可调用能力
+  src/worker.py   子进程 worker（stdin/stdout JSON 协议）
 workspace/      agent 可写区（pi 的 cwd）+ runs/<run_id>/
   .pi/mcp.json  Pi 的项目级 MCP 配置（exposure 必须为 direct）
   .pi-sessions/ Pi session JSONL
-skills/         白名单内的 SKILL.md（约 30 个；不是 88 个全量）
+skills/         白名单内的 SKILL.md（13 个；不是 88 个全量）
 docs/           REFACTOR-PLAN.md · PLAN.md · TASKS.md · adr/ · research/
+scripts/        vendor-a-stock-data.sh（vendor 同步，只读区靠它更新）
 ```
+
+**为什么没有 apps/web + apps/server**（ADR-0015）：monorepo 的收益是多包共享
+与独立发版，本项目一个前端一个后端、前后端不同语言（不存在共享代码）、
+一起部署——收益为零，代价是全路径改写 + 全部测试重验。
 
 **后端是 Python，不是 TypeScript**（ADR-0011 §0，2026-10-21 修订）。
 Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共享类型层，
@@ -30,19 +40,28 @@ Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共
 
 **迁移期（M1–M2）目录名保持 `backend/` + `frontend/` 不变**，M3 才搬。
 
-分层职责：
+分层职责（四层，不要混）：
 
-- `research/` `duanxian/` `alpha/`：纯函数数据与计算层，**禁加框架依赖**，不持状态
-- `apps/server`：唯一持有产品数据库的角色；唯一与 agent 运行时耦合的角色；
+- `backend/{research,duanxian,alpha}`：纯函数数据与计算层，**禁加框架依赖**，不持状态。
+  其中 `research/astock.py` 是**取数的语义封装层**（`DataUnavailable` / 域名兜底 /
+  多源尝试），不是「第二套实现」——见 ADR-0015 决定 1
+- `backend/api`：唯一持有产品数据库的角色；唯一与 agent 运行时耦合的角色；
   同进程直接调 `alpha.*` / `research.*`
-- `apps/web`：只读 API，不读 agent 会话文件
+- `data-service`：**只做 vendor 托管**（SKILL.md + 独立 venv + loader/worker）。
+  不承载我们的业务计算。它的存在理由是依赖隔离，不是架构设计（ADR-0015 决定 3）
+- `frontend`：只读 API，不读 agent 会话文件
+
+**两套取数入口的分工**（ADR-0015）：
+- 页面高频路径 → `research/astock.py`（实测 0.32s/次）
+- agent 广度探索 → `/api/v1/invoke` 调 vendor 的 104 个能力
+  （实测 0.77s/次：进程 0.01s + vendor load 0.36s + 网络；agent 一轮本身好几秒，可接受）
 
 ## 硬规则
 
 1. 从 `main` 拉分支 `feat/<slug>` → squash PR，conventional commits
 2. **产品真源在我们的数据库**。agent 的 session 文件是它的内部记忆，前端永不读取；
-   `apps/server` 负责把消息与 artifact 落库
-3. **agent 不直接写数据库**：写库一律经 `apps/server` 校验（artifact manifest /
+   `backend/api` 负责把消息与 artifact 落库
+3. **agent 不直接写数据库**：写库一律经 `backend/api` 校验（artifact manifest /
    provenance / page spec 白名单）
 4. **重活不进 agent 的 turn**：长任务走 job 队列，agent「写代码 → 提交 job → 读结果」
 5. **每个 artifact 必须带 provenance**（ADR-0012）：
@@ -107,15 +126,23 @@ Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共
 ## 命令
 
 ```bash
-# 重构期（M1–M2）：后端是 Python，没有第二套后端
-cd backend && pytest -q                    # Python 测试（含 PiProvider 契约测试）
-cd backend && ruff check .                 # lint
+# 后端 + 数据与计算层（Python）
+cd backend && python3 -m pytest -q          # 358 passed
+cd backend && ruff check .
+
+# 前端（TS）
 cd frontend && npx tsc --noEmit && npx vitest --run && npx vite build
 
-# 目标形态（M3+）
-pytest -q apps/server data-service          # 后端与数据层仍是 Python
-pnpm --prefix apps/web build
+# vendor（独立 venv，M3-V1）
+cd data-service && .venv/bin/python -m pytest tests -q                 # loader/worker
+cd data-service && .venv/bin/python -m pytest vendor/a-stock-data/tests -q   # 上游 179 条
+
+# vendor 同步（唯一合法的更新方式，vendor/ 是只读区）
+./scripts/vendor-a-stock-data.sh            # 加 DRY_RUN=1 只演练
 ```
+
+**顺序说明**：先跑 backend 再跑 frontend —— 后端改动（API 契约）会让前端 tsc
+先红，反过来不会。
 
 ## 数据层冻结（2026-10-21 起，M0-5）
 
