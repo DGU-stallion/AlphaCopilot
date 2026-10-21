@@ -62,6 +62,11 @@ RENDERER_BY_FN: dict[str, str] = {
     "correlation.overlay": RENDERER_ECHARTS,
     "correlation.matrix": RENDERER_ECHARTS,
     "correlation.rolling": RENDERER_ECHARTS,
+    # M4-1 因子实验室
+    "factorlab.ic_series": RENDERER_LWC,            # IC 时间序列
+    "factorlab.ic_decay": RENDERER_LWC,             # 衰减曲线（横轴为期限 t+N）
+    "factorlab.quantile_returns": RENDERER_ECHARTS,  # 分层收益柱状图
+    "factorlab.quantile_heatmap": RENDERER_ECHARTS,  # 分层收益热力图
 }
 
 

@@ -9,6 +9,7 @@ import { MyReports } from "@/pages/MyReports";
 import { Watchlist } from "@/pages/Watchlist";
 import { Journal } from "@/pages/Journal";
 import { Settings } from "@/pages/Settings";
+import { Runs } from "@/pages/Runs";
 import { ProtoReview } from "@/pages/__proto__/ProtoReview";
 import { ProtoShell } from "@/pages/__proto__/ProtoShell";
 import { ProtoApp } from "@/pages/__proto__/ProtoApp";
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
       // 个人与系统
       { path: "/journal", element: <Journal /> },
       { path: "/settings", element: <Settings /> },
+      { path: "/runs", element: <Runs /> },
       { path: "*", element: <Navigate to="/daily-review" replace /> },
     ],
   },

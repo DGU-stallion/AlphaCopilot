@@ -401,3 +401,67 @@ export const api = {
   backtest: (days: number) => get<BacktestData>(`/backtest?days=${days}`),
   backtestRefresh: (days: number) => request<BacktestData>(`/backtest/refresh?days=${days}`, "POST"),
 };
+
+// ---------- Run registry / View（M3-1，见 backend/api/runs.py）----------
+// 注意 request() 已经解包一层 payload.data，泛型里的就是数据本身（别多取一层）。
+
+/** Run：一次确定性计算的完整可复现要素（同组 params/codeHash/dataAsOf 产多个 artifact） */
+export interface RunRow {
+  id: string;
+  kind: string;
+  params: Record<string, unknown>;
+  code_hash: string;
+  data_as_of: string;
+  metrics: Record<string, number>;
+  artifact_ids: string[];
+  created_at: number;
+}
+
+/** 两个 Run 的差异：只有一侧有的指标 delta 为 null —— 不是 0（严谨约定，误读 0 为「没变化」） */
+export interface RunDiff {
+  a: string;
+  b: string;
+  params: Record<string, { a: unknown; b: unknown }>;
+  metrics: Record<string, { a: number | null; b: number | null; delta: number | null }>;
+}
+
+/** View：保存的「看什么」（回测该怎么跑、看哪段数据），页面 = View 的集合 */
+export interface ViewRow {
+  id: string;
+  name: string;
+  kind: string;
+  params: Record<string, unknown>;
+  pinned: boolean;
+  last_run_id: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CreateViewIn {
+  name: string;
+  kind: string;
+  params?: Record<string, unknown>;
+  last_run_id?: string;
+}
+
+export const runsApi = {
+  runs: (opts?: { kind?: string; data_as_of?: string; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (opts?.kind) q.set("kind", opts.kind);
+    if (opts?.data_as_of) q.set("data_as_of", opts.data_as_of);
+    if (opts?.limit) q.set("limit", String(opts.limit));
+    const qs = q.toString();
+    return get<RunRow[]>(`/runs${qs ? `?${qs}` : ""}`);
+  },
+  run: (rid: string) => get<RunRow>(`/runs/${encodeURIComponent(rid)}`),
+  runDiff: (a: string, b: string) =>
+    get<RunDiff>(`/runs/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`),
+  views: () => get<ViewRow[]>("/views"),
+  pinnedViews: () => get<ViewRow[]>("/views/pinned"),
+  createView: (body: CreateViewIn) =>
+    request<{ id: string }>("/views", "POST", body),
+  pinView: (vid: string, pinned: boolean) =>
+    request<{ id: string; pinned: boolean }>(`/views/${encodeURIComponent(vid)}/pin`, "POST", { pinned }),
+  deleteView: (vid: string) =>
+    request<{ ok: boolean }>(`/views/${encodeURIComponent(vid)}`, "DELETE"),
+};

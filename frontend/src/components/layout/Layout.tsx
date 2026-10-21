@@ -3,12 +3,13 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import {
   Moon, Sun, ChevronsLeft, ChevronsRight, CandlestickChart, Cog,
   Activity, Globe, Star, FileText, TrendingDown, GitCompare, Briefcase,
-  NotebookPen, Sparkles, PanelRightClose, ArrowUpDown,
+  NotebookPen, Sparkles, PanelRightClose, ArrowUpDown, Clock3, History,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { AiPageProvider } from "@/lib/ai-page";
+import { DataAsOfProvider, useDataAsOfValue, formatAsOf } from "@/lib/data-asof";
 import { AiConsole } from "@/components/ai/AiConsole";
 import { currentCaliber, setCaliber } from "@/theme/usePalette";
 import { ROW } from "@/theme/tokens";
@@ -47,6 +48,7 @@ const RESEARCH_NAV = [
 ];
 const QUANT_NAV = [
   { to: "/quant-backtest", icon: TrendingDown, label: "回测" },
+  { to: "/runs", icon: History, label: "Run 记录" },
   { to: "/correlation", icon: GitCompare, label: "相关性分析" },
   { to: "/portfolios", icon: Briefcase, label: "模拟组合" },
 ];
@@ -54,6 +56,23 @@ const SYSTEM_NAV = [
   { to: "/journal", icon: NotebookPen, label: "交易日志" },
   { to: "/settings", icon: Cog, label: "接入 AI" },
 ];
+
+/** 底栏的数据时点（M5-4）：页面报告什么，这里就显示什么。 */
+function AsOfBadge() {
+  const info = useDataAsOfValue();
+  const { text, stale } = formatAsOf(info);
+  if (!info) return <span className="text-muted-foreground/60">as-of —</span>;
+  return (
+    <span
+      className={cn("flex items-center gap-1", stale ? "text-[hsl(var(--warning))]" : "text-muted-foreground")}
+      title={stale ? "这不是今天取到的数据，注意时效" : "数据时点"}
+    >
+      <Clock3 className="h-3 w-3" />
+      {/* 数字必须等宽：时间戳跳动会让它旁边的按钮跟着位移 */}
+      <span style={{ fontFamily: "var(--font-mono, monospace)" }}>as-of {text}</span>
+    </span>
+  );
+}
 
 const NAV_W = { open: 176, closed: 52 };
 const AGENT_W = { open: 360, closed: 44 };
@@ -105,6 +124,7 @@ export function Layout() {
     );
 
   return (
+    <DataAsOfProvider>
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       {/* ---------------- 顶栏 48 ---------------- */}
       <header
@@ -233,6 +253,7 @@ export function Layout() {
         style={{ height: ROW.compact }}
       >
         <span>本地 · data-service</span>
+        <AsOfBadge />
         <button
           onClick={flipCaliber}
           className="flex items-center gap-1 rounded-[2px] px-1 py-0.5 transition-colors hover:bg-[hsl(var(--muted))] hover:text-foreground"
@@ -244,6 +265,7 @@ export function Layout() {
         <span className="ml-auto">v2 · M2</span>
       </footer>
     </div>
+    </DataAsOfProvider>
   );
 }
 

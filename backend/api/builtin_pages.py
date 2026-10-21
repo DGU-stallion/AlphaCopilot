@@ -18,6 +18,7 @@ from typing import Any
 
 import alpha.backtest_page  # noqa: F401 —— 触发 backtest.* 注册
 import alpha.factor  # noqa: F401 —— 触发 correlation.* 注册
+import alpha.factor_lab  # noqa: F401 —— 触发 factorlab.* 注册
 from api.store import Store
 
 CORRELATION_SPEC: dict[str, Any] = {

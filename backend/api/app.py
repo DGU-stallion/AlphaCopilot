@@ -28,8 +28,10 @@ from api.business import build_business_router
 from api.jobs import JobQueue
 from api.market import build_market_router
 from api.pages import build_pages_router
+from api.runs import build_runs_router
 from api.session_manager import SessionManager
 from api.store import Store
+from api.universes import build_universe_router  # M3-2：Universe as query
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -259,5 +261,7 @@ def create_app(
     app.include_router(router)
     app.include_router(build_pages_router(store))
     app.include_router(build_business_router(store))
+    app.include_router(build_runs_router(store))  # M3-1：Run registry + View API
     app.include_router(build_market_router())
+    app.include_router(build_universe_router())  # M3-2：Universes as query
     return app

@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { Num } from "@/components/Num";
 import { RefreshCw, Gauge, ArrowDownUp, TrendingUp, TrendingDown, Flame, BarChart3 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { getCache, setCache, hasCache } from "@/lib/cache";
 import { LimitUpStats } from "./LimitUpStats";
 import { useAiPage } from "@/lib/ai-page";
+import { useDataAsOf } from "@/lib/data-asof";
 
 // A股红涨绿跌。全球市场（美股/港股指数）**也沿用红涨**——与整个看板及东财等中国平台一致，
 // A 股惯例：红涨绿跌。与国际绿涨惯例相反，是有意选择，全站必须一致，勿改。
@@ -147,6 +148,21 @@ export function DailyReview() {
       (emotion?.max_boards != null ? `\n昨日连板：最高 ${emotion.max_boards} 板、连板 ${emotion.lianban_count} 家` : ""),
     suggestions: ["今天大盘怎么走", "哪些板块资金在流入", "连板梯队说明什么"],
   });
+
+  // M5-4：把本页数据的真实时点报给底栏。
+  // 用实时打板情绪的 date/as_of（这是唯一带精确到分钟时点的接口）；
+  // 取不到就报「有数据但时点未知」，而不是装作没问题 —— 未知的时间戳
+  // 和不显示时间戳一样危险。
+  // fetchedAt 必须**只在数据真变化时更新**，不能用 Date.now() 写在渲染体里：
+  // 那样每次渲染都是新值 → useDataAsOf 的 effect 每次都跑 → setState → 再渲染
+  // → 无限循环。用 liveEmo 对象本身的引用变化当触发器。
+  const asOfFetchedAt = useRef(Date.now());
+  useEffect(() => { asOfFetchedAt.current = Date.now(); }, [liveEmo]);
+  useDataAsOf(
+    liveEmo?.available && liveEmo.date
+      ? { dataAsOf: liveEmo.date, fetchedAt: asOfFetchedAt.current, label: "打板情绪快照" }
+      : { dataAsOf: "", fetchedAt: 0, label: "盘面数据" },
+  );
 
   return (
     <div>

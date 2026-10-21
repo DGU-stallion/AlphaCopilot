@@ -92,6 +92,38 @@ CREATE TABLE IF NOT EXISTS job (
     updated_at  REAL NOT NULL
 );
 
+-- M3-1 Run registry：一次确定性计算的**全部可复现要素**。
+-- 为什么不是「只留 runs/ 目录」：对比两个 Run 要查指标、按 dataAsOf 过滤、
+-- 按 codeHash 判断「是不是同一份策略代码」——这些都要可查询，扫目录做不到。
+CREATE TABLE IF NOT EXISTS run (
+    id           TEXT PRIMARY KEY,
+    kind         TEXT NOT NULL,                 -- backtest / factor / correlation ...
+    params       TEXT NOT NULL DEFAULT '{}',    -- 输入参数 JSON
+    -- 产出这份结果的代码指纹。同一个策略改一个字就该是新 Run，
+    -- 否则「可复现」是空话（你不知道当时跑的是哪版代码）。
+    code_hash    TEXT NOT NULL DEFAULT '',
+    -- 数据截止时点。早上的数字与下午的数字必须能区分（ADR-0012）。
+    data_as_of   TEXT NOT NULL DEFAULT '',
+    metrics      TEXT NOT NULL DEFAULT '{}',    -- 指标 JSON（结构化，前端直接读）
+    artifact_ids TEXT NOT NULL DEFAULT '[]',    -- 产出的 artifact id 列表 JSON
+    created_at   REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_run_created ON run(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_run_kind_asof ON run(kind, data_as_of);
+
+-- M3-3 View：保存的「看什么」。页面 = View 的集合（ADR-0012）。
+CREATE TABLE IF NOT EXISTS view (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    kind        TEXT NOT NULL,                  -- correlation / backtest / factor ...
+    params      TEXT NOT NULL DEFAULT '{}',
+    pinned      INTEGER NOT NULL DEFAULT 0,     -- 0/1：Pin = 「我天天要看这个」
+    last_run_id TEXT,                           -- 上次用这个 View 跑出的 Run（重跑/对比用）
+    created_at  REAL NOT NULL,
+    updated_at  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_view_pinned ON view(pinned, updated_at DESC);
+
 CREATE TABLE IF NOT EXISTS doc (
     id          TEXT PRIMARY KEY,
     title       TEXT NOT NULL,
@@ -463,6 +495,157 @@ class JobRepo:
         return d
 
 
+class RunRepo:
+    """Run registry（M3-1）：一次确定性计算的完整可复现要素。
+
+    ADR-0012：每个 artifact 带 provenance；Run 是 provenance 的**上位概念** ——
+    一次计算产多个 artifact，它们共享同一组 params / codeHash / dataAsOf。
+    """
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self.conn = conn
+
+    def create(
+        self,
+        *,
+        kind: str,
+        params: dict[str, Any] | None = None,
+        code_hash: str = "",
+        data_as_of: str = "",
+        metrics: dict[str, Any] | None = None,
+        artifact_ids: list[str] | None = None,
+    ) -> str:
+        rid = _new_id("run")
+        self.conn.execute(
+            "INSERT INTO run "
+            "(id, kind, params, code_hash, data_as_of, metrics, artifact_ids, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (
+                rid, kind,
+                json.dumps(params or {}, ensure_ascii=False),
+                code_hash, data_as_of,
+                json.dumps(metrics or {}, ensure_ascii=False),
+                json.dumps(artifact_ids or [], ensure_ascii=False),
+                time.time(),
+            ),
+        )
+        self.conn.commit()
+        return rid
+
+    def _row(self, row: sqlite3.Row | None) -> dict[str, Any] | None:
+        if row is None:
+            return None
+        d = dict(row)
+        d["params"] = json.loads(d.get("params") or "{}")
+        d["metrics"] = json.loads(d.get("metrics") or "{}")
+        d["artifact_ids"] = json.loads(d.get("artifact_ids") or "[]")
+        return d
+
+    def get(self, rid: str) -> dict[str, Any] | None:
+        return self._row(self.conn.execute("SELECT * FROM run WHERE id = ?", (rid,)).fetchone())
+
+    def list_recent(
+        self, *, kind: str | None = None, data_as_of: str | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """按时间倒序。kind / data_as_of 可过滤 —— 「只看今天数据算出来的」是常见诉求。"""
+        sql = "SELECT * FROM run"
+        where: list[str] = []
+        args: list[Any] = []
+        if kind:
+            where.append("kind = ?")
+            args.append(kind)
+        if data_as_of:
+            where.append("data_as_of = ?")
+            args.append(data_as_of)
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        args.append(limit)
+        return [self._row(r) for r in self.conn.execute(sql, args).fetchall()]  # type: ignore[misc]
+
+    def diff(self, a_id: str, b_id: str) -> dict[str, Any]:
+        """两个 Run 的差异（M3-4）：参数变化 + 指标 delta。
+
+        约定：只有一侧有的指标 delta 为 None（**不是 0**）——
+        delta=0 会让人以为「没变化」，而实际是「这一侧根本没这个指标」。
+        """
+        a = self.get(a_id)
+        b = self.get(b_id)
+        if a is None:
+            raise KeyError(a_id)
+        if b is None:
+            raise KeyError(b_id)
+
+        params = {
+            k: {"a": a["params"].get(k), "b": b["params"].get(k)}
+            for k in set(a["params"]) | set(b["params"])
+            if a["params"].get(k) != b["params"].get(k)
+        }
+        metrics: dict[str, Any] = {}
+        for k in set(a["metrics"]) | set(b["metrics"]):
+            av, bv = a["metrics"].get(k), b["metrics"].get(k)
+            both = isinstance(av, (int, float)) and isinstance(bv, (int, float))
+            metrics[k] = {
+                "a": av, "b": bv,
+                "delta": (bv - av) if both else None,
+            }
+        return {"a": a_id, "b": b_id, "params": params, "metrics": metrics}
+
+
+class ViewRepo:
+    """View：保存的「看什么」（M3-3）。页面 = View 的集合。"""
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self.conn = conn
+
+    def create(
+        self, *, name: str, kind: str, params: dict[str, Any] | None = None,
+        last_run_id: str | None = None,
+    ) -> str:
+        vid = _new_id("view")
+        now = time.time()
+        self.conn.execute(
+            "INSERT INTO view "
+            "(id, name, kind, params, pinned, last_run_id, created_at, updated_at) "
+            "VALUES (?,?,?,?,0,?,?,?)",
+            (vid, name, kind, json.dumps(params or {}, ensure_ascii=False), last_run_id, now, now),
+        )
+        self.conn.commit()
+        return vid
+
+    def _row(self, row: sqlite3.Row | None) -> dict[str, Any] | None:
+        if row is None:
+            return None
+        d = dict(row)
+        d["params"] = json.loads(d.get("params") or "{}")
+        d["pinned"] = bool(d.get("pinned"))
+        return d
+
+    def get(self, vid: str) -> dict[str, Any] | None:
+        return self._row(self.conn.execute("SELECT * FROM view WHERE id = ?", (vid,)).fetchone())
+
+    def list_all(self) -> list[dict[str, Any]]:
+        rows = self.conn.execute("SELECT * FROM view ORDER BY updated_at DESC").fetchall()
+        return [self._row(r) for r in rows]  # type: ignore[misc]
+
+    def list_pinned(self) -> list[dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM view WHERE pinned = 1 ORDER BY updated_at DESC"
+        ).fetchall()
+        return [self._row(r) for r in rows]  # type: ignore[misc]
+
+    def set_pinned(self, vid: str, pinned: bool) -> None:
+        self.conn.execute(
+            "UPDATE view SET pinned = ?, updated_at = ? WHERE id = ?",
+            (1 if pinned else 0, time.time(), vid),
+        )
+        self.conn.commit()
+
+    def delete(self, vid: str) -> None:
+        self.conn.execute("DELETE FROM view WHERE id = ?", (vid,))
+        self.conn.commit()
+
+
 class DocRepo:
     """文档库聚合：doc。"""
 
@@ -644,6 +827,8 @@ class Store:
         self.stock_pool = StockPoolRepo(self.conn)
         self.journal = JournalRepo(self.conn)
         self.portfolio = PortfolioRepo(self.conn)
+        self.runs = RunRepo(self.conn)
+        self.views = ViewRepo(self.conn)
 
     def migrate(self) -> None:
         """建表 + 增量迁移（幂等）。这是唯一的迁移入口。"""

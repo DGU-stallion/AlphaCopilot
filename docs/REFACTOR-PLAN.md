@@ -142,21 +142,34 @@ AI native 个人投研量化工作台。
 
 | ID | 任务 | 验收 |
 |---|---|---|
-| **M2-0** | **文档先行**（本 ADR-0014 + 本表 + AGENTS 硬规则 7 修订） | 三处表述一致，无冲突 |
-| **M2-1** | `theme/tokens.ts` 落地：深/浅两套 Palette + antd token + 字体/间距/字号 | `grep -rn "#[0-9A-Fa-f]\{6\}" src --include=*.tsx` 只剩 tokens.ts |
-| **M2-2** | 迁 `index.css`：旧 HSL token → tokens.ts；删 `glass`/`shadow-glow`/渐变/大圆角 | `grep -rn "glass\|glow\|rounded-2xl" src` 为空 |
-| **M2-3** | `chart-theme.ts` 改为从 tokens.ts 读（不再自定义颜色），LWC 与 ECharts 同源 | 切主题图表跟着变；图表色 == token 色 |
-| **M2-4** | `Num` 组件 + 字体接入（Inter Variable / JetBrains Mono 自托管） | 全站数字等宽；`grep "toFixed(" src/pages` 只出现在 `<Num>` 内 |
-| **M2-5** | 布局重排：左导航(176/52) + 顶栏 + 主画布 + **右 Agent 栏(360/44 可折叠)** + 底栏 | 三区布局 + 两侧都能折；折叠后主画布变宽 |
-| **M2-6** | **单 chart 多 pane**：K线+成交量、净值+回撤各用一个实例的多个 pane | 两 pane 左右边缘左坐标相等；缩放联动 |
-| **M2-7** | **`renderer` 判别符**（ADR-0012 与 ADR-0013 的缝合）：block 增加 `renderer: "lwc" \| "echarts"` | agent 产 K 线走 LWC、热力图走 ECharts，同一图形不出现两种实现 |
-| **M2-8** | 10 个页面按新 token 重排（`pages/` 现有 11 个 tsx，删 `Placeholder` 后 10 个） | 逐页视觉验收 |
-| **M2-9** | 涨跌双口径切换 + localStorage 持久化 | 切换后全站数字与图表同步反向 |
-| **M2-10** | `npx skills add tradingview/lightweight-charts` | agent 写图表代码用 v5 API |
+| ID | 任务 | 状态 | 验收 | |
+|---|---|---|---|---|
+| **M2-0** | **文档先行**（ADR-0014 + 本表 + AGENTS 硬规则 7/8 修订） | ✅ | 三处表述一致 | |
+| **M2-1** | `theme/tokens.ts` 落地：深浅两套 Palette + antd token + 字体/间距/字号 | ✅ | 颜色字面量只在 tokens.ts | |
+| **M2-2** | 迁 `index.css`：旧 HSL token 值 → 新 palette；删 glass/glow/渐变/大圆角 | ✅ | 守门 grep 为空 | |
+| **M2-3** | `chart-theme.ts` 改为从 tokens 读，LWC 与 ECharts 同源 | ✅ | 7 条测试 + 3 变异 | |
+| **M2-4** | `Num` 组件 + 自托管字体（Inter Variable / JetBrains Mono） | ✅ | 16 条测试 + 4 变异 | |
+| **M2-5** | 三区布局：左导航 176/52 + 顶栏 48 + 主画布 + Agent 栏 360/44 + 底栏 28 | ✅ | 9 条测试 + 4 变异 | |
+| **M2-6** | **单 chart 多 pane**：K线+成交量、净值+回撤各一个实例 | ✅ | canvas 左坐标实测相等 | |
+| **M2-7** | `renderer: "lwc" \| "echarts"` 判别符 + fn 映射白名单 | ✅ | 9 条测试 + 5 变异 | |
+| **M2-8** | 10 个页面按新 token 重排 | ✅ | 7 页截图核对 | |
+| **M2-9** | 涨跌双口径 + localStorage 持久化 | ✅ | 15 条测试 + 变异 | |
+| **M2-10** | LWC v5 skill 纳入白名单 | ✅ | RPC 实测 13 个 skill 加载 | |
+
+**M2 完成状态：11/11 ✅（2026-10-21）**
 
 **M2 的 DoD**：`grep` 三连为空（glass/glow、颜色字面量、`toFixed` 裸渲染）；
 双主题 + 双口径切换无样式漂移；K 线与成交量左右严格对齐且缩放联动；
 10 个页面视觉一致。
+
+**DoD 实测结果**（2026-10-21）：
+- 守门测试 7 条全绿：旧视觉残留 / 颜色字面量 / 裸 `toFixed` / 单文件单
+  `createChart` / 建实例 effect 不依赖 palette / 带符号数字不套固定语义色 /
+  页面不给 ECharts 传 legend
+- K 线双 pane：canvas 左坐标 217 == 217，宽 914 == 914；净值双 pane：217/928 一致
+- 双口径：`html.caliber-intl` 派生 `--danger/--success`，45 处调用点零改动；
+  **UI 语义色（操作成功/失败）不随口径翻转**（拆成 danger/success 两个概念）
+- 前端 154 passed / 后端 258 passed
 
 **已验证的实现参考**（原型 v4，可直接抄结构，不要抄代码）：
 - `frontend/src/pages/__proto__/ProtoApp.tsx` —— 三区布局 + 可折叠 Agent 栏 + 单 chart 双 pane

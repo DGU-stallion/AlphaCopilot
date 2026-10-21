@@ -13,6 +13,8 @@ Job 生命周期（PLAN §Job 契约）：queued → running → succeeded(run_i
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import inspect
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -131,6 +133,22 @@ class JobQueue:
             # 失败时不该再等成功回调
             self._on_complete.pop(jid, None)
 
+    def _trading_dates(self, closes: list[float], *, symbol: str) -> list[str]:
+        """从数据源取真实交易日，长度与 closes 对齐。
+
+        为什么需要这一步：调用方（agent / 前端）往往只给收盘价序列。
+        缺日期时若拿索引占位，"119" 会被当日期写进 provenance —— 那是假的时间点。
+        所以这里按代码取最近 N 根日线，用它们的真实日期。
+        """
+        if not symbol:
+            return []
+        try:
+            from research import astock
+            bars = astock.kline(symbol, category=4, offset=len(closes))
+        except Exception:  # noqa: BLE001
+            return []
+        return [str(b["datetime"]) for b in bars][-len(closes):]
+
     def _compute_and_write(self, jid: str, params: dict[str, Any]) -> dict[str, Any]:
         """跑回测 + 产净值/回撤图 artifact + manifest，返回 {run_id, metrics}。"""
         closes = [float(x) for x in params.get("closes", [])]
@@ -138,7 +156,23 @@ class JobQueue:
             raise ValueError("closes 至少 2 个点")
         fast = int(params.get("fast", 20))
         slow = int(params.get("slow", 60))
-        dates = params.get("dates") or [str(i) for i in range(len(closes))]
+        # 没有真实交易日历时，**不要**用索引占位（"119" 会被当成日期写进
+        # provenance，让「数据时点」显示成一个假的时间点）。
+        # 正确做法是从数据源取真实交易日；取不到就直接失败 ——
+        # provenance 的 dataAsOf 是必填的（api/artifacts.py 会拒收空值），
+        # 而「不知道数据是哪天的」本来就不该产出一个声称可复现的 artifact。
+        symbol = str(params.get("symbol") or "")
+        dates = params.get("dates") or self._trading_dates(closes, symbol=symbol)
+        if not dates:
+            # 拿不到真实交易日历（合成数据 / 无代码 / 数据源不可用）时，
+            # 用**明确标注为合成**的日期序列，而不是索引数字：
+            #   - provenance 的 dataAsOf 必填（api/artifacts.py 会拒空值），
+            #     所以不能留空；
+            #   - 但也不能写 "119" 冒充日期。
+            # 合成序列形如 SYNTHETIC-0001，任何人看到都知道这不是真实交易日。
+            dates = [f"SYNTHETIC-{i + 1:04d}" for i in range(len(closes))]
+        if len(dates) != len(closes):
+            raise ValueError(f"交易日历长度 {len(dates)} 与收盘价 {len(closes)} 不一致")
         res = bt.backtest_golden_cross(closes, fast=fast, slow=slow, dates=dates)
 
         run_dir = self._ws / "runs" / f"job-{jid}"
@@ -164,7 +198,7 @@ class JobQueue:
             "kind": "deterministic",
             "fn": "alpha.backtest.backtest_golden_cross",
             "params": {"fast": fast, "slow": slow},
-            "dataAsOf": str(dates[-1]) if dates else "",
+            "dataAsOf": str(dates[-1]),
         }
         manifest = {
             "run_id": f"job-{jid}",
@@ -183,7 +217,39 @@ class JobQueue:
         (run_dir / "manifest.json").write_text(
             json.dumps(manifest, ensure_ascii=False), encoding="utf-8"
         )
-        return {"run_id": f"job-{jid}", "run_dir": str(run_dir), "metrics": res.metrics}
+
+        # Run registry（M3-1）：同一组 params / codeHash / dataAsOf 的一次确定性计算。
+        # manifest 只描述「这次产出了哪些文件」；Run 回答的是「这些数字怎么算出来的、
+        # 能不能复现、能不能与另一次比较」。没有留档，「可复现」就只是口头承诺。
+        code_hash = self._code_hash(bt)
+        rid = self._store.runs.create(
+            kind="backtest",
+            params={"fast": fast, "slow": slow, "symbol": params.get("symbol", "")},
+            code_hash=code_hash,
+            data_as_of=str(dates[-1]),
+            metrics=res.metrics,
+            artifact_ids=[a["id"] for a in manifest["artifacts"]],
+        )
+        return {
+            "run_id": f"job-{jid}",
+            # registry 的 run id：session 事件回传、前端「打开这次留档」都用它。
+            "registry_run_id": rid,
+            "code_hash": code_hash,
+            "run_dir": str(run_dir),
+            "metrics": res.metrics,
+        }
+
+    @staticmethod
+    def _code_hash(bt_mod: Any) -> str:
+        """产出指标的策略代码指纹，短 hash 直接入库 / 展示。
+
+        为什么是**整个 backtest 模块**而不是单个函数：指标的口径是
+        ma / golden_cross_signal / backtest_golden_cross 三者合力的结果，
+        改任何一个信号辅助函数都会改变指标值 —— 那就必须是新 Run。
+        同一策略代码改了一个字，「可复现」立刻变空话，所以拿 hash 说真话。
+        """
+        src = inspect.getsource(bt_mod)
+        return hashlib.sha256(src.encode("utf-8")).hexdigest()[:12]
 
     # ---- SSE 订阅 ----
     def subscribe(self, jid: str, last_id: int | None = None) -> asyncio.Queue:
