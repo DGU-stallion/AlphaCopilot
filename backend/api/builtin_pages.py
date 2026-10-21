@@ -38,9 +38,13 @@ CORRELATION_SPEC: dict[str, Any] = {
         {"name": "range", "type": "date_range", "label": "区间", "default": "1y"},
     ],
     "blocks": [
-        {"kind": "chart", "span": 2, "analysis_ref": {"fn": "correlation.overlay"}},
-        {"kind": "chart", "span": 1, "analysis_ref": {"fn": "correlation.matrix"}},
-        {"kind": "chart", "span": 1, "analysis_ref": {"fn": "correlation.rolling"}},
+        # M2-7：renderer 由服务端映射裁决（correlation.* 全族为 ECharts option，ADR-0012）。
+        {"kind": "chart", "span": 2, "renderer": "echarts",
+         "analysis_ref": {"fn": "correlation.overlay"}},
+        {"kind": "chart", "span": 1, "renderer": "echarts",
+         "analysis_ref": {"fn": "correlation.matrix"}},
+        {"kind": "chart", "span": 1, "renderer": "echarts",
+         "analysis_ref": {"fn": "correlation.rolling"}},
     ],
     "refresh": {"mode": "manual"},
 }
@@ -61,8 +65,12 @@ BACKTEST_SPEC: dict[str, Any] = {
     ],
     "blocks": [
         {"kind": "metric", "span": 3, "analysis_ref": {"fn": "backtest.metrics"}},
-        {"kind": "chart", "span": 2, "analysis_ref": {"fn": "backtest.equity"}},
-        {"kind": "chart", "span": 1, "analysis_ref": {"fn": "backtest.drawdown"}},
+        # M2-7：净值/回撤是金融时间序列（ADR-0014 §6），ADR-0012 裁决产 LWC 输入。
+        # payload 现仍为 ECharts option，换 LWC 输入属 M2-6/M2-8 范围；renderer 先行表态。
+        {"kind": "chart", "span": 2, "renderer": "lwc",
+         "analysis_ref": {"fn": "backtest.equity"}},
+        {"kind": "chart", "span": 1, "renderer": "lwc",
+         "analysis_ref": {"fn": "backtest.drawdown"}},
     ],
     "refresh": {"mode": "manual"},
 }

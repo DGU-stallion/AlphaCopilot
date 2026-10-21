@@ -147,3 +147,30 @@ describe("禁用的旧视觉残留（ADR-0013 §5）", () => {
     ).toEqual([]);
   });
 });
+
+describe("带符号的数字不能被固定语义类包裹", () => {
+  it("不得用 text-danger / text-success 包 <Num pct>（与按符号上色打架）", () => {
+    // 抓到的真实 bug：`最好 <b className="text-success"><Num pct inheritColor/>`
+    // 「最好」被当成「好=绿」，但 A 股口径下正收益是红 —— 于是 +24.12% 显示成绿色，
+    // 而同一屏其他地方的正收益是红的。用户读到的是「同一类事实两种颜色」。
+    //
+    // 正确做法：pct 已经有按符号上色，不要再套固定语义类。
+    // 这条测试用一个结构性规则替代「靠人眼看截图」。
+    const offenders: string[] = [];
+    for (const f of prodFiles()) {
+      const rel = f.rel.replace(/\\/g, "/");
+      if (rel.includes("__proto__")) continue;
+      const lines = f.src.split("\n");
+      lines.forEach((line, i) => {
+        const hasFixed = /text-(danger|success)[^\n]*<Num/.test(line);
+        const hasPct = /<Num[^/]*\bpct\b/.test(line);
+        if (hasFixed && hasPct) offenders.push(`${rel}:${i + 1}: ${line.trim().slice(0, 90)}`);
+      });
+    }
+    expect(
+      offenders,
+      "带符号数值不要用固定语义类包裹（Num 的 pct 会按符号上色，两者会打架）：\n" +
+        offenders.join("\n"),
+    ).toEqual([]);
+  });
+});

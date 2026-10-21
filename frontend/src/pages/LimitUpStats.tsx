@@ -185,8 +185,12 @@ export function LimitUpStats() {
                   <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-dashed border-border pt-2 text-[12px] text-muted-foreground">
                     <span>样本 <Num v={o.sample} digits={0} inheritColor /></span>
                     <span>再涨停 <b className="text-foreground"><Num v={o.limit_up_rate} rate inheritColor /></b></span>
-                    <span>最好 <b className="text-success"><Num v={finite(o.best)} pct inheritColor /></b></span>
-                    <span>最差 <b className="text-danger"><Num v={finite(o.worst)} pct inheritColor /></b></span>
+                    {/* 不能用固定的 text-success/text-danger 包裹：那是把「好/坏」当成
+                        「红/绿」，在 A 股口径下正好反了（最好的收益是正数 = 红）。
+                        去掉 inheritColor 让 Num 按数值符号上色 —— 全套收益为负时，
+                        「最好」那个负数自然会显示成绿色，这才是对的。 */}
+                    <span>最好 <b><Num v={finite(o.best)} pct /></b></span>
+                    <span>最差 <b><Num v={finite(o.worst)} pct /></b></span>
                   </div>
 
                   {/* 日均收益柱：一眼看出赚亏集中在哪几天 */}

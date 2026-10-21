@@ -21,8 +21,26 @@ export interface Palette {
   accent: string; accentHover: string;
   /** 图表多系列分类补位色：紫 / 青（> 5 系列时与语义色区分用，见 chart-theme.ts） */
   catViolet: string; catTeal: string;
-  up: string; down: string; warning: string; info: string;
+  /**
+   * 涨跌色 —— 表达市场事实，**随口径切换反向**（withCaliber）。
+   * 只用于价格、涨跌幅、涨跌家数这类「市场方向」。
+   */
+  up: string; down: string;
+  /**
+   * UI 语义色 —— 表达「操作出错 / 操作成功」，**不随口径变化**。
+   * 用于表单校验、toast、「删除成功」这类界面反馈。
+   * 与 up/down 分开的原因见 withCaliber 的注释。
+   */
+  danger: string; success: string;
+  warning: string; info: string;
 }
+
+/**
+ * 涨跌口径（ADR-0014 §3）。
+ * - `cn`   A 股习惯：涨=红、跌=绿（默认）
+ * - `intl` 国际习惯：涨=绿、跌=红
+ */
+export type Caliber = "cn" | "intl";
 
 // ---------------------------------------------------------------- 深色（默认）
 export const DARK: Palette = {
@@ -50,6 +68,10 @@ export const DARK: Palette = {
   // 涨跌：降饱和 18%（TradingView 案例：观看时长 +23%）
   up: "#D9534F",
   down: "#3FAE7A",
+
+  // UI 语义色（固定，不随口径变）
+  danger: "#D9534F",
+  success: "#3FAE7A",
 
   // 语义
   warning: "#D99A4E",
@@ -79,9 +101,28 @@ export const LIGHT: Palette = {
   up: "#C7423E",
   down: "#2E8F63",
 
+  danger: "#C7423E",
+  success: "#2E8F63",
+
   warning: "#B8792E",
   info: "#3B72D9",
 };
+
+// ---------------------------------------------------------------- 涨跌口径
+
+/**
+ * 按口径置换涨跌色。**纯函数，不改原 palette**。
+ *
+ * 为什么是「换 up/down」而不是「多一套 palette」：调用方（Num / chart-theme /
+ * 图表系列）只需要读 `palette.up` 就是「涨价该用的颜色」，不必到处判断口径。
+ * 口径只在一个地方生效，以后加第三种习惯（比如「涨=蓝」）也只改这里。
+ *
+ * 注意 danger/success **不参与置换** —— 那是 UI 语义，翻转发红色提示会误导用户。
+ */
+export function withCaliber(p: Palette, caliber: Caliber): Palette {
+  if (caliber === "intl") return { ...p, up: p.down, down: p.up };
+  return p;
+}
 
 // ---------------------------------------------------------------- 排版
 // 数字必须等宽：防 1,234.56 读成 12,34.56（TradingView 案例的核心论点）
@@ -108,8 +149,11 @@ export function antdTheme(p: Palette) {
     token: {
       colorPrimary: p.accent,
       colorInfo: p.info,
-      colorSuccess: p.down,   // 语义上「绿色」在 antd 是 success；A 股跌是绿
-      colorError: p.up,       // 红色在 antd 是 error；A 股涨是红
+      // 注意用 danger/success 而**不是** up/down：
+      // antd 的这两个槽位是「操作成功/失败」的界面反馈，
+      // 国际口径下把 up/down 换过来后，保存成功的提示不该变成红色。
+      colorSuccess: p.success,
+      colorError: p.danger,
       colorWarning: p.warning,
 
       colorBgBase: p.bg,

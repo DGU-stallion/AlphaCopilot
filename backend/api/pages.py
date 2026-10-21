@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from alpha import registry
+from api.page_spec import normalize_spec
 from api.store import Store
 
 
@@ -28,8 +29,14 @@ class CreatePageIn(BaseModel):
 
 
 def _render_block(block: dict[str, Any], values: dict[str, Any]) -> dict[str, Any]:
-    """算单个 block 的渲染结果。markdown 直接回 text；analysis_ref 经白名单算 option。"""
+    """算单个 block 的渲染结果。markdown 直接回 text；analysis_ref 经白名单算 option。
+
+    M2-7：chart 块回传 renderer 判别符，前端据此分派 LWC / ECharts 渲染
+    （ADR-0012 未决 1；renderer 由 spec 校验层保证与 fn 语义匹配）。
+    """
     out: dict[str, Any] = {"kind": block["kind"], "span": block.get("span", 1)}
+    if block.get("kind") == "chart" and "renderer" in block:
+        out["renderer"] = block["renderer"]
     ref = block.get("analysis_ref")
     if ref is None:
         # markdown / 引用型 block：无动态计算，回传声明的 text（若有）。
@@ -79,6 +86,8 @@ def build_pages_router(store: Store) -> APIRouter:
         page = store.pages.get_page_by_slug(slug)
         if page is None:
             raise HTTPException(404, "page not found")
+        # M2-7：读时按 fn 映射补全老 spec 缺失的 renderer（不写迁移脚本，见 normalize_spec）。
+        page["spec"] = normalize_spec(page["spec"])
         return page
 
     @router.post("/pages")
@@ -95,7 +104,9 @@ def build_pages_router(store: Store) -> APIRouter:
         if page is None:
             raise HTTPException(404, "page not found")
         try:
-            blocks = [_render_block(b, values) for b in page["spec"].get("blocks", [])]
+            # M2-7：render 前 normalize，老 spec 缺 renderer 也按映射补全后回传。
+            blocks = [_render_block(b, values)
+                      for b in normalize_spec(page["spec"]).get("blocks", [])]
         except HTTPException:
             raise
         except Exception as e:  # noqa: BLE001

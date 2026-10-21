@@ -31,12 +31,20 @@ EXPECTED = {
     "earnings-revision",
     "factor-research",
     "financial-statement",
+    "lightweight-charts",
     "performance-attribution",
     "quant-statistics",
     "risk-analysis",
     "sector-rotation",
     "technical-basic",
     "valuation-model",
+}
+
+# 非 HKUDS 来源的 skill：来源标注在头两行注释里，各自的字符串。
+# （M2-10 加的 lightweight-charts：改写自 TradingView/lightweight-charts 官方
+# skills 仓库 + 本地 typings.d.ts 逐条核对，不是 HKUDS 体系的，单列。）
+NON_HKUDS_SOURCE = {
+    "lightweight-charts": "TradingView/lightweight-charts",
 }
 
 # AGENTS 硬规则 10 明确禁止的类别（不引入实盘/live/channels/qveris 相关任何代码）。
@@ -46,7 +54,8 @@ FORBIDDEN = {
 }
 
 # 每轮常驻的 description 预算。12 个实测约 700 tokens；给一倍余量。
-MAX_DESCRIPTION_CHARS = 4000
+# M2-10 加 lightweight-charts 后约 2.3k 字符，预算放宽到 5000。
+MAX_DESCRIPTION_CHARS = 5000
 
 
 def _skill_dirs() -> list[Path]:
@@ -164,10 +173,18 @@ def test_data_access_points_at_our_library():
 
 @pytest.mark.parametrize("name", sorted(EXPECTED))
 def test_skill_mentions_its_source(name):
-    """每个 skill 头部要标来源与适配说明（MIT 归属 + 我们改了哪）。
+    """每个 skill 头部要标来源与适配说明（归属 + 我们改了哪）。
 
     这不是形式主义：半年后看到「为什么这个文件说 A 股用 244 天」时，
-    需要能追回上游原文对照。
+    需要能追回上游原文对照。HKUDS 系列统一标 HKUDS/Vibe-Trading（MIT）；
+    非 HKUDS 来源的各自标注（NON_HKUDS_SOURCE）。
     """
     text = (SKILLS_DIR / name / "SKILL.md").read_text(encoding="utf-8")
-    assert "HKUDS/Vibe-Trading" in text[:400], f"{name} 缺来源标注（MIT 归属）"
+    expected_source = NON_HKUDS_SOURCE.get(name)
+    if expected_source is None:
+        # HKUDS 系：frontmatter 短，头部注释必然落在前 400 字符里
+        assert "HKUDS/Vibe-Trading" in text[:400], f"{name} 缺来源标注（MIT 归属）"
+    else:
+        # 非 HKUDS 系：本项目的 frontmatter 里单独标 source: 键
+        m = re.search(r"^source: (.*)$", text, re.M)
+        assert m and expected_source in m.group(1), f"{name} 缺 source 标注（{expected_source}）"

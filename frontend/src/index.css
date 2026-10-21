@@ -36,9 +36,11 @@
     --border: 221 21% 17%;             /* border ← tokens.border */
     --radius: 1rem;
 
-    /* 语义色：danger=涨(红) success=跌(绿)，A股口径。口径可切换（ADR-0014 §3） */
-    --success: 152 47% 46%;
-    --danger: 2 64% 58%;
+    /* 涨跌原色（口径的原始定义）。--danger/--success 由它们派生，见文件末 .caliber-intl */
+    --up-raw: 2 64% 58%;
+    --down-raw: 152 47% 46%;
+    --danger: var(--up-raw);
+    --success: var(--down-raw);
     --warning: 33 65% 58%;
     --info: 220 82% 65%;
 
@@ -65,8 +67,10 @@
     --destructive-foreground: 0 0% 100%;
     --border: 218 23% 91%;
 
-    --success: 153 51% 37%;
-    --danger: 2 55% 51%;
+    --up-raw: 2 55% 51%;
+    --down-raw: 153 51% 37%;
+    --danger: var(--up-raw);
+    --success: var(--down-raw);
     --warning: 33 60% 45%;
     --info: 219 68% 54%;
 
@@ -114,4 +118,20 @@
   --tw-prose-pre-bg: hsl(var(--muted) / 0.5);
   --tw-prose-th-borders: hsl(var(--border));
   --tw-prose-td-borders: hsl(var(--border));
+}
+
+/* ============================================================
+   涨跌口径（ADR-0014 §3 / M2-9）
+
+   text-danger / text-success 这套语义类**表达的是市场涨跌**（涨停家数、
+   涨跌幅、涨跌占比），所以它们跟随口径反向。国际口径下「涨」变绿、
+   「跌」变红，而这 45 处调用点一行都不用改。
+
+   ⚠️ 界面反馈（表单校验、toast）不走这两个类，走 antd 的 colorError/
+   colorSuccess（其值来自 palette.danger/success，withCaliber 不动它们）。
+   混用会让国际口径下「保存成功」变成红色。
+   ============================================================ */
+html.caliber-intl {
+  --danger: var(--down-raw);
+  --success: var(--up-raw);
 }

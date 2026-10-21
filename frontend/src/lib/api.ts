@@ -8,6 +8,13 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 图表渲染器判别符（M2-7，ADR-0012 未决 1 缝合 ADR-0014 §6）。
+ * 同一 kind:"chart" 有两个可能渲染器，必须由服务端白名单映射
+ * （api/page_spec.py 的 RENDERER_BY_FN）裁决，前端只按声明分派，不猜。
+ */
+export type ChartRenderer = "lwc" | "echarts";
+
 // 后端访问密钥（对应后端部署时的 VR_API_KEY，公网部署防蹭用）。只存本地浏览器。
 const ACCESS_KEY = "vr-access-key";
 

@@ -11,6 +11,11 @@ import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/jetbrains-mono/700.css";
 import "./index.css";
+import { initCaliber } from "./theme/usePalette";
+
+// 在首次渲染前把口径应用到 <html>：放在 render 之后会导致
+// 首帧按默认口径上色、下一帧才跳变（可见的闪色）。
+initCaliber();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
