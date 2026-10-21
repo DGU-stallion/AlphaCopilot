@@ -50,6 +50,7 @@ import time
 from collections.abc import AsyncIterator
 from typing import Any
 
+from agent.pi_env import write_project_pi_config
 from agent.provider import (
     EVENT_ERROR,
     EVENT_TEXT_DELTA,
@@ -113,6 +114,10 @@ class PiProvider:
         """
         if self._proc is not None:
             raise RuntimeError("PiProvider 已 start()，不可重复启动")
+
+        # 先落 MCP 配置，再起进程：Pi 在启动时读 .pi/mcp.json，错过就没有了。
+        # 这一步失败不应该默默继续——没有 MCP 的 agent 等于被砍了双手。
+        write_project_pi_config(self._spec.workspace)
 
         argv = self._build_argv()
         env = self._build_env()
