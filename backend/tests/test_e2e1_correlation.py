@@ -52,12 +52,16 @@ option = chart.heatmap(labels, matrix, title="白酒板块与沪深300 相关性
 with open("chart.json", "w", encoding="utf-8") as f:
     json.dump(option, f, ensure_ascii=False)
 
+# provenance：这是 agent 自己写代码算的（走 run_python），属于 agent 轨。
+# 即使这里谎称 deterministic 也会被服务端降级 —— 见 tests/test_provenance.py。
 manifest = {
     "run_id": "e2e1",
     "code_ref": "code.py",
     "artifacts": [
         {"id": "a1", "kind": "chart", "title": "白酒相关性热力图", "path": "chart.json",
-         "inputs": {"symbols": labels}},
+         "inputs": {"symbols": labels},
+         "provenance": {"kind": "agent", "runId": "e2e1", "codeHash": "sha256:e2e1",
+                        "dataAsOf": "2025-12-31"}},
     ],
 }
 with open("manifest.json", "w", encoding="utf-8") as f:
@@ -207,6 +211,10 @@ async def test_e2e1_correlation_heatmap_in_chat_stream():
             assert len(arts) >= 1, f"assistant 消息没挂 artifact：{assistant}"
 
             chart_art = next(a for a in arts if a["kind"] == "chart")
+            assert json.loads(chart_art["provenance"])["kind"] == "agent", (
+                "agent 自己写代码算的图应带 AI 角标（provenance.kind=agent），"
+                f"实际 {chart_art.get('provenance')}"
+            )
             assert chart_art["payload"]["series"][0]["type"] == "heatmap", (
                 f"chart payload 不是 heatmap option：{str(chart_art['payload'])[:300]}"
             )

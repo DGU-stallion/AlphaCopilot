@@ -134,13 +134,25 @@ class JobQueue:
         (run_dir / "drawdown.json").write_text(
             json.dumps(dd_opt, ensure_ascii=False), encoding="utf-8"
         )
+        # provenance：回测是**我们自己**调 alpha.backtest 跑出来的，所以是
+        # deterministic —— 这是「服务端铸造」的典型场景（ADR-0012「已决 1」）。
+        # 注意这个章不是 agent 能盖的：manifest 由本模块（业务层）生成，
+        # 摄取时还要经 server_stamped=True 才保留。
+        provenance = {
+            "kind": "deterministic",
+            "fn": "alpha.backtest.backtest_golden_cross",
+            "params": {"fast": fast, "slow": slow},
+            "dataAsOf": str(dates[-1]) if dates else "",
+        }
         manifest = {
             "run_id": f"job-{jid}",
             "artifacts": [
                 {"id": "equity", "kind": "chart", "title": "净值曲线", "path": "equity.json",
-                 "inputs": {"fast": fast, "slow": slow}},
-                {"id": "drawdown", "kind": "chart", "title": "回撤", "path": "drawdown.json"},
-                {"id": "metrics", "kind": "metric", "title": "回测指标", "path": "metrics.json"},
+                 "inputs": {"fast": fast, "slow": slow}, "provenance": provenance},
+                {"id": "drawdown", "kind": "chart", "title": "回撤", "path": "drawdown.json",
+                 "provenance": provenance},
+                {"id": "metrics", "kind": "metric", "title": "回测指标", "path": "metrics.json",
+                 "provenance": provenance},
             ],
         }
         (run_dir / "metrics.json").write_text(

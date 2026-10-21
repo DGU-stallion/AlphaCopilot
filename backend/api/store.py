@@ -56,6 +56,10 @@ CREATE TABLE IF NOT EXISTS artifact (
     path        TEXT NOT NULL,
     payload     TEXT,              -- 内联 JSON（chart option / metric 等），可空
     inputs      TEXT,              -- 可重跑参数 JSON
+    -- provenance：这个数字凭什么是可信的（ADR-0012 §1，唯一硬约束）。
+    -- JSON：{kind:"deterministic"|"agent", ...}。deterministic **只能由服务端铸造**
+    -- （ADR-0012「已决 1」）；agent 交来的声明一律降级为 agent 并记 claimedKind。
+    provenance  TEXT,
     created_at  REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_artifact_message ON artifact(message_id);
@@ -150,6 +154,18 @@ def _migrate_page_kind(conn: sqlite3.Connection) -> None:
         )
 
 
+def _migrate_artifact_provenance(conn: sqlite3.Connection) -> None:
+    """幂等迁移：老库 artifact 表缺 provenance 列时补列。
+
+    旧行留 NULL 而不是编一个默认值 —— 「这个 artifact 没有 provenance」是历史事实，
+    伪造一个 `{"kind":"agent"}` 会让它看起来像是走过了盖章流程。
+    读的时候按 NULL 处理成「未声明」，前端不显示角标。
+    """
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(artifact)").fetchall()}
+    if "provenance" not in cols:
+        conn.execute("ALTER TABLE artifact ADD COLUMN provenance TEXT")
+
+
 class SessionRepo:
     """会话聚合：session / message / artifact（artifact 挂在 message 上）。"""
 
@@ -217,12 +233,14 @@ class SessionRepo:
         title: str = "",
         payload: Any = None,
         inputs: Any = None,
+        provenance: Any = None,
     ) -> str:
         aid = _new_id("a")
         self.conn.execute(
             "INSERT INTO artifact "
-            "(id, message_id, run_id, kind, title, path, payload, inputs, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?)",
+            "(id, message_id, run_id, kind, title, path, payload, inputs, provenance, "
+            " created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
             (
                 aid,
                 message_id,
@@ -232,6 +250,7 @@ class SessionRepo:
                 path,
                 json.dumps(payload, ensure_ascii=False) if payload is not None else None,
                 json.dumps(inputs, ensure_ascii=False) if inputs is not None else None,
+                json.dumps(provenance, ensure_ascii=False) if provenance is not None else None,
                 time.time(),
             ),
         )
@@ -608,6 +627,7 @@ class Store:
         """建表 + 增量迁移（幂等）。这是唯一的迁移入口。"""
         self.conn.executescript(SCHEMA)
         _migrate_page_kind(self.conn)
+        _migrate_artifact_provenance(self.conn)
         self.conn.commit()
 
     def close(self) -> None:
@@ -647,10 +667,12 @@ class Store:
         title: str = "",
         payload: Any = None,
         inputs: Any = None,
+        provenance: Any = None,
     ) -> str:
         return self.sessions.add_artifact(
             run_id, kind, path,
             message_id=message_id, title=title, payload=payload, inputs=inputs,
+            provenance=provenance,
         )
 
     def get_artifact(self, aid: str) -> dict[str, Any] | None:

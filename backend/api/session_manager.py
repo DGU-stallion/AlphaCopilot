@@ -132,11 +132,20 @@ class SessionManager:
         rt._emit("message/committed", {"message_id": mid, "content": text})
 
     def _ingest_job_artifacts(self, rt: SessionRuntime, run_dir: str, message_id: str) -> None:
-        """job 成功后：把其 run_dir 的 manifest 摄取为 artifact 挂到消息，并发事件。"""
+        """job 成功后：把其 run_dir 的 manifest 摄取为 artifact 挂到消息，并发事件。
+
+        `server_stamped=True`：这个 run_dir 是 **JobQueue 自己跑出来的**
+        （`alpha.backtest.*` 的结果），不是 agent 交来的，所以它的
+        `kind: "deterministic"` 声明是真的，应当保留 —— 这正是「盖章权归服务端」
+        里服务端该用的那条路径（ADR-0012「已决 1」）。
+
+        对比：`_ingest_new_artifacts` 扫的是 agent 自己写进 runs/ 的目录，
+        那里必须保持默认 False，其 deterministic 声明会被降级。
+        """
         from api.artifacts import ManifestError, ingest_run
 
         try:
-            aids = ingest_run(self._store, run_dir, message_id)
+            aids = ingest_run(self._store, run_dir, message_id, server_stamped=True)
         except ManifestError as e:
             rt._emit("artifact/rejected", {"run": str(run_dir), "error": str(e)})
             return

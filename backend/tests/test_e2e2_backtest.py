@@ -155,6 +155,15 @@ async def test_e2e2_backtest_job_attaches_equity_drawdown_metric():
             )
             assert equity["payload"]["series"][0]["type"] == "line"
 
+            # job 产物是 deterministic —— 回测数字由我们自己调 alpha.backtest 算，
+            # 不是 agent 编的，所以应当带确定性章（ADR-0012「已决 1」的服务端铸造路径）
+            prov = json.loads(arts[0]["provenance"])
+            assert prov["kind"] == "deterministic", (
+                f"job 产出的回测数字应为 deterministic；实际 {prov}"
+            )
+            assert prov["fn"] == "alpha.backtest.backtest_golden_cross"
+            assert prov.get("dataAsOf"), "deterministic 必须带 dataAsOf（数据截止时点）"
+
             # job 在 store 里确实是 succeeded（不是「恰好有 artifact 但 job 失败」）
             jobs_rows = app.state.store.conn.execute(
                 "SELECT status, result FROM job"
