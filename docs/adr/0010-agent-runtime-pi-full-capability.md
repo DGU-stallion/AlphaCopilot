@@ -89,7 +89,7 @@ changes do not create a security boundary."* 因此：
 | session 就地 | `--session-dir workspace/.pi-sessions`，不污染 `~/.pi/agent` |
 | 密钥不落 workspace | 沿用现有约定：密钥只在 `~/.dsh/.credentials.yaml`，代码不读不写 |
 | 可回滚 | Pi 的 session JSONL 保留完整 tool call 记录，误改可追溯 |
-| **项目自持 agent 目录** | `PI_CODING_AGENT_DIR=workspace/.pi-agent`（**2026-10-21 新增**，见修订 §1） |
+| **`--approve` + 项目 `.pi/`** | 启用项目信任；**不设** `PI_CODING_AGENT_DIR`（**2026-10-21 实测修正**，见修订 §1） |
 
 ### 4. 保住 `AgentProvider` 契约（ADR-0007 的结构性遗产）
 
@@ -157,33 +157,47 @@ dsh 排除在外（无中途取消）。
 - `defaultProjectTrust` **只能在 agent 目录的 settings.json 里设**，不能设在项目 `.pi`。
 - skills 的项目发现从 cwd 向上找，而 pi 的 cwd 是 `workspace/`；`skills/` 在仓库根，
   **不在 cwd 的祖先链上** → 递归发现不到。
+  （解法：用 `--skill <dir>` 显式挂载，不依赖自动发现。）
 
-**决定**：给 Pi 一个项目自持的 agent 目录，一个开关解决三件事。
+**决定（2026-10-21 实测后修正）**：只用 `--approve`，**不设 `PI_CODING_AGENT_DIR`**。
 
 ```bash
-PI_CODING_AGENT_DIR=<repo>/workspace/.pi-agent \
 pi --mode rpc \
    --no-context-files \
+   --approve \
    --session-dir <repo>/workspace/.pi-sessions \
-   --skill <repo>/workspace/.pi-agent/skills \
-   --approve
+   --append-system-prompt "<合规 persona>"
 ```
 
-`workspace/.pi-agent/` 内容（由 `apps/server` 生成/校验，不进 git）：
+> ⚠️ **原方案（`PI_CODING_AGENT_DIR=<repo>/workspace/.pi-agent`）已废弃**。
+> 实测：把该变量指向项目的空目录，Pi 会**丢掉 `~/.pi/agent` 下的
+> `models.json` 与 `auth.json`**，直接报 `Unknown provider "magpie"` /
+> `No models available. Use /login ...`。而把 `auth.json` 复制进 workspace
+> 又违反「密钥不进 workspace」的硬约束。两者不可兼得，所以放弃隔离 agent 目录。
+
+前面担心的「与 `~/.pi` 互相污染」，实测影响面小于预期：我们要隔离的
+MCP 与 skills 都在**项目 `.pi/`** 下（由 `--approve` 启用），
+user-level 的 `~/.pi/agent/mcp.json` / `skills/` 只是不被动用，并不冲突。
+
+项目 `.pi/` 内容（由 `agent/pi_env.py` 的 `write_project_pi_config` 生成）：
 
 | 文件 | 作用 |
 |---|---|
-| `settings.json` | `{"defaultProjectTrust": "always", "skills": ["./skills"]}` |
-| `mcp.json` | 我们的 MCP server（`run_python` / `get_quote` / `submit_backtest`） |
-| `models.json` | agnes 端点（`openai-completions` + baseUrl + API key 用 `$AGNES_API_KEY`） |
-| `skills/` | 白名单内的 SKILL.md（见 §2），从 `skills/` 同步或 symlink |
-| `APPEND_SYSTEM.md` | 合规 persona（替代现在的 `ProviderSpec.system_prompt`） |
+| `mcp.json` | 我们的 MCP server（`run_python` / `get_quote` / `submit_backtest`），**`exposure` 必须为 `"direct"`** |
 
-**为什么不用 user-level `~/.pi/agent`**：会与本机其它 pi 使用/配置互相污染；
-而且 `pi mcp add` 写的是全局配置，项目改动会泄漏到全局。
+> ⚠️ **`exposure: "direct"` 是必须的**（实测）。Pi 默认给 MCP server
+> `codemode` exposure：工具**不声明给模型**，只能从 codemode 脚本间接调用。
+> 实测对比（真 pi 1.3.0 + 最小 MCP server）：
+> - 缺省 → `toolsAdded` 只有内置工具，没有 `mcp__*`
+> - `"direct"` → `toolsAdded` 出现 `mcp__echosrv__hello`
+>
+> 这个差异**不红任何测试**，只表现为 agent 说「我没有量化工具」，转而用 bash 瞎算。
 
-**对 `ProviderSpec` 的影响**：`system_prompt` 字段改为写 `APPEND_SYSTEM.md`
-（或 `--append-system-prompt <file>`），其余字段不变，`AgentProvider` 契约**不动**。
+skills 由 `--skill <dir>` 显式挂载；不给时加 `--no-skills` 禁用自动发现
+（否则会全量加载仓库根 88 个，见 §2）。
+
+**对 `ProviderSpec` 的影响**：`system_prompt` 仍走 `--append-system-prompt`，
+其余字段不变，`AgentProvider` 契约**不动**。
 
 ### 2. skills 白名单（撤回「全量恢复 88 个」）
 
@@ -199,7 +213,7 @@ pi --mode rpc \
 | **B · 不进 skills 目录，作为参考文档** | 保留在 `docs/research/skills-ref/`，agent 需要时用 `read` 读 | `deep-company-series` `private-company-research` `bottleneck-hunter` `behavioral-finance` `execution-model` `market-microstructure` `research-*` 长文类 |
 | **C · 不迁移** | 违反硬规则 10 / 反模式 | `qveris`（硬规则 10 点名）`okx-market` `ccxt` `perp-funding-basis` `crypto-derivatives` `token-unlock` `stablecoin-flow` `onchain-analysis` `defi-yield` `shadow-account` `vnpy-export` `mootdx` `tushare` `yfinance` `eastmoney` `pine-script` |
 
-**A 档的验收**：`PI_CODING_AGENT_DIR=... pi --mode json "列出可用 skill"` 快照里
+**A 档的验收**：`pi --mode json "列出可用 skill"` 快照里
 能见到且**仅见到** A 档条目；description 总字符数 < 8,000。
 
 > C 档的判据：涉及实盘/合约/crypto/第三方付费数据源/已死数据源。

@@ -18,7 +18,7 @@ apps/
   server/       Python 3.13 + FastAPI（session / artifact / view / page / job / SSE）
 data-service/   Python 3.13（research · duanxian · alpha），纯函数，不持状态
 workspace/      agent 可写区（pi 的 cwd）+ runs/<run_id>/
-  .pi-agent/    Pi 的项目自持 agent 目录（settings/mcp/models/skills）
+  .pi/mcp.json  Pi 的项目级 MCP 配置（exposure 必须为 direct）
   .pi-sessions/ Pi session JSONL
 skills/         白名单内的 SKILL.md（约 30 个；不是 88 个全量）
 docs/           REFACTOR-PLAN.md · PLAN.md · TASKS.md · adr/ · research/
@@ -66,7 +66,7 @@ Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共
 9. **agent 拥有完整工具集（含 bash / read / write / edit）**（ADR-0010）。
    这是显式接受的风险，不是疏忽：agent 以 OS 用户权限执行。
    必须有：pi cwd = `workspace/`、`--no-context-files`、session 落 `workspace/.pi-sessions`、
-   **`PI_CODING_AGENT_DIR=workspace/.pi-agent` + `--approve`**
+   **`--approve`**（**不要**设 `PI_CODING_AGENT_DIR`，会丢凭据）
    （不加后者，RPC 模式拿不到 project trust → MCP 与 skills 静默不加载，ADR-0010 修订 §1）
 10. 不引入实盘/live/channels/qveris/scheduled 相关任何代码。
     **skills 也不得全量恢复**：`qveris` / crypto 系列（`okx-market` `ccxt` `perp-funding-basis`
@@ -86,7 +86,9 @@ Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共
 - ❌ 恢复 mootdx（K 线/盘口/逐笔 2026-09 起失效，本机连财务也取不到）
 - ❌ 直接把我们自己的取数逻辑写成第二套：`data-service/vendor/a-stock-data` 是唯一取数实现
 - ❌ 裁剪 vendor 的端点：保留全部 15 层（期货/期权/可转债以后会用）
-- ❌ 把 Pi 配置写进 `~/.pi/agent`（要项目自持 `workspace/.pi-agent`，否则污染本机其它 pi 使用）
+- ❌ 设 `PI_CODING_AGENT_DIR` 指向项目目录 —— 会让 Pi 丢掉 `~/.pi/agent` 的
+  `models.json`/`auth.json`（实测报 `Unknown provider`）。隔离靠项目 `.pi/` + `--approve`
+- ❌ MCP server 不给 `exposure: "direct"` —— 默认 `codemode` 不把工具声明给模型
 - ❌ 在 RPC 模式下依赖 project trust 自动生效（不会弹窗，只会静默不加载）
 - ❌ 「反正重写 TS 就能解决」——后端就是 Python（ADR-0011 §0）
 - ❌ 把 88 个 skills 一次性拷进 `skills/`（白名单，见硬规则 10）

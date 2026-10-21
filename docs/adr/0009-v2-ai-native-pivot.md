@@ -74,7 +74,7 @@ ADR-0008（2026-09-05）把产品定成「确定性计算为主 + AI 只解释�
 
 | ADR | 修订内容 |
 |---|---|
-| 0010 | RPC 模式下 MCP/skills 的挂载方式（`PI_CODING_AGENT_DIR` + `--approve`）；skills 改为白名单 30 个 |
+| 0010 | RPC 模式下 MCP/skills 的挂载方式（`--approve` + 项目 `.pi/mcp.json`，`exposure: "direct"`；`PI_CODING_AGENT_DIR` 方案实测废弃）；skills 改为白名单 30 个 |
 | 0011 | **后端保留 Python**，不重写；去掉 `MarketDataPort`；monorepo 只是搬目录 |
 | 0012 | provenance 与 Pin/View 目前**未实现**，给出 M1-7 / M3-3 排期；block 需 `renderer` 判别符 |
 | 0013 | 不变（只新增 M2-5 的判别符交接） |

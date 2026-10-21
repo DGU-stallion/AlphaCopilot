@@ -7,8 +7,8 @@
 > **2026-10-21 修订要点**（重要，先看这个）：
 > 1. **应用后端保留 Python**，不做 TS 重写（ADR-0011 §0）——M1/M3 任务表已同步
 > 2. **vendor a-stock-data 从 M0 移到 M3**（M0 只做真止血；依赖与主环境冲突）
-> 3. **M1-3 新增**：Pi 运行环境（`PI_CODING_AGENT_DIR` + `--approve`），
->    否则 MCP/skills 静默不加载（ADR-0010 修订 §1）
+> 3. **M1-3 新增**：Pi 运行环境（`--approve` + 项目 `.pi/mcp.json`），
+>    否则 MCP/skills 静默不加载（ADR-0010 修订 §1，已按实测修正）
 > 4. **M1-9 改为 skills 白名单 30 个**，不再「全量恢复 88 个」（违反硬规则 10，
 >    且 88 个 description ≈ 5.9k tokens/轮，ADR-0010 修订 §2）
 > 5. **M1-7 补上 provenance 落地 + 盖章权**（ADR-0012 的硬规则目前无任何实现）：
@@ -75,7 +75,7 @@ AI native 个人投研量化工作台。
 │ @earendil-works/pi-coding-agent 1.3.0        │
 │ 完整工具集（含 bash）· skills · MCP · abort    │
 │ cwd = workspace/                             │
-│ agent dir = workspace/.pi-agent（项目自持）     │
+│ MCP 配置 = workspace/.pi/mcp.json（exposure=direct）│
 └─────────────────────────────────────────────┘
 ```
 
@@ -117,9 +117,9 @@ AI native 个人投研量化工作台。
 
 | ID | 任务 | 验收 |
 |---|---|---|
-| M1-1 | **先写测试**：`PiProvider` 契约测试（假 pi 进程，无需真实模型），覆盖 5 类中立事件 | 8 条红 → 实现后全组 < 10s 绿 |
-| M1-2 | PiProvider 实现：`backend/agent/providers/pi.py`（RPC client，~200 行 Python）。事件映射逐字段对齐：`message_update.assistantMessageEvent.text_delta.delta` / `tool_execution_start\|end` / `agent_settled.aborted` / `error` | 一条消息能流式出字；字段名**断言**而非猜测 |
-| M1-3 | **Pi 运行环境就位**（ADR-0010 修订 §1）：生成 `workspace/.pi-agent/{settings.json,mcp.json,models.json,APPEND_SYSTEM.md,skills/}`，以 `PI_CODING_AGENT_DIR` + `--approve` 启动 | `pi --mode json "列出可用工具与 skill"` 快照里**见到**我们的 MCP 工具与白名单 skills；C 档一个不见 |
+| M1-1 | **先写测试**：`PiProvider` 契约测试（假 pi 进程，无需真实模型），覆盖 5 类中立事件 | **已完成**：7 条红 → 绿，1.3s；变异测试 6 个注入 bug 全部被抓住 |
+| M1-2 | PiProvider 实现：`backend/agent/providers/pi.py`（RPC client）。事件映射逐字段对齐 `message_update.assistantMessageEvent.text_delta.delta` / `tool_execution_start\|end` / `agent_settled.aborted` | **已完成**：真 pi + 真模型端到端跑通；11 条测试（含 4 条配置契约） |
+| M1-3 | **Pi 运行环境就位**（ADR-0010 修订 §1，**已实现**）：`agent/pi_env.py` 生成 `<workspace>/.pi/mcp.json`（`exposure: "direct"`），`--approve` 启用项目信任，不设 `PI_CODING_AGENT_DIR` | 已验：真 pi + 真模型下模型自主调 `mcp__alphacopilot__get_quote` 拿到茅台 1313.29 |
 | M1-4 | `abort()` 接前端「停止生成」按钮 | 点击后 1s 内停止，`agent_settled.aborted=true` |
 | M1-5 | **会话续接**：`_ensure_runtime` 在 provider 死掉时不能静默起空会话（DB 历史还在，agent 却失忆） | 杀掉 pi 子进程后继续对话，agent 仍知道前文 |
 | M1-6 | 删 dsh 全部痕迹：`providers/dsh.py` / `cordis.yml` / conftest sys.path / dev_keyless.sh；**`mcpserver/sandbox.py` → `runner.py` 重新定位**（ADR-0012「已决 2」：它不是安全边界，是「带留档的执行通道」——`run_id`/`code.py`/禁网络/可复现；docstring 与 `test_read_secret_denied` 的叙述一并改） | `grep -r "dsh\|deepseek_harness"` 为空；8 条测试从 xfail 转真绿；`runner.py` docstring 明写「不构成安全边界」 |
@@ -218,7 +218,7 @@ AI native 个人投研量化工作台。
 | 数字来源 | **只来自确定性函数** | 数字错一次，产品可信度归零；**但 bash 路径下不可验证**，见 §5 风险 |
 | 安全模型 | **接受 OS 级权限，配置层降低风险** | 见 ADR-0010 §3 |
 | skills | **白名单 30 个，不全量恢复** | 88 个 description ≈ 5.9k tokens/轮；含硬规则 10 禁止项（ADR-0010 修订 §2） |
-| Pi 配置 | **项目自持 `workspace/.pi-agent`** | RPC 模式无法弹 project trust，否则 MCP/skills 静默不加载（ADR-0010 修订 §1） |
+| Pi 配置 | **项目 `.pi/mcp.json` + `--approve`** | RPC 无法弹 project trust；且 `exposure` 必须 `direct`，否则工具不声明给模型（ADR-0010 修订 §1） |
 
 ---
 
@@ -227,7 +227,7 @@ AI native 个人投研量化工作台。
 | 风险 | 影响 | 对策 |
 |---|---|---|
 | **agent 有 bash = OS 级权限** | 可读写本机任意文件、可外发数据，包括 `~/.dsh/.credentials.yaml` | ADR-0010 显式记录；cwd 限 `workspace/`；`--no-context-files`；session 就地；可回滚 |
-| **配置静默失效**（RPC 无法弹 trust → MCP/skills 不加载） | agent 「变笨」但不报错 | M1-3：用 `PI_CODING_AGENT_DIR=workspace/.pi-agent` + `--approve`，并用快照断言可见性（ADR-0010 修订 §1） |
+| ~~配置静默失效~~ | 已解决 | M1-3 已实现并实测：`--approve` + `exposure: "direct"`。反例已验证（去掉 approve 或改回 codemode，工具就消失） |
 | ~~“数字只来自确定性函数”在 bash 路径下不可验证~~ | 已消失 | **已决 1**：执法点移到产物落库那刻——盖章权归服务端，agent 无权自称 deterministic，手算的数字必带 AI 角标（ADR-0012）。规则变得可测试 |
 | **provider 重启 → agent 记忆断链** | 前端看到历史，agent 不记得；`_ensure_runtime` 现成行为 | M1-5 必验：杀掉 pi 子进程后用 `switch_session`/重建上下文续上；或明确约定「重启=新会话」并告知用户 |
 | **图表两套库画同一个东西** | K 线用 ECharts option 还是 LWC？ADR-0012 与 ADR-0013 冲突 | M2-5：block 增加 `renderer` 判别符 |
@@ -276,7 +276,7 @@ M0-8 TASKS.md 重编号
    ↓  ← 到此为止就是「止血」，3–4 天，交付一个全绿的基线
 M1-1 PiProvider 契约测试（先红，假 pi 进程）
 M1-2 PiProvider 实现 + 事件映射
-M1-3 Pi 运行环境（.pi-agent / mcp.json / skills）← 不做这个后面全是空转
+M1-3 Pi 运行环境（.pi/mcp.json + --approve）← 已完成，真模型验过
 M1-4 abort → M1-5 会话续接 → M1-6 删 dsh + runner.py 重新定位（8 条测试转真绿）
 M1-7 provenance 落地 + 盖章权 ← 新规则第一次真正生效
 M1-8 job 订阅 / M1-9 skills 白名单 / M1-10 页面感知
