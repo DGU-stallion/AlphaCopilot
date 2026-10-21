@@ -11,6 +11,7 @@ import { useDarkMode } from "@/hooks/useDarkMode";
 import { AiPageProvider } from "@/lib/ai-page";
 import { DataAsOfProvider, useDataAsOfValue, formatAsOf } from "@/lib/data-asof";
 import { AiConsole } from "@/components/ai/AiConsole";
+import { CommandBar } from "@/components/ai/CommandBar";
 import { currentCaliber, setCaliber } from "@/theme/usePalette";
 import { ROW } from "@/theme/tokens";
 
@@ -140,7 +141,15 @@ export function Layout() {
         <div className="h-4 w-px bg-border" />
         <span className="text-[11px] text-muted-foreground">个人量化投研工作台</span>
 
-        <div className="ml-auto flex items-center gap-1">
+        <button
+          onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+          className="ml-auto flex items-center gap-1.5 rounded-[4px] border border-border px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-[hsl(var(--primary))] hover:text-foreground"
+          title="打开命令栏（⌘K）"
+        >
+          <span>问 AI</span>
+          <kbd className="rounded-[2px] border border-border px-1 text-[10px]">⌘K</kbd>
+        </button>
+        <div className="flex items-center gap-1">
           <button
             onClick={toggle}
             title={dark ? "切到亮色" : "切到暗色"}
@@ -264,6 +273,9 @@ export function Layout() {
         </button>
         <span className="ml-auto">v2 · M2</span>
       </footer>
+
+      {/* ⌘K 命令栏（M5-1）：全局入口，与右侧助手共用同一个对话 */}
+      <CommandBar />
     </div>
     </DataAsOfProvider>
   );
