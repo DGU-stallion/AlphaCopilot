@@ -180,6 +180,19 @@ class SessionManager:
                     "title": art["title"] if art else "",
                 })
 
+    def abort_turn(self, session_id: str, reason: str = "") -> bool:
+        """中止该会话进行中的 turn。返回是否确实有 runtime 被中止。
+
+        中止是 provider 契约的一部分（见 `AgentProvider.abort`），这里只做路由；
+        是否「真的停下来了」由 provider 决定，`finish_reason == "aborted"`
+        是它给前端的证据。
+        """
+        rt = self.get_runtime(session_id)
+        if rt is None:
+            return False
+        rt.provider.abort(reason)
+        return True
+
     def close_session(self, session_id: str) -> None:
         rt = self._runtimes.pop(session_id, None)
         if rt is not None:

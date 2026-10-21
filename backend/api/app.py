@@ -171,6 +171,22 @@ def create_app(
         await manager.send_message(sid, body.content)
         return {"ok": True}
 
+    @router.post("/sessions/{sid}/abort")
+    def abort_turn(sid: str) -> dict:
+        """中止该会话正在生成的那一轮。
+
+        语义（见 AgentProvider.abort 契约）：只停这一轮，不杀会话。
+        被中止的流仍以 turn_end(finish_reason="aborted") 收尾，
+        已收到的文本保留并落库。
+
+        没有进行中的 turn 时返回 ok=True 而非报错——前端「停止」按钮可能因为
+        竞态比 turn 结束晚一点到达，这时报 404 只会让界面闪一个无意义的错误。
+        """
+        if store.get_session(sid) is None:
+            raise HTTPException(404, "session not found")
+        aborted = manager.abort_turn(sid, reason="user")
+        return {"ok": True, "aborted": aborted}
+
     @router.get("/sessions/{sid}/stream")
     async def stream(
         sid: str,

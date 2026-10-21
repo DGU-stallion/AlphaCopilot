@@ -22,6 +22,8 @@ from typing import Any, Protocol, runtime_checkable
 # tool_started : 工具开始执行（payload: {"name": str, "args": dict}）
 # tool_result  : 工具返回（payload: {"name": str, "result": Any}）
 # turn_end     : 本轮结束（payload: {"final_text": str, "finish_reason": str}）
+#                  finish_reason 取值："stop"（正常说完）/ "aborted"（用户中止）/
+#                  "error" / "eof"（进程提前退出）/ "unknown"
 # error        : 出错（payload: {"error": str}）
 EVENT_TEXT_DELTA = "text_delta"
 EVENT_TOOL_STARTED = "tool_started"
@@ -85,6 +87,21 @@ class AgentProvider(Protocol):
 
     def close(self) -> None:
         """关闭运行时。幂等。"""
+        ...
+
+    def abort(self, reason: str = "") -> None:
+        """中止进行中的那一轮 turn。
+
+        语义要求：
+        - **同步、不阻塞**：可能在事件循环里的 HTTP handler 中调用。
+        - **幂等**：没有进行中的 turn 时调用不得抛异常。
+        - **不杀进程**：中止的是这一轮，不是整个会话。
+        - 被中止的流仍以 `turn_end` 收尾，`finish_reason == "aborted"`，
+          且已收到的 `final_text` 保留。
+
+        这些约束写在契约里而不是各 provider 自己决定，是因为它们会直接影响
+        用户看到的行为（半句回复是否保留、停止后能否继续聊）。
+        """
         ...
 
     def is_alive(self) -> bool:

@@ -65,6 +65,9 @@ from agent.provider import (
 _DEFAULT_EXECUTABLE = "pi"
 _SHUTDOWN_GRACE_SECONDS = 3.0
 
+# 无数据时 select 的轮询间隔。只影响 abort 响应的及时性，不是性能参数。
+_READ_POLL_SECONDS = 0.05
+
 
 def _split_model(model: str) -> tuple[str | None, str]:
     """把 `provider/id` 拆成 (provider, id)；不带斜线时 provider 为 None。
@@ -100,6 +103,10 @@ class PiProvider:
         self._closed = False
         self._lock = threading.Lock()  # 串行化 turn：同一会话同一时刻只跑一轮
         self._stderr_tail: list[str] = []
+        # 中止标志：由 abort() 置位，由该轮的读循环消费。
+        # 用它而不是「直接关 stdin」，因为关 stdin 是**关闭整个进程**的语义，
+        # 而用户想要的是只停这一轮、会话还能继续聊。
+        self._abort_reason: str | None = None
 
     # ---------------------------------------------------------------- 生命周期
 
@@ -278,6 +285,32 @@ class PiProvider:
         proc = self._proc
         return proc is not None and proc.poll() is None
 
+    def abort(self, reason: str = "") -> None:
+        """中止进行中的 turn。同步、幂等、不杀进程。
+
+        做法是「置标志 + 向 pi 发 abort 命令」，而不是关 stdin 或杀进程：
+        - 关 stdin = 让整个进程退出，会话就废了（用户下一句没人接）
+        - 杀进程 = 同上，还会丢掉 MCP server 子进程的清理机会
+
+        标志由该轮的读循环检查，它看到后主动结束流并以
+        `turn_end(finish_reason="aborted")` 收尾，已收到的文本保留。
+
+        同时仍向 pi 发一条 abort 命令：真的 pi 需要它来停下模型生成（否则它
+        会继续烧 token 直到自己说完）。假 pi 也实现了同一行为，两边契约一致。
+        """
+        self._abort_reason = reason or "user"
+
+        proc = self._proc
+        if proc is None or proc.stdin is None or proc.poll() is not None:
+            return
+        try:
+            cmd = {"id": f"abort-{int(time.time() * 1000)}", "type": "abort"}
+            proc.stdin.write((json.dumps(cmd) + "\n").encode("utf-8"))
+            proc.stdin.flush()
+        except (BrokenPipeError, OSError, ValueError):
+            # 进程刚好退出了——目标（停下）已经达成，不必报错
+            return
+
     # ---------------------------------------------------------------- turn
 
     def astream(self, prompt: str) -> AsyncIterator[AgentEvent]:
@@ -335,6 +368,8 @@ class PiProvider:
         assert proc is not None and proc.stdin is not None and proc.stdout is not None
 
         with self._lock:
+            # 新一轮开始：清掉上一轮的中止标志，否则这一轮会立刻自我中止。
+            self._abort_reason = None
             request_id = f"prompt-{int(time.time() * 1000)}"
             try:
                 cmd = {"id": request_id, "type": "prompt", "message": prompt}
@@ -359,7 +394,8 @@ class PiProvider:
                     ),
                 )
             finally:
-                # 收尾：仅当没收到过 agent_settled 时才补一个 turn_end（如进程早退）。
+                # 收尾：仅当没收到过 agent_settled 且不是主动中止时，才补一个
+                # turn_end（后者已由读循环设好 finish_reason="aborted"）。
                 # state.settled 由读线程同步置位，此处读到的一定是最新值。
                 if not state.settled:
                     loop.call_soon_threadsafe(
@@ -371,16 +407,45 @@ class PiProvider:
     def _read_until_settled(
         self, stdout, request_id: str, on_record: Any, state: _TurnState
     ) -> None:
-        """按 LF 切帧，逐条回调，直到 `agent_settled`。
+        """按 LF 切帧，逐条回调，直到本轮结束。
 
-        帧读取必须按字节、只切 b"\\n"：JSON 字符串里合法地包含 U+2028/U+2029，
+        帧读取必须按字节、只切 b"\n"：JSON 字符串里合法地包含 U+2028/U+2029，
         通用行读取器会把它们当行界，导致 JSON 解析失败。
+
+        ## 为什么用「按 id 归属」而不是「等 N 秒排空」
+
+        中止时真实 pi **不回应 abort 命令**：它在模型自然跑完后才发
+        `agent_settled(aborted=true)`，实测可能在中止后十几秒。于是：
+        - 上一轮中止后，那条 `agent_settled` 还压在 pipe 里；
+        - 下一轮开头读到它，误判「本轮已结束」，只产一个空 turn_end。
+
+        表现为「中止一次之后，这个会话就哑了」。任何超时值都会在慢响应时漏掉它，
+        所以不能靠时序近似。协议本身给了归属信息：
+
+          · 我们发出的 prompt 命令带唯一 `id`，pi 回一条同 `id` 的 `response`
+            （`data.disposition` 为 `started` 或 `handled`）；
+          · 会话事件（message_update / tool_execution_* / agent_settled）**没有 id**。
+
+        因此：**看到本轮自己的 response 之后，才把事件算作本轮的**；
+        之前的记录一律是上一轮的尾巴，丢弃。
         """
+        import select
+
         buf = bytearray()
+        own_response_seen = False
+
         while True:
+            ready = select.select([stdout], [], [], _READ_POLL_SECONDS)[0]
+            if not ready:
+                # 没数据。注意**不能**把它当成「进程挂了」：Pi 在 TUI 交互下
+                # 会用同步阻塞写 stdout，短暂空闲是正常的。
+                if state.settled:
+                    return
+                continue
+
             chunk = stdout.read(4096)
             if not chunk:
-                # 进程退出但没发 settled
+                # 真 EOF：进程退出了
                 if not state.settled:
                     state.finish_reason = state.finish_reason or "eof"
                 return
@@ -402,13 +467,38 @@ class PiProvider:
                 except (json.JSONDecodeError, UnicodeDecodeError):
                     continue  # 坏帧跳过：stderr 才是诊断通道
 
+                rtype = rec.get("type")
+
+                if rtype == "response":
+                    if rec.get("id") == request_id:
+                        own_response_seen = True
+                        if not rec.get("success", True):
+                            # prompt 被拒（如模型不存在）：这是一条真错误，不能吞
+                            on_record({
+                                "type": "error_response",
+                                "error": rec.get("error") or "prompt 被拒绝",
+                            })
+                    # 其他 id（如 abort 的回执）：与本轮无关
+                    continue
+
+                if not own_response_seen:
+                    # 本轮 prompt 还没被受理 → 这是上一轮的残留，丢弃
+                    continue
+
+                # 已中止：后续可能的文本增量都不再累加（不把中止后的残余算进回复）
+                if self._abort_reason is not None and not state.aborted:
+                    state.aborted = True
+                    state.finish_reason = "aborted"
+
                 on_record(rec)
 
-                if rec.get("type") == "agent_settled":
-                    # 在**读线程**里同步置位：不能依赖 _translate 里的置位，
-                    # 那是经 call_soon_threadsafe 排到事件循环的，本线程的 finally
-                    # 可能先于它执行，导致多发一个 turn_end（偶发多一个空 turn_end）。
+                if rtype == "agent_settled":
+                    # 在**读线程**里同步置位：_translate 里的置位是经
+                    # call_soon_threadsafe 排到事件循环的，本线程的 finally
+                    # 可能先于它执行，导致多发一个空 turn_end。
                     state.settled = True
+                    if state.aborted and state.finish_reason != "aborted":
+                        state.finish_reason = "aborted"
                     return
 
     # ---------------------------------------------------------------- 诊断
@@ -427,12 +517,13 @@ class PiProvider:
 class _TurnState:
     """一轮 turn 内的累积状态。"""
 
-    __slots__ = ("text_parts", "settled", "finish_reason")
+    __slots__ = ("text_parts", "settled", "finish_reason", "aborted")
 
     def __init__(self) -> None:
         self.text_parts: list[str] = []
         self.settled = False
         self.finish_reason: str | None = None
+        self.aborted = False
 
 
 def _turn_end_event(state: _TurnState, finish_reason: str) -> AgentEvent:
@@ -454,6 +545,10 @@ def _translate(rec: dict[str, Any], state: _TurnState) -> AgentEvent | None:
     rtype = rec.get("type")
 
     if rtype == "message_update":
+        # 中止后 pi 可能还会吐几个增量（模型已生成但尚未送达的部分）。
+        # 不把它们算进本轮回复：用户点了停止，就不该再看到新字往外冒。
+        if state.aborted:
+            return None
         update = rec.get("assistantMessageEvent") or {}
         if update.get("type") == "text_delta":
             delta = update.get("delta") or ""
