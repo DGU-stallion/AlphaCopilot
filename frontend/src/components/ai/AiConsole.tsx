@@ -2,37 +2,27 @@
 //
 //   embedded  —— 嵌在布局右侧的常驻栏里（M2-5 之后的默认形态）。
 //                位置固定、宽度由布局控制、没有浮标、不可拖拽。
-//   floating  —— 右下角浮标 + 可拖拽改大小的浮层（旧形态，保留给不希望
-//                常驻占宽度的场景，比如全屏图表页）。
+//   floating  —— 右下角浮标 + **可拖动/缩放/吸附**的浮层（ROUND3 C2）。
 //
-// 为什么从浮层改成常驻栏：浮层会压住内容、挡住表格最后一行、还得手动拖开。
-// 常驻栏宽度可预期，折叠后主画布自动变宽（见 Layout.tsx）。
+// ROUND3 的取舍变了：常驻右侧栏被取消，改为浮层。原因不是我们反复，而是
+// 用户在两轮反馈里说清了顺序 —— 先要「折叠后完全退出布局」（C1，因为 44px
+// 竖条会永久吃掉一列宽度 → 宽表格出横向滚动），再要「浮窗可拖动/resize/吸附」（C2）。
+// 右侧常驻栏与这两条不相容：它要么占宽度，要么就不是浮窗。
+//
+// 浮层的位置/尺寸记忆、吸附、窄屏退化全在 AgentWindow 里（单测在
+// components/agent/__tests__/AgentWindow.test.tsx），这里只管对话内容。
 //
 // 页面感知快照作对话上下文（lib/ai-page）：embedded 与 floating 都一样。
 
-import { useEffect, useRef, useState } from "react";
-import { Sparkles, X, Trash2, Maximize2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Sparkles, History, Trash2 } from "lucide-react";
 import { useCurrentAiPage } from "@/lib/ai-page";
 import { useAiChat } from "@/hooks/useAiChat";
 import { AiMessages, AiComposer } from "@/components/ai/AiMessages";
+import { AgentWindow } from "@/components/agent/AgentWindow";
+import { AgentSessionList } from "@/components/agent/AgentSessionList";
+import { agentApi, type SessionSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";
-
-const MIN_W = 340;
-const MIN_H = 380;
-const DEFAULT_W = 460;
-const DEFAULT_H = 560;
-const SIZE_KEY = "ac-ai-console-size";
-
-const readSize = (): { w: number; h: number } => {
-  try {
-    const raw = localStorage.getItem(SIZE_KEY);
-    if (raw) {
-      const s = JSON.parse(raw);
-      if (Number.isFinite(s.w) && Number.isFinite(s.h) && s.w >= MIN_W && s.h >= MIN_H) return s;
-    }
-  } catch { /* 默认 */ }
-  return { w: DEFAULT_W, h: DEFAULT_H };
-};
 
 export interface AiConsoleProps {
   /**
@@ -46,47 +36,45 @@ export function AiConsole({ embedded = false }: AiConsoleProps = {}) {
   const page = useCurrentAiPage();
   const [open, setOpen] = useState(false);
   // 对话按当前页 key 分开（换页换一份），页面没登记时用固定 "global" 长期对话。
-  const chat = useAiChat(page?.key ?? "global");
-  const [size, setSize] = useState(readSize);
-  const dragRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
-  const sizeRef = useRef(size);
-  sizeRef.current = size;
+  // C4：历史会话。null = 跟着「当前页的对话」走（默认行为）；
+  // 非 null = 用户主动打开了某条历史会话，消息从库里读。
+  const [activeSid, setActiveSid] = useState<string | null>(null);
+  const [showList, setShowList] = useState(false);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  // 「查不到」必须与「确实没有」分开：把一次失败的请求降级成空数组，
+  // 界面就会说「还没有会话」—— 那是在撒谎（实测踩过）。
+  const [sessionsErr, setSessionsErr] = useState<string | null>(null);
+  const chat = useAiChat(page?.key ?? "global", { sessionId: activeSid });
 
   const { abort } = chat;
 
   // 面板开着时 Esc 收起（并中止在跑的请求）
   useEffect(() => {
     if (!open || embedded) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { abort(); setOpen(false); } };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // 先关会话列表再关窗：一次 Esc 直接从「历史」跳到关闭会让人丢失位置感。
+      if (showList) { setShowList(false); return; }
+      abort();
+      setOpen(false);
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, abort]);
+  }, [open, embedded, abort, showList]);
 
-  // 拖左上角改大小。监听挂 window 上（鼠标易划出把手）。
+  // 打开「历史」时才拉会话列表（不在挂载时拉：不打无关的请求）。
+  const refreshSessions = useCallback(() => {
+    agentApi
+      .sessions()
+      .then((rows) => { setSessions(rows); setSessionsErr(null); })
+      .catch((e) => {
+        setSessions([]);
+        setSessionsErr(e instanceof Error ? e.message : String(e));
+      });
+  }, []);
   useEffect(() => {
-    if (embedded) return;   // 嵌入模式没有拖拽把手
-    const move = (e: MouseEvent) => {
-      const d = dragRef.current;
-      if (!d) return;
-      // 面板锚在右下角，向左上拖 = 变大：宽随 (d.x - e.clientX) 增，高随 (d.y - e.clientY) 增。
-      const w = Math.min(Math.max(d.w + (d.x - e.clientX), MIN_W), window.innerWidth - 40);
-      const h = Math.min(Math.max(d.h + (d.y - e.clientY), MIN_H), window.innerHeight - 40);
-      const next = { w, h };
-      sizeRef.current = next;
-      setSize(next);
-    };
-    const up = () => {
-      if (!dragRef.current) return;
-      dragRef.current = null;
-      try { localStorage.setItem(SIZE_KEY, JSON.stringify(sizeRef.current)); } catch { /* 下次回默认 */ }
-    };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-    return () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-    };
-  }, [embedded]);
+    if (showList && !embedded) refreshSessions();
+  }, [showList, embedded, refreshSessions]);
 
   // 把本页确定性数据快照作上下文；空时如实说明，不让模型凭空作答。
   const decorate = (q: string) => {
@@ -108,32 +96,48 @@ export function AiConsole({ embedded = false }: AiConsoleProps = {}) {
           {!embedded && (
             <span className="flex items-center gap-2 text-[13px] font-medium">
               <Sparkles className="h-4 w-4 shrink-0 text-primary" /> AI 助手
-              <span data-agent-runtime className="hidden items-center gap-1.5 rounded-[2px] border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline-flex">
+              <span data-agent-runtime className="hidden items-center gap-1.5 rounded-[2px] border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground sm:inline-flex">
                 <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--success))]" />
                 agnes · 本地
               </span>
             </span>
           )}
           <span className={cn("block truncate text-[11px] text-muted-foreground", !embedded && "mt-0.5")}>
-            {page ? `就「${page.title}」这一页聊` : "（这一页暂无可聊内容，可问通用问题）"}
+            {activeSid
+              ? "历史会话"
+              : page ? `就「${page.title}」这一页聊` : "（这一页暂无可聊内容，可问通用问题）"}
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {chat.msgs.length > 0 && (
-            <button onClick={chat.clear} title="清空对话" aria-label="清空对话"
+            <button onClick={chat.clear} title="新对话（清空当前）" aria-label="新对话"
               className="text-muted-foreground hover:text-foreground">
               <Trash2 className="h-4 w-4" />
-            </button>
-          )}
-          {!embedded && (
-            <button onClick={() => { abort(); setOpen(false); }} aria-label="关闭"
-              className="text-muted-foreground hover:text-foreground">
-              <X className="h-4 w-4" />
             </button>
           )}
         </div>
       </div>
 
+      {showList ? (
+        <AgentSessionList
+          sessions={sessions}
+          activeId={activeSid}
+          error={sessionsErr}
+          onPick={(sid) => { setActiveSid(sid); setShowList(false); }}
+          onNew={() => { setActiveSid(null); chat.clear(); setShowList(false); refreshSessions(); }}
+          onDelete={(sid) => {
+            // 删的是「历史会话」而不是产品数据（硬规则 2：会话是 agent 的内部记忆）。
+            // 因此这里直接删；删完刷新列表，若删的是当前打开的那条就回到默认对话。
+            agentApi
+              .deleteSession(sid)
+              .then(() => {
+                if (activeSid === sid) setActiveSid(null);
+                refreshSessions();
+              })
+              .catch(() => refreshSessions());
+          }}
+        />
+      ) : (
       <AiMessages
         msgs={chat.msgs}
         loading={chat.loading}
@@ -142,8 +146,12 @@ export function AiConsole({ embedded = false }: AiConsoleProps = {}) {
         suggestions={page?.suggestions}
         onPick={(x) => void chat.submit(x, decorate)}
       />
+      )}
       <AiComposer
-        placeholder={chat.loading ? "回复生成中…" : "就本页内容提问…"}
+        placeholder={
+          chat.historyLoading ? "正在读历史…" : chat.loading ? "回复生成中…" : "就本页内容提问…"
+        }
+        // 只挡「正在回答」：读历史时仍可输入（否则用户会以为输入框坏了）。
         disabled={chat.loading}
         onSend={(t) => void chat.submit(t, decorate)}
       />
@@ -153,40 +161,50 @@ export function AiConsole({ embedded = false }: AiConsoleProps = {}) {
   // ---------- 嵌入模式：填满父容器 ----------
   if (embedded) {
     return (
-      <div className="flex h-full min-h-0 flex-col" data-agent="embedded">
+      <div className="flex h-full min-h-0 flex-col" data-agent="embedded" data-agent-console="true">
         {body}
       </div>
     );
   }
 
-  // ---------- 浮层模式 ----------
+  // ---------- 浮层模式（C2：AgentWindow 负责拖动/缩放/吸附/记忆位置） ----------
   return (
     <>
-      {/* 右下角固定浮标 */}
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-label="打开 AI 助手"
-        title="AI 助手"
-        className="fixed bottom-5 right-5 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground ring-1 ring-primary/40 transition-transform hover:scale-105"
-      >
-        <Sparkles className="h-5 w-5" />
-      </button>
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          aria-label="打开 AI 助手"
+          title="AI 助手"
+          data-region="agent-fab"
+          className="fixed bottom-5 right-5 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground ring-1 ring-primary/40 transition-transform hover:scale-105"
+        >
+          <Sparkles className="h-5 w-5" />
+        </button>
+      )}
 
       {open && (
-        <aside
-          style={{ width: size.w, height: size.h }}
-          className="fixed bottom-20 right-5 z-50 flex max-h-[calc(100vh-2rem)] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-[6px] border border-border bg-card"
+        <AgentWindow
+          title="助手"
+          onClose={() => { abort(); setOpen(false); }}
+          headerExtra={
+            <button
+              onClick={() => setShowList((v) => !v)}
+              aria-label="历史会话"
+              title="历史会话"
+              aria-pressed={showList}
+              className={cn(
+                "rounded-[4px] p-1 transition-colors hover:bg-[hsl(var(--muted))]",
+                showList ? "text-primary" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <History className="h-4 w-4" />
+            </button>
+          }
         >
-          {/* 左上角拖拽把手：改大小 */}
-          <div
-            onMouseDown={(e) => { dragRef.current = { x: e.clientX, y: e.clientY, w: size.w, h: size.h }; }}
-            title="拖动调整大小"
-            className="group absolute left-0 top-0 z-10 flex h-5 w-5 cursor-nwse-resize items-center justify-center"
-          >
-            <Maximize2 className="h-3 w-3 rotate-90 text-muted-foreground/40 transition-colors group-hover:text-primary" />
+          <div className="flex h-full min-h-0 flex-col" data-agent="floating" data-agent-console="true">
+            {body}
           </div>
-          {body}
-        </aside>
+        </AgentWindow>
       )}
     </>
   );

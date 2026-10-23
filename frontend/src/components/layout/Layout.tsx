@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import {
   Moon, Sun, ChevronsLeft, ChevronsRight, CandlestickChart, Cog,
   Activity, Globe, Star, FileText, TrendingDown, GitCompare, Briefcase,
-  NotebookPen, Sparkles, PanelRightClose, ArrowUpDown, Clock3, History, GitBranch, Hammer,
+  NotebookPen, ArrowUpDown, Clock3, History, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ import { AiConsole } from "@/components/ai/AiConsole";
 import { CommandBar } from "@/components/ai/CommandBar";
 import { currentCaliber, setCaliber } from "@/theme/usePalette";
 import { ROW } from "@/theme/tokens";
+import { api } from "@/lib/api";
 
 /**
  * 三区布局（M2-5 / ADR-0014 §8）。
@@ -45,20 +46,89 @@ const REVIEW_NAV = [
 ];
 const RESEARCH_NAV = [
   { to: "/watchlist", icon: Star, label: "股票池" },
-  { to: "/research", icon: GitBranch, label: "研究线" },
   { to: "/reports", icon: FileText, label: "我的研报" },
 ];
 const QUANT_NAV = [
-  { to: "/quant-backtest", icon: TrendingDown, label: "回测" },
+  // ADR-0016：回测/相关已迁到 spec 渲染（/p/:slug）。
+  // 仍然指回同一个 slug，所以导航看起来没变，但底层不再是手写 TSX。
+  { to: "/p/backtest", icon: TrendingDown, label: "回测" },
   { to: "/runs", icon: History, label: "Run 记录" },
-  { to: "/correlation", icon: GitCompare, label: "相关性分析" },
+  { to: "/p/correlation", icon: GitCompare, label: "相关性分析" },
   { to: "/portfolios", icon: Briefcase, label: "模拟组合" },
 ];
 const SYSTEM_NAV = [
   { to: "/journal", icon: NotebookPen, label: "交易日志" },
-  { to: "/build", icon: Hammer, label: "Build" },
   { to: "/settings", icon: Cog, label: "接入 AI" },
 ];
+
+/**
+ * 自定义页导航（ADR-0016）：库里 kind=user 的页面自动出现在这里。
+ *
+ * 为什么导航要动态而不是写死：页面现在是**数据**，agent 新建一个页面后
+ * 用户应该立刻能看到入口，而不是「已经存在但你没地方点」。
+ * 内置页（backtest/correlation）已直接写在 QUANT_NAV 里，不在此列。
+ *
+ * 带删除能力（`del`）：建页面的成本极低（agent 一条 POST），没有删除就
+ * 只增不减，实验页会永久占着导航栏。
+ */
+function useUserPages() {
+  const [pages, setPages] = useState<
+    { id: string; slug: string; title: string }[]
+  >([]);
+
+  const load = useCallback(() => {
+    api
+      .pages()
+      .then((rows) =>
+        setPages(
+          rows
+            .filter((r) => r.kind === "user")
+            .map((r) => ({ id: r.id, slug: r.slug, title: r.title })),
+        ),
+      )
+      // 后端未起时不阻塞导航渲染 —— 自定义页看不到而已，不该把整个 UI 拖垮。
+      .catch(() => { /* 静默降级 */ });
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  /**
+   * 删除（软删）+ 撤销入口。
+   *
+   * 为什么不是「点一下就删完」：这条链路曾经是硬删除且无确认，我当时写的理由是
+   * 「页面内容是 spec，可再生」——**那个理由是错的**，用户手写的页面不是可再生
+   * 资源，实际造成一个自定义页被删后无法恢复。
+   *
+   * 现在两层保护：
+   *   1. 后端软删（数据还在，可 restore）
+   *   2. 前端给一个带「撤销」的提示条
+   */
+  const [undo, setUndo] = useState<{ id: string; title: string } | null>(null);
+
+  const del = useCallback(
+    async (id: string, title: string) => {
+      await api.deletePage(id);
+      setUndo({ id, title });
+      load();
+    },
+    [load],
+  );
+
+  const undoDelete = useCallback(async () => {
+    if (!undo) return;
+    try {
+      await api.restorePage(undo.id);
+      setUndo(null);
+      load();
+    } catch {
+      // 409 = slug 已被占用。保留提示条，让人看到「恢复不了」而不是静默失败。
+    }
+  }, [undo, load]);
+
+  const dismissUndo = useCallback(() => setUndo(null), []);
+
+  return { pages, del, undo, undoDelete, dismissUndo };
+}
 
 /** 底栏的数据时点（M5-4）：页面报告什么，这里就显示什么。 */
 function AsOfBadge() {
@@ -78,7 +148,6 @@ function AsOfBadge() {
 }
 
 const NAV_W = { open: 176, closed: 52 };
-const AGENT_W = { open: 360, closed: 44 };
 const TOPBAR_H = 48;
 
 export function Layout() {
@@ -86,11 +155,10 @@ export function Layout() {
   const { dark, toggle } = useDarkMode();
 
   const [navClosed, setNavClosed] = useState(() => localStorage.getItem("ac-nav") === "closed");
-  const [agentClosed, setAgentClosed] = useState(() => localStorage.getItem("ac-agent") === "closed");
   const [caliber, setCaliberState] = useState(currentCaliber);
+  const userPages = useUserPages();
 
   useEffect(() => { localStorage.setItem("ac-nav", navClosed ? "closed" : "open"); }, [navClosed]);
-  useEffect(() => { localStorage.setItem("ac-agent", agentClosed ? "closed" : "open"); }, [agentClosed]);
 
   const flipCaliber = () => {
     const next = caliber === "cn" ? "intl" : "cn";
@@ -121,7 +189,7 @@ export function Layout() {
 
   const groupLabel = (text: string) =>
     !navClosed && (
-      <div className="mb-1 mt-3 px-2.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70 first:mt-0">
+      <div className="mb-1 mt-3 px-2.5 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground/70 first:mt-0">
         {text}
       </div>
     );
@@ -136,7 +204,7 @@ export function Layout() {
       >
         <Link to="/daily-review" className="flex items-center gap-2">
           <CandlestickChart className="h-[18px] w-[18px] text-primary" />
-          <span className="text-[14px] font-semibold tracking-tight">
+          <span className="text-[16px] font-semibold tracking-tight">
             Alpha<span className="text-primary">Copilot</span>
           </span>
         </Link>
@@ -149,7 +217,7 @@ export function Layout() {
           title="打开命令栏（⌘K）"
         >
           <span>问 AI</span>
-          <kbd className="rounded-[2px] border border-border px-1 text-[10px]">⌘K</kbd>
+          <kbd className="rounded-[2px] border border-border px-1 text-[11px]">⌘K</kbd>
         </button>
         <div className="flex items-center gap-1">
           <button
@@ -185,6 +253,53 @@ export function Layout() {
             {!navClosed && <div className="my-2 border-t border-border" />}
             {groupLabel("个人与系统")}
             {SYSTEM_NAV.map((n) => item(n))}
+
+            {/* 自定义页（ADR-0016）：库里 kind=user 的页面自动出现。
+                空时不显示分组标题，避免一条空行占位。
+                悬停显删除按钮：建页成本极低（agent 一条 POST），没有删除就只增不减。 */}
+            {userPages.pages.length > 0 && (
+              <>
+                {!navClosed && <div className="my-2 border-t border-border" />}
+                {groupLabel("自定义页")}
+                {userPages.pages.map((u) => {
+                  const active = pathname === `/p/${u.slug}`;
+                  return (
+                    <div key={u.id} className="group/u relative flex items-center">
+                      <Link
+                        to={`/p/${u.slug}`}
+                        title={navClosed ? u.title : undefined}
+                        className={cn(
+                          "flex flex-1 items-center rounded-[4px] text-[13px] transition-colors",
+                          navClosed ? "justify-center py-2" : "gap-2 px-2.5 py-1.5 pr-7",
+                          active
+                            ? "bg-[hsl(var(--muted))] font-medium text-foreground"
+                            : "text-muted-foreground hover:bg-[hsl(var(--muted))] hover:text-foreground",
+                        )}
+                      >
+                        <FileText className="h-[15px] w-[15px] shrink-0" />
+                        {!navClosed && <span className="truncate">{u.title}</span>}
+                      </Link>
+                      {/* 折叠态没有空间放删除按钮，所以只在展开时出现。 */}
+                      {!navClosed && (
+                        <button
+                          onClick={() => {
+                            // 不弹 modal 确认，但**不是**无保护：
+                            // 后端是软删（可 restore），前端给带「撤销」的提示条。
+                            // 比 modal 少一次点击，又留了后悔的余地。
+                            void userPages.del(u.id, u.title).catch(() => { /* 失败时列表不刷 */ });
+                          }}
+                          title={`删除「${u.title}」`}
+                          aria-label={`删除 ${u.title}`}
+                          className="absolute right-1 rounded-[2px] p-1 text-muted-foreground/0 transition-colors group-hover/u:text-muted-foreground/70 hover:!text-danger"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
           </nav>
 
           <div className={cn("border-t border-border", navClosed ? "flex flex-col items-center gap-1 p-1.5" : "p-2")}>
@@ -216,45 +331,19 @@ export function Layout() {
             </div>
           </main>
 
-          {/* Agent 栏 */}
-          <aside
-            data-region="agent"
-            className="flex shrink-0 flex-col border-l border-border bg-[hsl(var(--card))]"
-            style={{ width: agentClosed ? AGENT_W.closed : AGENT_W.open, transition: "width 160ms ease" }}
-          >
-            <div
-              className="flex shrink-0 items-center border-b border-border px-3"
-              style={{ height: TOPBAR_H }}
-            >
-              {agentClosed ? (
-                <button
-                  onClick={() => setAgentClosed(false)}
-                  title="展开助手"
-                  className="mx-auto rounded-[4px] p-1.5 text-muted-foreground transition-colors hover:bg-[hsl(var(--muted))] hover:text-foreground"
-                >
-                  <Sparkles className="h-4 w-4" />
-                </button>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  <span className="ml-2 text-[13px] font-medium">助手</span>
-                  <button
-                    onClick={() => setAgentClosed(true)}
-                    title="收起助手"
-                    className="ml-auto rounded-[4px] p-1.5 text-muted-foreground transition-colors hover:bg-[hsl(var(--muted))] hover:text-foreground"
-                  >
-                    <PanelRightClose className="h-4 w-4" />
-                  </button>
-                </>
-              )}
-            </div>
-            {!agentClosed && (
-              <div className="min-h-0 flex-1" style={{ minHeight: 0 }}>
-                <AiConsole embedded />
-              </div>
-            )}
-          </aside>
+          {/* Agent 栏已改为**浮窗**（ROUND3 C2），不再占布局宽度。
+
+              ROUND2 时它是右侧常驻 aside，折叠后收成 44px 竖条；用户反馈
+              「折叠后仍占右侧空间」，于是 C1 改成「折叠即完全退出布局」。
+              ROUND3 又要求「浮窗可拖动/resize/吸附」，这两条与常驻栏不相容：
+              常驻栏要么占宽度，要么就不是浮窗。所以整块从布局里移出去，
+              由 AiConsole 自己渲染 fixed 浮层（位置/尺寸记在 localStorage）。
+              附带好处：主画布永远拿满宽度，宽表格不再出横向滚动。 */}
         </AiPageProvider>
+
+        {/* 助手浮层（ROUND3 C2/C3/C4/C5）。
+            放在 Provider 内部才拿得到「当前页确定性数据快照」作对话上下文。 */}
+        <AiConsole />
       </div>
 
       {/* ---------------- 底栏 28 ---------------- */}
@@ -276,6 +365,33 @@ export function Layout() {
         <span className="ml-auto">v2 · M2</span>
       </footer>
 
+      {/* 删除后的撤销提示（ROUND2 §9）。软删 + 撤销，替代确认弹窗：
+          确认弹窗能防「手滑」，但防不了「确认了才发现想错了」。
+          撤销能防后者，且不打断操作流。 */}
+      {userPages.undo && (
+        <div
+          role="status"
+          className="fixed bottom-10 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-[4px] border border-border bg-[hsl(var(--card))] px-3 py-2 text-[12px]"
+        >
+          <span className="text-muted-foreground">
+            已删除「{userPages.undo.title}」
+          </span>
+          <button
+            onClick={() => void userPages.undoDelete()}
+            className="font-medium text-primary hover:underline"
+          >
+            撤销
+          </button>
+          <button
+            onClick={() => userPages.dismissUndo()}
+            aria-label="关闭提示"
+            className="text-muted-foreground/60 hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+
       {/* ⌘K 命令栏（M5-1）：全局入口，与右侧助手共用同一个对话 */}
       <CommandBar />
     </div>
@@ -284,4 +400,4 @@ export function Layout() {
 }
 
 /** 供别处引用的一致尺寸常量（避免各页面各写一个数）。 */
-export const LAYOUT_SIZE = { NAV_W, AGENT_W, TOPBAR_H };
+export const LAYOUT_SIZE = { NAV_W, TOPBAR_H };

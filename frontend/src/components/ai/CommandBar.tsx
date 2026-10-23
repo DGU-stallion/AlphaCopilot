@@ -104,7 +104,7 @@ export function CommandBar() {
             className="w-full resize-none bg-transparent text-foreground outline-none placeholder:text-muted-foreground/60"
             style={{ fontSize: SIZE.md }}
           />
-          <kbd className="mt-0.5 flex shrink-0 items-center gap-0.5 rounded-[2px] border border-border px-1 text-[10px] text-muted-foreground">
+          <kbd className="mt-0.5 flex shrink-0 items-center gap-0.5 rounded-[2px] border border-border px-1 text-[11px] text-muted-foreground">
             <CornerDownLeft className="h-2.5 w-2.5" />
           </kbd>
         </div>

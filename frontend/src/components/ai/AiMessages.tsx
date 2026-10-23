@@ -1,11 +1,13 @@
 // 对话气泡区 + 输入条（S5，移植自上游项目的 core/ai/AiMessages）。
-// 回答按 markdown 渲染（模型答的是带 **加粗**/列表/表格的正文），提问按纯文本。
+//
+// ROUND3 C5：气泡渲染交给 `components/agent/ChatMessage` —— 它把「markdown 正文 /
+// 思考过程 / 工具调用」三件事收在一处，并且是**唯一**的 markdown 引擎
+// （与 MyReports 共用 react-markdown，不再有第二套手写解析器）。
+// 这里只负责滚动、错误条、建议胶囊这些「列表层」的职责。
 
 import { useEffect, useRef } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { cn } from "@/lib/utils";
+import { AlertCircle } from "lucide-react";
+import { ChatMessage } from "@/components/agent/ChatMessage";
 import type { AiMsg } from "@/hooks/useAiChat";
 
 export interface AiMessagesProps {
@@ -31,26 +33,15 @@ export function AiMessages({ msgs, loading, err, notice, suggestions = [], onPic
         </div>
       )}
       {msgs.map((m, i) => (
-        <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-          <div className={cn(
-            "max-w-[85%] rounded-[4px] px-3.5 py-2 leading-relaxed",
-            m.role === "user" ? "bg-primary/20 text-foreground" : "bg-muted/40 text-foreground",
-          )}>
-            {m.role === "assistant" ? (
-              m.content ? (
-                <div className="prose prose-sm dark:prose-invert max-w-none break-words text-foreground">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
-                </div>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> 思考中…
-                </span>
-              )
-            ) : (
-              <p className="whitespace-pre-wrap break-words">{m.content}</p>
-            )}
-          </div>
-        </div>
+        <ChatMessage
+          key={i}
+          role={m.role}
+          content={m.content}
+          meta={m.meta}
+          // 只有最后一条 assistant 才可能是「流式中」：中段消息一定已经收尾。
+          // 不看位置就全标 streaming，界面会同时出现多个闪烁光标。
+          streaming={m.partial === true && i === msgs.length - 1}
+        />
       ))}
       {err && (
         <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
