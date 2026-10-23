@@ -177,7 +177,7 @@ cd backend && python3 -m pytest -q          # 523 passed
 cd backend && ruff check .
 
 # 前端（TS）
-cd frontend && npx tsc --noEmit && npx vitest --run && npx vite build   # 350 passed
+cd frontend && npx tsc --noEmit && npx vitest --run && npx vite build   # 299 passed
 
 # vendor（独立 venv，M3-V1）
 cd data-service && .venv/bin/python -m pytest tests -q                 # 19 passed
