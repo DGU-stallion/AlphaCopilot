@@ -201,6 +201,71 @@ def _migrate_note_links(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN note_id TEXT NOT NULL DEFAULT ''")
 
 
+def _migrate_page_soft_delete(conn: sqlite3.Connection) -> None:
+    """幂等迁移：page 补软删除列（ROUND2 §9）。
+
+    `deleted_at` 非空 = 已软删（不出现在列表/查询里，但数据还在）；
+    `former_slug` 存删除前的原 slug —— 删除时把 `slug` 改成墓标值以释放
+    UNIQUE 约束（否则「删了想改一下再建同名页」会撞 UNIQUE）。
+    """
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(page)").fetchall()}
+    if cols and "deleted_at" not in cols:
+        conn.execute("ALTER TABLE page ADD COLUMN deleted_at REAL")
+    if cols and "former_slug" not in cols:
+        conn.execute("ALTER TABLE page ADD COLUMN former_slug TEXT")
+
+
+def _migrate_soft_delete_and_meta(conn: sqlite3.Connection) -> None:
+    """幂等迁移：run / doc 补软删除 + 备注/归档列（ROUND2 §13）。
+
+    **为什么 run 也要软删**：Run 是「这次计算的留档」，删了就没法证明当时跑的是
+    哪一版代码/哪一份数据。硬删等于毁掉可复现性的证据链。所以：
+      - `deleted_at` 非空 = 已软删（列表里不出现，但 `get()` 仍能取到，可撤销）
+      - `note` 是用户自己写的备注（「这一版是想验证什么」），与 `note_id`
+        不同：`note_id` 指向研究线 doc，`note` 是一行随手写的说明
+
+    doc（研报归档）需要 `kind`/`tags`/`file_path`/`bytes`/`mime`/`deleted_at`：
+    之前只有 title/source_path/text，无法承载「上传一个 PDF 文件」这件事。
+    """
+    for table, cols in (
+        ("run", {
+            "deleted_at": "REAL",
+            "note": "TEXT NOT NULL DEFAULT ''",
+        }),
+        ("doc", {
+            "deleted_at": "REAL",
+            "kind": "TEXT NOT NULL DEFAULT 'note'",   # note / pdf / markdown / image
+            "tags": "TEXT NOT NULL DEFAULT ''",
+            "file_path": "TEXT NOT NULL DEFAULT ''",   # 相对 workspace/reports/ 的文件名
+            "bytes": "INTEGER NOT NULL DEFAULT 0",
+            "mime": "TEXT NOT NULL DEFAULT ''",
+        }),
+    ):
+        have = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if not have:
+            continue
+        for name, decl in cols.items():
+            if name not in have:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+
+
+def _migrate_setting_table(conn: sqlite3.Connection) -> None:
+    """幂等迁移：建 setting 表（k/v）。
+
+    为什么不用环境变量：`ALPHACOPILOT_MODEL` 只在进程启动时读一次，改它要重启
+    后端。而「换个模型试试」是高频操作 —— 前端改完就生效才叫能改。
+    也不用写 JSON 文件：已经有一个 SQLite 了，再引入第二种持久化形态，
+    备份/迁移就会漏掉一份。
+    """
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS setting ("
+        "  key TEXT PRIMARY KEY,"
+        "  value TEXT NOT NULL DEFAULT '',"
+        "  updated_at REAL NOT NULL"
+        ")"
+    )
+
+
 def _migrate_page_kind(conn: sqlite3.Connection) -> None:
     """幂等迁移：老库 page 表缺 kind 列时补列，旧行默认 'user'。
 
@@ -264,10 +329,27 @@ class SessionRepo:
         return dict(row) if row else None
 
     def list_sessions(self) -> list[dict[str, Any]]:
+        """会话列表 + 消息条数。
+
+        带上 `message_count` 是为了让前端会话列表能区分「聊了 30 轮的」和
+        「误点开一次空着的」—— 只有标题和时间的列表几乎没法挑。
+        """
         rows = self.conn.execute(
-            "SELECT * FROM session ORDER BY created_at DESC"
+            "SELECT s.*, (SELECT COUNT(*) FROM message m WHERE m.session_id = s.id) "
+            "AS message_count FROM session s ORDER BY s.created_at DESC"
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def delete_session(self, sid: str) -> bool:
+        """删会话连同它的消息。
+
+        ⚠️ 这里是**硬删**，与 Run 的软删不同，理由是：会话是 agent 的内部记忆
+        （硬规则 2 明确说它「不是产品真源」），产出的 artifact 早已独立落库。
+        删掉一个会话不会让任何已经展示过的数字失去证据。
+        """
+        cur = self.conn.execute("DELETE FROM session WHERE id=?", (sid,))
+        self.conn.commit()
+        return cur.rowcount > 0
 
     # ---------- message ----------
     def add_message(self, session_id: str, role: str, content: str = "") -> str:
@@ -444,17 +526,27 @@ class PageRepo:
         return pid
 
     def get_page(self, pid: str) -> dict[str, Any] | None:
+        # 已软删的页对「读」不可见 —— 但对 restore 需要看得到，那个走 find_any。
+        row = self.conn.execute(
+            "SELECT * FROM page WHERE id=? AND deleted_at IS NULL", (pid,)
+        ).fetchone()
+        return self._row_to_dict(row)
+
+    def find_any(self, pid: str) -> dict[str, Any] | None:
+        """含已软删的行。只给 restore / 诊断用，**不要**拿它做页面查询。"""
         row = self.conn.execute("SELECT * FROM page WHERE id=?", (pid,)).fetchone()
         return self._row_to_dict(row)
 
     def get_page_by_slug(self, slug: str) -> dict[str, Any] | None:
-        row = self.conn.execute("SELECT * FROM page WHERE slug=?", (slug,)).fetchone()
+        row = self.conn.execute(
+            "SELECT * FROM page WHERE slug=? AND deleted_at IS NULL", (slug,)
+        ).fetchone()
         return self._row_to_dict(row)
 
     def list_pages(self) -> list[dict[str, Any]]:
         rows = self.conn.execute(
             "SELECT id, slug, title, kind, status, created_at, updated_at FROM page "
-            "ORDER BY created_at DESC"
+            "WHERE deleted_at IS NULL ORDER BY created_at DESC"
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -465,27 +557,60 @@ class PageRepo:
         )
         self.conn.commit()
 
-    # ---------- M5-2 Build 模式：草稿生命周期 ----------
+    def delete_page(self, pid: str) -> bool:
+        """**软删**一个页面。返回 False 表示不存在（或已删）。
 
-    _ALLOWED_STATUS = ("draft", "published")
+        为什么放在 repo 而不在 api 层写 SQL：所有 page 的写操作都应该走同一个
+        地方，否则「哪些字段能改」会散到多个文件（ADR-0016 之后页面的建/删会
+        被 agent 频繁调用，不能让它变成散装 SQL）。
 
-    def set_status(self, pid: str, status: str) -> None:
-        """draft ↔ published 双向切换（M5-2）。
+        **内置页拒删的判断不在这里**，而在 api 层（那里才知道「内置」意味着
+        会被 `register_builtin_pages` 重新 upsert 的事实）。repo 只管删除。
 
-        为什么必须能撤回：agent 写的页面可能有细微问题（图表选错数据、
-        标题写错），发布后要能收回来修改，而不是只能删了重建。
+        为什么是软删（ROUND2 §9 事故）：这条链路原本是硬 DELETE，且前端没有
+        确认框。当时的理由是「页面内容是 spec，可再生」——**这个判断是错的**，
+        用户手写的页面不是可再生资源，实际造成了一个自定义页被删后无法恢复。
 
-        非法状态直接 ValueError 而不是静默接受：
-        status 是 CHECK 约束列，让 SQLite 报错的话信息是一句
-        "CHECK constraint failed"，不如在这里说清合法值是什么。
+        释放 slug 的做法：删除时把 `slug` 改成墓标值 `原slug#deleted#id`，
+        原值存进 `former_slug`。这样 UNIQUE 约束不会挡住「删了再建同名页」，
+        恢复时又能查出原来的 slug 是否已被占用。
         """
-        if status not in self._ALLOWED_STATUS:
-            raise ValueError(f"非法状态 {status!r}，只允许 {self._ALLOWED_STATUS}")
-        self.conn.execute(
-            "UPDATE page SET status=?, updated_at=? WHERE id=?",
-            (status, time.time(), pid),
+        cur = self.conn.execute(
+            "UPDATE page SET deleted_at=?, former_slug=slug, "
+            "slug = slug || '#deleted#' || id, updated_at=? "
+            "WHERE id=? AND deleted_at IS NULL",
+            (time.time(), time.time(), pid),
         )
         self.conn.commit()
+        return cur.rowcount > 0
+
+    def restore_page(self, pid: str) -> tuple[bool, str]:
+        """恢复软删的页。返回 (成功, 原因)。
+
+        失败的唯一情况：删除后有人又建了同名 slug —— 那时不能恢复，
+        因为 slug 是 URL 的一部分，两个页抢一个 slug 会让「打开哪个」不确定。
+        """
+        row = self.find_any(pid)
+        if row is None:
+            return False, "not found"
+        if row.get("deleted_at") is None:
+            return True, "already active"      # 幂等：没删过也算成功
+        target = row.get("former_slug") or row["slug"]
+        taken = self.conn.execute(
+            "SELECT id FROM page WHERE slug=? AND deleted_at IS NULL", (target,)
+        ).fetchone()
+        if taken is not None:
+            return False, f"slug 已被占用：{target!r}"
+        self.conn.execute(
+            "UPDATE page SET slug=?, former_slug=NULL, deleted_at=NULL, updated_at=? "
+            "WHERE id=?",
+            (target, time.time(), pid),
+        )
+        self.conn.commit()
+        return True, "restored"
+
+    # 注：M5-2 的 `set_status`（draft ↔ published）已随 Build 模式删除
+    # （ROUND2-B1）。发布语义仍保留在 `publish_page`（内置页注册用）。
 
 
 class JobRepo:
@@ -615,11 +740,41 @@ class RunRepo:
         if data_as_of:
             where.append("data_as_of = ?")
             args.append(data_as_of)
-        if where:
-            sql += " WHERE " + " AND ".join(where)
+        # 软删的 Run 不出现在列表里（但 get() 仍取得到，撤销才可能）。
+        where.append("deleted_at IS NULL")
+        sql += " WHERE " + " AND ".join(where)
         sql += " ORDER BY created_at DESC LIMIT ?"
         args.append(limit)
         return [self._row(r) for r in self.conn.execute(sql, args).fetchall()]  # type: ignore[misc]
+
+    def soft_delete(self, rid: str) -> bool:
+        """软删一条 Run。
+
+        **为什么不是硬删**（ROUND2 §13）：Run 是「这次计算跑的是哪一版代码、
+        哪一份数据」的唯一证据。硬删之后「可复现」就变成空话 —— 你无法证明
+        当时那个数字是怎么来的。而删错的代价是不对称的：多留一条列表脏一点，
+        删掉一条则永远回不来。
+        """
+        cur = self.conn.execute(
+            "UPDATE run SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
+            (time.time(), rid),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def restore(self, rid: str) -> bool:
+        cur = self.conn.execute(
+            "UPDATE run SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL",
+            (rid,),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def set_note(self, rid: str, note: str) -> bool:
+        """写一行备注（「这一版想验证什么」）。与 note_id 不同：那个指向研究线文档。"""
+        cur = self.conn.execute("UPDATE run SET note = ? WHERE id = ?", (note, rid))
+        self.conn.commit()
+        return cur.rowcount > 0
 
     def list_by_note(self, note_id: str) -> list[dict[str, Any]]:
         """某个研究判断下跑过的全部 Run（M5-3：这个判断我用什么验证过）。"""
@@ -718,11 +873,30 @@ class DocRepo:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self.conn = conn
 
-    def add_doc(self, title: str, source_path: str, text: str = "") -> str:
+    def add_doc(
+        self,
+        title: str,
+        source_path: str,
+        text: str = "",
+        *,
+        kind: str = "note",
+        tags: str = "",
+        file_path: str = "",
+        bytes_: int = 0,
+        mime: str = "",
+    ) -> str:
+        """新增一条归档。
+
+        `kind` 区分形态（note / pdf / markdown / image）—— 前端据此决定
+        「用 <img> 预览 / 用 iframe 嵌 PDF / 直接渲染正文」，不靠猜扩展名。
+        `file_path` 是**相对** `workspace/reports/` 的文件名：存绝对路径会让
+        备份/搬家后全部失效，而且会把本机目录结构写进数据库。
+        """
         did = _new_id("d")
         self.conn.execute(
-            "INSERT INTO doc (id, title, source_path, text, created_at) VALUES (?,?,?,?,?)",
-            (did, title, source_path, text, time.time()),
+            "INSERT INTO doc (id, title, source_path, text, kind, tags, file_path, "
+            "bytes, mime, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (did, title, source_path, text, kind, tags, file_path, bytes_, mime, time.time()),
         )
         self.conn.commit()
         return did
@@ -732,10 +906,47 @@ class DocRepo:
         return dict(row) if row else None
 
     def list_docs(self) -> list[dict[str, Any]]:
+        """归档列表。**不含软删**；`text` 全文不回传（可能几百 KB，列表不需要）。"""
         rows = self.conn.execute(
-            "SELECT id, title, source_path, created_at FROM doc ORDER BY created_at DESC"
+            "SELECT id, title, source_path, kind, tags, file_path, bytes, mime, "
+            "deleted_at, created_at FROM doc WHERE deleted_at IS NULL "
+            "ORDER BY created_at DESC"
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def soft_delete_doc(self, did: str) -> bool:
+        cur = self.conn.execute(
+            "UPDATE doc SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
+            (time.time(), did),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def restore_doc(self, did: str) -> bool:
+        cur = self.conn.execute(
+            "UPDATE doc SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL",
+            (did,),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def update_doc_meta(
+        self, did: str, *, title: str | None = None, tags: str | None = None
+    ) -> bool:
+        sets: list[str] = []
+        args: list[Any] = []
+        if title is not None:
+            sets.append("title = ?")
+            args.append(title)
+        if tags is not None:
+            sets.append("tags = ?")
+            args.append(tags)
+        if not sets:
+            return False
+        args.append(did)
+        cur = self.conn.execute(f"UPDATE doc SET {', '.join(sets)} WHERE id = ?", args)
+        self.conn.commit()
+        return cur.rowcount > 0
 
     def thread(self, did: str) -> dict[str, Any]:
         """一条研究线的完整视图（M5-3）：笔记本身 + 它的 Run + 它的 View。
@@ -776,6 +987,30 @@ class DocRepo:
         cur = self.conn.execute("DELETE FROM doc WHERE id=?", (did,))
         self.conn.commit()
         return cur.rowcount > 0
+
+
+class SettingRepo:
+    """键值设置（ROUND2 §13，A3）。
+
+    只放**运行时该改的东西**，不放大配置：模型 id 属于前者（换模型要立刻生效），
+    数据源地址/密钥属于后者（改了等于换环境，应当走配置文件）。
+    """
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self.conn = conn
+
+    def get(self, key: str, default: str = "") -> str:
+        row = self.conn.execute("SELECT value FROM setting WHERE key=?", (key,)).fetchone()
+        return row["value"] if row else default
+
+    def set(self, key: str, value: str) -> None:
+        self.conn.execute(
+            "INSERT INTO setting (key, value, updated_at) VALUES (?,?,?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value, "
+            "updated_at=excluded.updated_at",
+            (key, value, time.time()),
+        )
+        self.conn.commit()
 
 
 class StockPoolRepo:
@@ -930,6 +1165,7 @@ class Store:
         self.portfolio = PortfolioRepo(self.conn)
         self.runs = RunRepo(self.conn)
         self.views = ViewRepo(self.conn)
+        self.settings = SettingRepo(self.conn)
 
     def migrate(self) -> None:
         """建表 + 增量迁移（幂等）。这是唯一的迁移入口。"""
@@ -939,6 +1175,9 @@ class Store:
         _migrate_session_runtime_id(self.conn)
         _migrate_run_inputs(self.conn)
         _migrate_note_links(self.conn)
+        _migrate_page_soft_delete(self.conn)
+        _migrate_soft_delete_and_meta(self.conn)
+        _migrate_setting_table(self.conn)
         self.conn.commit()
 
     def close(self) -> None:
@@ -956,6 +1195,9 @@ class Store:
 
     def list_sessions(self) -> list[dict[str, Any]]:
         return self.sessions.list_sessions()
+
+    def delete_session(self, sid: str) -> bool:
+        return self.sessions.delete_session(sid)
 
     # ---------- message ----------
     def add_message(self, session_id: str, role: str, content: str = "") -> str:
@@ -1010,6 +1252,12 @@ class Store:
 
     def publish_page(self, pid: str) -> None:
         self.pages.publish_page(pid)
+
+    def delete_page(self, pid: str) -> bool:
+        return self.pages.delete_page(pid)
+
+    def restore_page(self, pid: str) -> tuple[bool, str]:
+        return self.pages.restore_page(pid)
 
     # ---------- job（委派 JobRepo）----------
     def create_job(

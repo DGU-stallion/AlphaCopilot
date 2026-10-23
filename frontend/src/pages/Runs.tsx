@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { GitCompare, RefreshCw, RotateCcw, Star, Trash2 } from "lucide-react";
+import { GitCompare, RefreshCw, RotateCcw, Star, Trash2, X } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Num } from "@/components/Num";
 import { Button } from "@/components/ui/Form";
-import { Disclaimer } from "@/components/ui/Disclaimer";
 import { useCachedResource } from "@/lib/cache";
 import { useAiPage } from "@/lib/ai-page";
 import { useDataAsOfAuto } from "@/lib/data-asof";
@@ -41,6 +40,9 @@ function metricKeys(a: RunRow | null, b: RunRow | null): string[] {
   for (const r of [a, b]) if (r) Object.keys(r.metrics ?? {}).forEach((k) => keys.add(k));
   return [...keys].sort();
 }
+
+/** RunRow 暂无 note 字段的类型声明（api.ts 契约不动），后端 GET /runs 已返回 note。 */
+type RunRowWithNote = RunRow & { note?: string };
 
 export function Runs() {
   const [picked, setPicked] = useState<string[]>([]);
@@ -118,6 +120,53 @@ export function Runs() {
     viewsRes.refresh();
   };
 
+  // ---------- B3：软删 + 撤销（硬规则 14）----------
+  // 交互与页面删除完全同一套（Layout.tsx）：**不弹确认框** —— 确认弹窗能防
+  // 「手滑」，防不了「确认了才发现想错了」；撤销能防后者，且不打断操作流。
+  const [undo, setUndo] = useState<{ id: string; label: string } | null>(null);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
+
+  const doDelete = async (r: RunRowWithNote) => {
+    setDeleteErr(null);
+    try {
+      await runsApi.deleteRun(r.id);
+      setUndo({ id: r.id, label: `${KIND_LABEL[r.kind] ?? r.kind}（${fmtTime(r.created_at)}）` });
+      refresh();
+    } catch (e) {
+      setDeleteErr(e instanceof Error ? e.message : "删除失败");
+    }
+  };
+
+  const undoDelete = async () => {
+    if (!undo) return;
+    try {
+      await runsApi.restoreRun(undo.id);
+      setUndo(null);
+      refresh();
+    } catch {
+      // 恢复失败时保留提示条，让人看到「还撤销不掉」而不是静默失败。
+    }
+  };
+
+  // ---------- B3：行内备注（失焦保存）----------
+  // 点开 → 输入框 → 失焦/回车保存，Esc 取消。noteNotify 只记本地改动：
+  // 等 refresh() 回来再覆盖一次会闪烁，先就地放进去。
+  const [noteEdit, setNoteEdit] = useState<{ id: string; value: string } | null>(null);
+  const [noteSaved, setNoteSaved] = useState<Record<string, string>>({});
+
+  const noteOf = (r: RunRowWithNote) =>
+    noteSaved[r.id] ?? r.note ?? "";
+
+  const saveNote = async (rid: string, note: string) => {
+    setNoteSaved((m) => ({ ...m, [rid]: note })); // 就地更新，不等 refresh 回来（会闪烁）
+    try {
+      await runsApi.setRunNote(rid, note); // 空串也允许（清除备注）
+      refresh();
+    } catch {
+      setDeleteErr("备注保存失败（服务端返回错误）");
+    }
+  };
+
   return (
     <div>
       <PageHeader
@@ -158,6 +207,36 @@ export function Runs() {
         </div>
       )}
 
+      {deleteErr && (
+        <div className="mb-3 rounded-[4px] border border-[hsl(var(--danger))]/40 px-3 py-1.5 text-[12px] text-danger">
+          {deleteErr}
+        </div>
+      )}
+
+      {/* 软删后的撤销提示条（B3，硬规则 14）：确认弹窗防不了「确认完才发现想错了」，
+          撤销能防后者且不打断操作流。与 Layout 的页面删除提示完全同一套。 */}
+      {undo && (
+        <div
+          role="status"
+          className="fixed bottom-10 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-[4px] border border-border bg-[hsl(var(--card))] px-3 py-2 text-[12px]"
+        >
+          <span className="text-muted-foreground">已删除 {undo.label}，可撤销</span>
+          <button
+            onClick={() => void undoDelete()}
+            className="font-medium text-primary hover:underline"
+          >
+            撤销
+          </button>
+          <button
+            onClick={() => setUndo(null)}
+            aria-label="关闭提示"
+            className="text-muted-foreground/60 hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+
       {tab === "runs" ? (
         <>
           {runsRes.loading && runs.length === 0 ? (
@@ -177,6 +256,7 @@ export function Runs() {
                     <th className="px-2 py-1.5 font-medium">时间</th>
                     <th className="px-2 py-1.5 font-medium">类型</th>
                     <th className="px-2 py-1.5 font-medium">参数</th>
+                    <th className="w-40 px-2 py-1.5 font-medium">备注</th>
                     <th className="px-2 py-1.5 font-medium">数据时点</th>
                     <th className="px-2 py-1.5 font-medium">代码指纹</th>
                     <th className="px-2 py-1.5 text-right font-medium">关键指标</th>
@@ -191,7 +271,7 @@ export function Runs() {
                         key={r.id}
                         onClick={() => toggle(r.id)}
                         className={cn(
-                          "cursor-pointer border-b border-border/40 transition-colors hover:bg-[hsl(var(--muted))]",
+                          "group cursor-pointer border-b border-border/40 transition-colors hover:bg-[hsl(var(--muted))]",
                           on && "bg-[hsl(var(--muted))]",
                         )}
                       >
@@ -208,6 +288,21 @@ export function Runs() {
                         <td className="max-w-[240px] truncate px-2 py-1.5 text-muted-foreground" style={{ fontFamily: "var(--font-mono, monospace)" }}>
                           {JSON.stringify(r.params)}
                         </td>
+                        <td className="max-w-[160px] px-2 py-1.5">
+                          <NoteCell
+                            note={noteOf(r as RunRowWithNote)}
+                            editing={noteEdit?.id === r.id ? noteEdit.value : null}
+                            onStart={() => setNoteEdit({ id: r.id, value: noteOf(r as RunRowWithNote) })}
+                            onChange={(v) => setNoteEdit({ id: r.id, value: v })}
+                            onSubmit={() => {
+                              if (!noteEdit) return;
+                              const { id, value } = noteEdit;
+                              setNoteEdit(null);
+                              if (value !== noteOf(r as RunRowWithNote)) void saveNote(id, value);
+                            }}
+                            onCancel={() => setNoteEdit(null)}
+                          />
+                        </td>
                         <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground" style={{ fontFamily: "var(--font-mono, monospace)" }}>
                           {r.data_as_of || "—"}
                         </td>
@@ -220,6 +315,29 @@ export function Runs() {
                               {k} <Num v={v} digits={2} colorBySign />
                             </span>
                           ))}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); void doRerun(r); }}
+                              disabled={Object.keys(r.inputs ?? {}).length === 0}
+                              title={Object.keys(r.inputs ?? {}).length === 0
+                                ? "这条 Run 没有输入快照，无法重跑"
+                                : "用同样的输入重跑一次"}
+                              className="text-muted-foreground/60 hover:text-[hsl(var(--primary))] disabled:cursor-not-allowed disabled:opacity-30"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </button>
+                            {/* 软删（可撤销，见提示条）。悬停才显示：不挡选中点击流 */}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); void doDelete(r as RunRowWithNote); }}
+                              title={`删除 Run ${r.id}`}
+                              aria-label={`删除 Run ${r.id}`}
+                              className="text-muted-foreground/60 opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </td>
                         <td className="px-2 py-1.5">
                           <button
@@ -315,8 +433,55 @@ export function Runs() {
         <ViewsPanel views={views} onChanged={refresh} />
       )}
 
-      <Disclaimer />
     </div>
+  );
+}
+
+/** 行内备注：点开 → 输入框 → 失焦保存（B3）。Esc 取消。 */
+function NoteCell({ note, editing, onStart, onChange, onSubmit, onCancel }: {
+  note: string;
+  editing: string | null;
+  onStart: () => void;
+  onChange: (v: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  if (editing !== null) {
+    return (
+      <input
+        autoFocus
+        aria-label="Run 备注"
+        value={editing}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onSubmit}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") { e.preventDefault(); onCancel(); }
+          if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
+        }}
+        className="w-full rounded-[4px] border border-border bg-transparent px-1.5 py-0.5 text-[12px] text-foreground outline-none focus:border-[hsl(var(--primary))]"
+      />
+    );
+  }
+  if (note) {
+    return (
+      <button
+        title="写备注"
+        onClick={(e) => { e.stopPropagation(); onStart(); }}
+        className="block max-w-full truncate text-left text-[12px] text-foreground/90 hover:text-foreground"
+      >
+        {note}
+      </button>
+    );
+  }
+  return (
+    <button
+      title="写备注"
+      onClick={(e) => { e.stopPropagation(); onStart(); }}
+      className="text-[12px] text-muted-foreground/40 hover:text-foreground"
+    >
+      写备注…
+    </button>
   );
 }
 

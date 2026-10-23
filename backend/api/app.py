@@ -26,10 +26,12 @@ from agent.providers.pi import PiProvider
 from api.builtin_pages import register_builtin_pages
 from api.business import build_business_router
 from api.jobs import JobQueue
+from api.macro import build_macro_router
 from api.market import build_market_router
 from api.pages import build_pages_router
 from api.runs import build_runs_router
 from api.session_manager import SessionManager
+from api.settings_ai import build_settings_router, resolve_model
 from api.store import Store
 from api.universes import build_universe_router  # M3-2：Universe as query
 from api.vendor import build_vendor_router
@@ -75,10 +77,12 @@ def _default_provider_factory(
         if store is not None:
             row = store.get_session(session_id) or {}
             stored_sid = row.get("runtime_session_id")
+        # 模型**每次建会话时现读** setting 表（A3）：改完设置后下一条消息就是
+        # 新模型，不用重启后端。这里没有缓存层，代价是每条会话多一次 SQLite 读。
         spec = ProviderSpec(
             workspace=ws,
             system_prompt=_compliance_prompt(),
-            model=model,
+            model=resolve_model(store, model) if store is not None else model,
             session_id=stored_sid,
             # skills 目录是可选的：不存在时不挂载（Pi 侧会 --no-skills 全关）。
             skills_dir=_SKILLS_DIR if _SKILLS_DIR.is_dir() else None,
@@ -137,6 +141,13 @@ def create_app(
     def create_session(title: str = "") -> dict:
         sid = manager.create_session(title)
         return {"session_id": sid}
+
+    @router.delete("/sessions/{sid}")
+    def delete_session(sid: str) -> dict:
+        """删会话（硬删：agent 的会话是内部记忆，不是产品真源）。"""
+        if store.get_session(sid) is None:
+            raise HTTPException(404, "session not found")
+        return {"ok": store.delete_session(sid)}
 
     @router.get("/sessions")
     def list_sessions() -> list:
@@ -269,6 +280,8 @@ def create_app(
     # 未就绪时端点自己回 503，不影响 app 启动 ——
     # 页面不该因为 vendor 没装而整体打不开。
     app.include_router(build_vendor_router())
-    app.include_router(build_market_router())
+    app.include_router(build_market_router(store))
+    app.include_router(build_macro_router(store))
+    app.include_router(build_settings_router(store))
     app.include_router(build_universe_router())  # M3-2：Universes as query
     return app

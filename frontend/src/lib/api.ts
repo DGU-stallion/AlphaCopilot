@@ -44,11 +44,17 @@ export interface MyReport {
   id: string; name: string; industry: string; size: number; ext: string; ts: number;
 }
 
-async function request<T>(path: string, method: "GET" | "POST" | "DELETE" = "GET", body?: unknown): Promise<T> {
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+async function request<T>(path: string, method: Method = "GET", body?: unknown): Promise<T> {
   let resp: Response;
   const headers: Record<string, string> = { ...authHeaders() };
   const opts: RequestInit = { method };
-  if (body !== undefined) {
+  if (body instanceof FormData) {
+    // 上传：**绝不能**自己设 Content-Type —— 浏览器要往里面加 multipart boundary，
+    // 手动设成 multipart/form-data（没有 boundary）后端解析会得到空文件。
+    opts.body = body;
+  } else if (body !== undefined) {
     headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);
   }
@@ -148,6 +154,16 @@ export interface ShortTermEmotion {
   lianban_stocks: LianbanStock[];
   seal_rate: number | null; break_rate: number | null; promotion_rate: number | null;
   yzt_count: number;
+}
+
+/** 情绪历史的一行（`GET /api/market/emotion-history`）。
+ *  与 ShortTermEmotion 的区别：没有 `ladder` / `lianban_stocks` ——
+ *  历史表只存聚合计数（个股清单不进历史，见 api/emotion_store.py）。 */
+export interface EmotionHistoryRow {
+  date: string;
+  zt_count: number; dt_count: number; zb_count: number;
+  max_boards: number; lianban_count: number; yzt_count: number;
+  seal_rate: number | null; break_rate: number | null; promotion_rate: number | null;
 }
 
 // 每日盯盘：3 秒实时快照（持仓/自选/500亿大票/三板+/昨日成交前十 + 异动流）
@@ -343,6 +359,20 @@ export interface KlineBar {
 
 export const api = {
   health: () => get<{ ok: boolean }>("/health"),
+  /** 页面列表（ADR-0016）：导航栏据此动态显示用户/agent 建的页面。 */
+  pages: () =>
+    get<
+      { id: string; slug: string; title: string; kind: string; status: string }[]
+    >("/pages"),
+  /** 删一个自定义页。内置页会 400（它会在下次启动时重建）。
+   *  软删除：可通过 restorePage 恢复。 */
+  deletePage: (pid: string) =>
+    request<{ ok: boolean; id: string; soft: boolean }>(
+      `/pages/${encodeURIComponent(pid)}`, "DELETE"),
+  /** 恢复软删的页。409 = slug 已被占用（删后有人建了同名页）。 */
+  restorePage: (pid: string) =>
+    request<{ ok: boolean; id: string }>(
+      `/pages/${encodeURIComponent(pid)}/restore`, "POST"),
   // 注意 request() 已经解包了一层 payload.data，所以这里的泛型直接是 {code,bars}。
   // 再取一次 .data 会得到 undefined（踩过：图表显示「K 线取不到」）。
   kline: (code: string, offset = 120) =>
@@ -354,6 +384,10 @@ export const api = {
   liveEmotion: () => get<LiveEmotion>("/market/live-emotion"),
   marketOverview: () => get<MarketOverview>("/market/overview"),
   emotion: () => get<ShortTermEmotion>("/market/emotion"),
+  /** 情绪历史序列（升序，画图直接用）。条数少于 days 是正常的 ——
+   *  东财涨停池只保留约 28 天历史，之后靠每日落库积累。 */
+  emotionHistory: (days = 60) =>
+    get<EmotionHistoryRow[]>(`/market/emotion-history?days=${days}`),
   monitorSnapshot: (watch: string) => get<MonitorSnapshot>(`/monitor/snapshot?watch=${encodeURIComponent(watch)}`),
   firstBoard: () => get<FirstBoardData>("/market/first-board"),
   turnoverTop: () => get<TurnoverTop>("/market/turnover-top"),
@@ -485,18 +519,178 @@ export const runsApi = {
   noteThread: (did: string) =>
     get<NoteThread>(`/notes/${encodeURIComponent(did)}/thread`),
 
-  // ---------- M5-2 Build 模式：草稿 → 预览 → 确认发布 ----------
-  /** agent 或用户产出的 page spec 落成草稿。坏 spec → 400。 */
-  createDraft: (spec: Record<string, unknown>) =>
-    request<{ id: string; slug: string; status: string }>("/pages/drafts", "POST", spec),
-  publishPage: (pid: string) =>
-    request<{ id: string; status: string }>(`/pages/${encodeURIComponent(pid)}/publish`, "POST"),
-  unpublishPage: (pid: string) =>
-    request<{ id: string; status: string }>(`/pages/${encodeURIComponent(pid)}/unpublish`, "POST"),
+  // 注：Build 草稿 API（createDraft/publishPage/unpublishPage）已于 ROUND2-B1
+  // 删除。原因：前端从来没有渲染 published page 的路由 ——「发布」只写库，
+  // 用户永远看不见，整条链路是空转的。用户决策「固定图表不如直接改代码」。
 
   /** M3-4：用同一条 Run 的输入快照重跑。409=无快照，501=未启用 job 队列。 */
   rerun: (rid: string) =>
     request<{ job_id: string; rerun_of: string }>(
       `/runs/${encodeURIComponent(rid)}/rerun`, "POST",
     ),
+
+  // ---------- 软删除与备注（ROUND2 §13，B3）----------
+  // 硬删一条 Run = 毁掉「当时跑的是哪一版代码/哪一份数据」的唯一证据，
+  // 所以只能软删（可恢复）。列表接口默认不含软删的条目。
+  deleteRun: (rid: string) =>
+    request<{ ok: boolean; id: string; soft: boolean }>(
+      `/runs/${encodeURIComponent(rid)}`, "DELETE"),
+  restoreRun: (rid: string) =>
+    request<{ ok: boolean; id: string }>(
+      `/runs/${encodeURIComponent(rid)}/restore`, "POST"),
+  /** 写一行备注（「这一版想验证什么」）。与 note_id 不同：那个指向研究线文档。 */
+  setRunNote: (rid: string, note: string) =>
+    request<{ ok: boolean }>(`/runs/${encodeURIComponent(rid)}/note`, "POST", { note }),
+};
+
+// ---------------------------------------------------------------------------
+// 研报归档（ROUND2 §13，B4）
+//
+// 之前的 doc 表只有 title/source_path/text，撑不住「上传一个 PDF」。
+// 现在带 kind（note/pdf/markdown/image）+ file_path（相对 workspace/reports/）
+// + tags，前端据 kind 决定预览方式，不靠扩展名猜。
+// ---------------------------------------------------------------------------
+
+/** 归档形态。前端据此选预览器：image → <img>，pdf → <iframe>，markdown/note → 正文。 */
+export type DocKind = "note" | "pdf" | "markdown" | "image";
+
+export interface DocRow {
+  id: string;
+  title: string;
+  source_path: string;
+  kind: DocKind;
+  tags: string;
+  file_path: string;
+  bytes: number;
+  mime: string;
+  created_at: number;
+}
+
+export const reportsApi = {
+  list: () => get<DocRow[]>("/docs"),
+  /** 带正文的单条（列表不回 text：可能几百 KB）。 */
+  detail: (did: string) =>
+    get<DocRow & { text: string }>(`/docs/${encodeURIComponent(did)}`),
+  /** 上传。用 FormData —— 不要手动设 Content-Type，浏览器要自己加 boundary。 */
+  upload: (file: File, meta: { title?: string; tags?: string } = {}) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    if (meta.title) fd.append("title", meta.title);
+    if (meta.tags) fd.append("tags", meta.tags);
+    return request<DocRow>("/docs", "POST", fd);
+  },
+  /** 纯文本笔记（不传文件）。 */
+  createNote: (body: { title: string; text: string; tags?: string }) =>
+    request<DocRow>("/docs/note", "POST", body),
+  remove: (did: string) =>
+    request<{ ok: boolean; soft: boolean }>(`/docs/${encodeURIComponent(did)}`, "DELETE"),
+  restore: (did: string) =>
+    request<{ ok: boolean }>(`/docs/${encodeURIComponent(did)}/restore`, "POST"),
+  setMeta: (did: string, body: { title?: string; tags?: string }) =>
+    request<{ ok: boolean }>(`/docs/${encodeURIComponent(did)}`, "PATCH", body),
+  /** 文件下载/预览地址（<img src> / <iframe src> 直接用）。 */
+  fileUrl: (did: string) => apiUrl(`/api/docs/${encodeURIComponent(did)}/file`),
+};
+
+// ---------------------------------------------------------------------------
+// AI 运行时设置（ROUND2 §13，A3）
+//
+// **只暴露 model**：这是唯一真的生效的项（pi.py 拼成 --provider/--model）。
+// 不做 baseURL/apiKey 输入框 —— PiProvider 不消费它们（provider.py:81）。
+// ---------------------------------------------------------------------------
+
+export interface ModelOption {
+  /** "provider/model"，也是提交给 PUT 的值。 */
+  id: string;
+  provider: string;
+  model: string;
+  label: string;
+  /** 是否支持图片输入（决定是否允许传图给 agent）。 */
+  vision: boolean;
+}
+
+export const settingsApi = {
+  ai: () => get<{ current: string; options: ModelOption[] }>("/settings/ai"),
+  setModel: (model: string) =>
+    request<{ current: string }>("/settings/ai", "PUT", { model }),
+};
+
+// ---------------------------------------------------------------------------
+// 宏观时间序列（ROUND2 §13，D4）
+//
+// 宏观看板之前是「一行孤立数字」，看不出现在处于历史什么位置。
+// 这些端点返回**序列**，让「PMI 连续 4 个月在荣枯线下」这类判断肉眼可见。
+// ---------------------------------------------------------------------------
+
+export interface MacroPoint {
+  /** ISO 日期或「2026-10」这种月度标签。 */
+  period: string;
+  value: number | null;
+}
+
+export interface MacroSeries {
+  available: boolean;
+  reason: string;
+  unit: string;
+  points: MacroPoint[];
+}
+
+export interface MacroCurve {
+  available: boolean;
+  reason: string;
+  unit: string;
+  date: string;
+  /** 收益率曲线：期限（"1Y"/"10Y"）→ 收益率。 */
+  points: { tenor: string; value: number }[];
+}
+
+export const macroApi = {
+  socialFinancing: () => get<MacroSeries>("/macro/social-financing"),
+  pmi: () => get<MacroSeries>("/macro/pmi"),
+  cnYields: () => get<MacroCurve>("/macro/cn-yields"),
+  lpr: () => get<MacroSeries>("/macro/lpr"),
+  repo: () => get<MacroSeries>("/macro/repo"),
+  northbound: () => get<MacroSeries>("/macro/northbound"),
+  margin: () => get<MacroSeries>("/macro/margin"),
+};
+
+// ---------------------------------------------------------------------------
+// Agent 会话历史（ROUND2 §13，C4）
+//
+// 前端**不读 Pi 的 session JSONL**（硬规则 2）：产品真源是我们的数据库。
+// 这里读的就是 `message` 表，与流式对话同一来源。
+// ---------------------------------------------------------------------------
+
+export interface SessionSummary {
+  id: string;
+  title: string;
+  runtime_session_id: string | null;
+  created_at: number;
+  message_count: number;
+}
+
+export interface SessionMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  /** assistant 消息若带工具调用/思考过程，放这里（可选，缺省不渲染）。 */
+  meta?: { thinking?: string; tool_calls?: { name: string; args?: string; result?: string }[] };
+  created_at: number;
+}
+
+/**
+ * Agent 会话历史（C4）。
+ *
+ * ⚠️ 路径是 `/sessions` 而**不是** `/agent/sessions`：会话路由本来就在
+ * `api/app.py` 里（流式对话用的也是它）。这里曾经写成 `/agent/sessions`，
+ * 后端返回 404，而调用方 `catch(() => setSessions([]))` 把它吞成了空数组 ——
+ * 界面于是理直气壮地显示「还没有会话」，而库里躺着 17 条。
+ * 「查询失败」被降级成「确实没有」是这里最危险的地方：它不报错，只是撒谎。
+ */
+export const agentApi = {
+  sessions: () => get<SessionSummary[]>("/sessions"),
+  messages: (sid: string) =>
+    get<SessionMessage[]>(`/sessions/${encodeURIComponent(sid)}/messages`),
+  deleteSession: (sid: string) =>
+    request<{ ok: boolean }>(`/sessions/${encodeURIComponent(sid)}`, "DELETE"),
 };

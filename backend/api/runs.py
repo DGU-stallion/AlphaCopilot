@@ -36,6 +36,16 @@ class NoteIn(BaseModel):
     text: str = ""
 
 
+class RunNoteIn(BaseModel):
+    """Run 的一行备注（B3）。上限 500，与页面备注口径一致。"""
+
+    note: str
+
+    @property
+    def too_long(self) -> bool:
+        return len(self.note) > 500
+
+
 def build_runs_router(
     store: Store,
     submit_backtest: Callable[[dict[str, Any]], str] | None = None,
@@ -63,6 +73,42 @@ def build_runs_router(
     def list_runs(kind: str | None = None, data_as_of: str | None = None,
                   limit: int = 50) -> list:
         return store.runs.list_recent(kind=kind, data_as_of=data_as_of, limit=limit)
+
+    @router.delete("/runs/{rid}")
+    def delete_run(rid: str) -> dict:
+        """软删一条 Run（B3，硬规则 14：破坏性操作必须可撤销）。
+
+        Run 是「这次算了什么、用哪版代码、哪份数据」的证据链，硬删不可恢复；
+        撤销入口在前端提示条里，后端只保证数据还在。没有「内置 Run」的保护：
+        Run 只能由确定性计算产生，不存在手写产物。
+        """
+        r = store.runs.get(rid)   # get 也能取到已软删的（重复删不报 404）
+        if r is None:
+            raise HTTPException(404, f"run not found: {rid}")
+        soft = store.runs.soft_delete(rid)
+        return {"ok": True, "id": rid, "soft": soft}
+
+    @router.post("/runs/{rid}/restore")
+    def restore_run(rid: str) -> dict:
+        """撤销软删。get() 看得见软删行，所以 restore 找得回来。"""
+        r = store.runs.get(rid)
+        if r is None:
+            raise HTTPException(404, f"run not found: {rid}")
+        restored = store.runs.restore(rid)
+        if not restored:
+            raise HTTPException(404, f"run not found: {rid}")
+        return {"ok": True, "id": rid}
+
+    @router.post("/runs/{rid}/note")
+    def set_run_note(rid: str, body: RunNoteIn) -> dict:
+        """写一行备注（「这一版想验证什么」）。上限 500，超了 400。"""
+        if body.too_long:
+            raise HTTPException(400, f"note 太长（{len(body.note)} > 500 字）")
+        if store.runs.get(rid) is None:
+            raise HTTPException(404, f"run not found: {rid}")
+        if not store.runs.set_note(rid, body.note):
+            raise HTTPException(404, f"run not found: {rid}")
+        return {"ok": True}
 
     @router.post("/runs/{rid}/rerun")
     def rerun(rid: str) -> dict:
