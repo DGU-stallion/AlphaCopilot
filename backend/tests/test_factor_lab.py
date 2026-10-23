@@ -323,9 +323,9 @@ def test_renderer_by_fn_appended():
     # 旧条目原样保留
     assert page_spec.RENDERER_BY_FN["backtest.equity"] == "lwc"
     assert page_spec.RENDERER_BY_FN["backtest.drawdown"] == "lwc"
-    assert page_spec.RENDERER_BY_FN["correlation.overlay"] == "echarts"
+    assert page_spec.RENDERER_BY_FN["correlation.overlay"] == "lwc"
     assert page_spec.RENDERER_BY_FN["correlation.matrix"] == "echarts"
-    assert page_spec.RENDERER_BY_FN["correlation.rolling"] == "echarts"
+    assert page_spec.RENDERER_BY_FN["correlation.rolling"] == "lwc"
 
 
 def test_validate_spec_accepts_factorlab_chart_blocks():
@@ -368,7 +368,9 @@ def fake_lab_data(monkeypatch):
     }
     monkeypatch.setattr(
         factor_lab.data, "closes_with_dates",
-        lambda code, count=250: list(fake[code]),
+        # 必须接受 period：真实签名是 (code, period, count)，
+        # 只写 (code, count) 的 mock 会在调用方换实现时炸（已发生过）。
+        lambda code, period=0, count=250: list(fake[code]),
     )
     monkeypatch.setattr(factor_lab.data, "names", lambda codes: {c: c for c in codes})
 
@@ -406,7 +408,10 @@ def test_registered_decay_and_quantile_fns(fake_lab_data):
 
 def test_registered_fns_degrade_when_no_data(monkeypatch):
     """数据源不可用 → 空图不崩（与 backtest_page 同一约定）。"""
-    monkeypatch.setattr(factor_lab.data, "closes_with_dates", lambda code, count=250: [])
+    monkeypatch.setattr(
+        factor_lab.data, "closes_with_dates",
+        lambda code, period=0, count=250: [],
+    )
     monkeypatch.setattr(factor_lab.data, "names", lambda codes: {c: c for c in codes})
     reg = __import__("alpha.registry", fromlist=["get"])
     for fn in _FACTORLAB_FNS:

@@ -440,7 +440,7 @@ def walkforward_oos_equity(symbol: str, range: str = "1y", train: int = 120,
     if not grid:
         return chart.line([], {"样本外净值": []},
                           title="Walk-forward 样本外净值（参数组合为空：需 slow > fast）")
-    rows = data.closes_with_dates(symbol, _RANGE_COUNT.get(range, 250))
+    rows = data.closes_for_range(symbol, range)
     if len(rows) < 2:
         return chart.line([], {"样本外净值": []},
                           title="Walk-forward 样本外净值（数据暂不可用）")

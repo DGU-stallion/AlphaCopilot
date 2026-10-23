@@ -380,8 +380,7 @@ def paramscan_heatmap(
     """
     fg = _parse_grid(fast_grid, [20, 30, 60])
     sg = _parse_grid(slow_grid, [120, 180, 250])
-    count = {"3m": 63, "6m": 126, "1y": 250}.get(range, 250)
-    rows = data.closes_with_dates(symbol, count=count)
+    rows = data.closes_for_range(symbol, range)
     closes = [c for _, c in rows]
     dates = [d for d, _ in rows]
     if len(closes) < 2:

@@ -79,18 +79,25 @@ def option_to_series(option: Any) -> list[dict[str, Any]]:
     return out
 
 
-def lwc_payload(option: Any) -> dict[str, Any]:
+def lwc_payload(option: Any, *, with_drawdown: bool = False) -> dict[str, Any]:
     """renderer=lwc 的 chart 块载荷。
 
     `series` 是各系列的 {time,value} 序列（pane 0 用第一个/前几个）；
-    `drawdown` 是第一条系列的回撤（相对历史最高点的百分比，≤0）。
+    `drawdown` 是第一条系列的回撤（相对历史最高点的百分比，≤ 0）。
 
     回撤在这里算而不是让前端算：一是前端算等于把确定性计算搬到 UI 层
     （违反硬规则 6）；二是净值与回撤必须来自同一条序列，分开算容易错位。
+
+    **`with_drawdown` 默认 False 是必要的，不是保守**。曾经的 bug 是对
+    任何 option 都算回撤，结果：
+      - `backtest.equity` 自带回撤 → 前端加回撤 pane（正确）
+      - `backtest.drawdown` 也被算了一份「回撤的回撤」→ 同一屏两份回撤
+      - `tearsheet.rolling_sharpe` 被算了「Sharpe 的回撤」→ 毫无意义
+    调用方（api/pages.py）按 fn 显式声明谁要回撤，见 DRAWDOWN_FNS。
     """
     series = option_to_series(option)
     drawdown: list[dict[str, Any]] = []
-    if series:
+    if with_drawdown and series:
         base = series[0]["points"]
         peak = float("-inf")
         dd: list[dict[str, Any]] = []

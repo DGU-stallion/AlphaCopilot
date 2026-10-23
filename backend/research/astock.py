@@ -279,6 +279,19 @@ def _tencent_kline(code: str, category: int = 4, offset: int = 60) -> list[dict]
 
     返回记录列表，字段名与 mootdx 对齐：datetime/open/close/high/low/vol。
     category: 4=日 5=周 6=月（gtimg 无 60 分钟，60分钟仍走 mootdx）。
+
+    **两层回退，不是一层**（2026-10-22 实测）：
+      1. 端点：`/fqkline/get`（前复权）优先 —— 复权数据才与「持有到今天」的
+         收益一致；它被上游 WAF 拦（整个端点 501）时回退到 `/kline/kline`（不复权）。
+      2. 域名：`ifzq` 与 `web.ifzq` 依次试。
+
+    为什么必须两层：只做域名回退不够。两个域名会**同时**变成 501
+    （同一个 WAF 策略），此时看起来「数据源全挂」而实际上只是 fqkline 这个
+    路径被拦。不做端点回退的后果是整个回测页 503，用户以为数据源不可用。
+
+    不复权的代价：分红/送股后早期价格与本金的对应关系会偏。所以它只是
+    回退，不是默认 —— 复权端点可用时一定用它（见测试
+    test_gtimg_prefers_adjusted_endpoint_when_it_works）。
     """
     import json
     import urllib.request
@@ -286,33 +299,48 @@ def _tencent_kline(code: str, category: int = 4, offset: int = 60) -> list[dict]
     scale = {4: "day", 5: "week", 6: "month"}.get(category, "day")
     prefix = _INDEX_PREFIX.get(code, get_prefix(code))  # 指数走显式映射，否则按个股前缀规则
     sym = f"{prefix}{code}"
-    # 两个域名的行为会各自变化：2026-10-21 实测 `web.ifzq` 返回 501 而
-    # `ifzq` 正常。所以**依次尝试**而不是只认一个 —— 单点域名故障会让
-    # 整个 K 线功能挂掉，而它只是同一个服务的两个入口。
-    # 顺序上先 `ifzq`（实测可用），`web.ifzq` 留作回退。
+
+    # (路径模板, 复权字段前缀)。顺序即优先级：复权优先。
+    endpoints = (
+        ("/appstock/app/fqkline/get?param={sym},{scale},,,{offset},qfq", "qfq"),
+        ("/appstock/app/kline/kline?param={sym},{scale},,,{offset}", ""),
+    )
+    hosts = ("ifzq.gtimg.cn", "web.ifzq.gtimg.cn")
+
     payload = None
     last_err: Exception | None = None
-    for host in ("ifzq.gtimg.cn", "web.ifzq.gtimg.cn"):
-        url = (
-            f"https://{host}/appstock/app/fqkline/get"
-            f"?param={sym},{scale},,,{offset},qfq"
-        )
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            raw = urllib.request.urlopen(req, timeout=12).read().decode("utf-8")  # noqa: S310
-            payload = json.loads(raw)
+    for tpl, _field_prefix in endpoints:
+        for host in hosts:
+            url = f"https://{host}" + tpl.format(sym=sym, scale=scale, offset=offset)
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                raw = urllib.request.urlopen(req, timeout=12).read().decode("utf-8")  # noqa: S310
+                payload = json.loads(raw)
+                break
+            except Exception as e:  # noqa: BLE001 —— 换下一个入口
+                last_err = e
+        if payload is not None:
             break
-        except Exception as e:  # noqa: BLE001 —— 换下一个域名
-            last_err = e
+
     if payload is None:
-        raise DataUnavailable(f"gtimg K 线两个入口均不可用：{type(last_err).__name__}: {last_err}") from last_err
+        raise DataUnavailable(
+            f"gtimg K 线全部入口均不可用（fqkline 与 kline、两个域名均试过）："
+            f"{type(last_err).__name__}: {last_err}"
+        ) from last_err
     if payload.get("code") not in (0, None):
         raise DataUnavailable(f"gtimg 返回错误 code={payload.get('code')} msg={payload.get('msg')!r}")
     node = (payload.get("data") or {}).get(sym)
     if node is None:
         raise DataUnavailable(f"gtimg 响应里没有 {sym} 节点（代码可能不存在）")
 
-    rows = node.get(f"qfq{scale}") or node.get(scale) or []
+    # fqkline 的数组叫 qfqday/hfqday/day，kline/kline 的叫 day/week/month。
+    # 两种都认，免得为了区分端点再传一个标志进解析层。
+    rows = (
+        node.get(f"qfq{scale}")
+        or node.get(f"hfq{scale}")
+        or node.get(scale)
+        or []
+    )
     if not rows:
         # 空数组有两种含义，必须区分：
         #   · 代码无效（退市/不存在）→ qt 里该股票对应的是 []
@@ -634,13 +662,82 @@ def _numf(v):
     return v if isinstance(v, (int, float)) else None
 
 
+def _sina_turnover_rank(n: int) -> list[dict]:
+    """新浪全市场成交额榜（东财 clist 被阻断时的回退源）。
+
+    2026-10-22 实测：东财 `push2` / `push2delay` 的 `/api/qt/clist/get` 全部
+    `RemoteDisconnected`（与 gtimg 501 同一类：上游 WAF），而两处代码只认东财，
+    于是「成交额 TOP20」整块显示「暂无数据」。
+
+    **单位陷阱**（容易静默错一万倍）：
+      · `amount` 已经是**元** → 直用
+      · `mktcap` / `nmc` 是**万元** → 必须 ×10000，否则市值显示小一万倍
+
+    拿不到的字段：**行业**（东财的 f100）。新浪这个接口不返行业，回空串——
+    不要用别的字段充数，宁可缺失。
+    """
+    import json as _json
+
+    params = f"page=1&num={n}&sort=amount&asc=0&node=hs_a"
+    url = (
+        "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/"
+        f"Market_Center.getHQNodeData?{params}"
+    )
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": UA, "Referer": "https://finance.sina.com.cn/"},
+    )
+    raw = urllib.request.urlopen(req, timeout=12).read().decode("utf-8", "ignore")  # noqa: S310
+    data = _json.loads(raw)
+    if not isinstance(data, list):
+        return []
+
+    def _wan(v: object) -> float | None:
+        """万元 → 元。非数值返回 None（不要静默变 0，0 市值看起来像真数据）。"""
+        x = _numf(v)
+        if isinstance(x, str):
+            try:
+                x = float(x)
+            except ValueError:
+                return None
+        return x * 10_000 if isinstance(x, (int, float)) else None
+
+    def _num_str(v: object) -> float | None:
+        """新浪的价格/涨跌幅是**字符串**（如 \"590.110\"）。"""
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return None
+        return f if f == f and f not in (float("inf"), float("-inf")) else None
+
+    out: list[dict] = []
+    for d in data:
+        if not isinstance(d, dict):
+            continue
+        out.append({
+            "code": str(d.get("code", "")),
+            "name": d.get("name", ""),
+            "price": _num_str(d.get("trade")),
+            "pct": _num_str(d.get("changepercent")),
+            "amount": _num_str(d.get("amount")),
+            "mcap": _wan(d.get("mktcap")),
+            "float_cap": _wan(d.get("nmc")),
+            # 新浪这个接口不返行业。不要用别的字段充数。
+            "industry": "",
+        })
+    return out
+
+
 def market_turnover_rank(n: int = 20) -> list[dict]:
     """全市场成交额榜（沪深京 A 股按成交额降序 TopN）。
 
-    东财行情中心 clist。**push2(实时) 不可达时降级 push2delay(延迟行情，日榜场景足够)**。
+    **两源回退**：东财 clist（字段最全，含行业）→ 新浪排行（无行业）。
+    2026-10-22 实测东财 push2/push2delay 均被断开（WAF），只认东财会让整个
+    「成交额 TOP20」块空白 —— 这是阻断性取数失败，不是新增数据源。
+
     返回每只: code / name / price / pct / amount(成交额,元) / mcap(总市值,元) /
     float_cap(流通市值,元) / industry。
-    ⚠️ 这是客观公开榜单数据（东财/同花顺同款），产品侧只做客观展示——非推荐、非预测、不评分。
+    ⚠️ 客观公开榜单数据（东财/同花顺同款），产品侧只做客观展示——非推荐、非预测、不评分。
     """
     params = {"pn": 1, "pz": n, "po": 1, "np": 1, "fltt": 2, "invt": 2, "fid": "f6",
               "fs": "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23,m:0 t:81 s:2048",
@@ -653,14 +750,21 @@ def market_turnover_rank(n: int = 20) -> list[dict]:
             diff = (r.json().get("data") or {}).get("diff") or []
             if diff:
                 break
-        except Exception:
+        except Exception:  # noqa: BLE001
             continue
-    return [{
-        "code": str(d.get("f12", "")), "name": d.get("f14", ""),
-        "price": _numf(d.get("f2")), "pct": _numf(d.get("f3")),
-        "amount": _numf(d.get("f6")), "mcap": _numf(d.get("f20")),
-        "float_cap": _numf(d.get("f21")), "industry": d.get("f100", "") or "",
-    } for d in diff]
+    if diff:
+        return [{
+            "code": str(d.get("f12", "")), "name": d.get("f14", ""),
+            "price": _numf(d.get("f2")), "pct": _numf(d.get("f3")),
+            "amount": _numf(d.get("f6")), "mcap": _numf(d.get("f20")),
+            "float_cap": _numf(d.get("f21")), "industry": d.get("f100", "") or "",
+        } for d in diff]
+
+    # 回退：新浪。失败也不抛 —— 上层按「暂无数据」展示，不应 500。
+    try:
+        return _sina_turnover_rank(n)
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def eastmoney_datacenter(report_name: str, columns: str = "ALL", filter_str: str = "",

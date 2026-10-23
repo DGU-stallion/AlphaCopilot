@@ -359,11 +359,10 @@ def _load(symbols: list[str], momentum: int, range: str):
 
     因子 = close[t]/close[t-momentum] - 1（只用 t 及以前，无未来函数）。
     """
-    count = _RANGE_COUNT.get(range, 250)
     factor: dict[str, dict[str, float]] = {}
     daily: dict[str, dict[str, float]] = {}
     for code in symbols:
-        rows = data.closes_with_dates(code, count=count)
+        rows = data.closes_for_range(code, range)
         for i, (d, c) in enumerate(rows):
             if i >= 1 and rows[i - 1][1]:
                 daily.setdefault(d, {})[code] = c / rows[i - 1][1] - 1.0

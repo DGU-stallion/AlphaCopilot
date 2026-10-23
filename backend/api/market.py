@@ -13,15 +13,24 @@ research.market 数据层与新搬入的 duanxian（session/overseas/live-emotio
 
 from __future__ import annotations
 
+import time as _time
+
 from fastapi import APIRouter, HTTPException, Query
 
 from alpha import limit_up_sample
+from api import emotion_store as _es
 from duanxian import live_emotion, overseas, trade_calendar
 from duanxian.util import china_now, china_today, is_a_share_closed, is_weekend
 from research import astock, macro, market
 
 
-def build_market_router() -> APIRouter:
+def build_market_router(store=None) -> APIRouter:
+    """盘面数据/复盘看板端点。
+
+    `store` 仅用于情绪历史（ROUND2 阶段 1：`emotion_daily` 表）。
+    传 None 时 `emotion-history` 返回空列表而不是报错 —— 交易数据本身
+    不依赖数据库，没库也该能看当天盘面。
+    """
     router = APIRouter(prefix="/api")
 
     # ---- A 股大盘指数 / 个股行情（仅标准库，永远可用）----
@@ -83,11 +92,43 @@ def build_market_router() -> APIRouter:
         """短线情绪：连板梯队 / 最高连板 / 炸板率 / 封板率 / 晋级率 / 涨跌停家数。
 
         全站共享缓存 5 分钟。
+
+        **副产品：每日落库**（ROUND2 阶段 1）。每次取到时顺手写一行
+        `emotion_daily`，这样不用额外的定时任务也能积累历史。
+        失败不影响返回：历史攒不下来比看不到今天的情绪轻得多。
         """
         try:
-            return {"data": market.get_short_term_emotion()}
+            snap = market.get_short_term_emotion()
         except Exception as e:  # noqa: BLE001
             raise HTTPException(502, f"短线情绪异常：{e}") from e
+
+        if store is not None and snap.get("date"):
+            try:
+                _es.ensure_schema(store.conn)
+                _es.upsert_snapshot(store.conn, snap, _time.time())
+                store.conn.commit()
+            except Exception:  # noqa: BLE001
+                # 故意吞掉：落库失败不该让用户看不到情绪数据。
+                pass
+
+        return {"data": snap}
+
+    @router.get("/market/emotion-history")
+    def market_emotion_history(days: int = Query(60, ge=5, le=250)) -> dict:
+        """情绪历史序列（升序，画图直接用）—— ROUND2 阶段 1。
+
+        为什么需要它：所有其他接口只返回**当天快照**。一条只有今天一个点的
+        折线画出来是一颗孤零零的点，比数字还糟。用户原话：「单纯的独立数字
+        看不出来什么，需要跟之前的数据进行比对」。
+
+        注意实际能拿到多少：东财涨停池只保留约 28 天历史，所以开发期回填
+        加每日积累最多约 15–20 个交易日，之后再随时间增长。返回条数少于
+        `days` 是正常的，不要当错误。
+        """
+        if store is None:
+            return {"data": []}
+        _es.ensure_schema(store.conn)
+        return {"data": _es.history(store.conn, days)}
 
     @router.get("/market/turnover-top")
     def market_turnover_top() -> dict:

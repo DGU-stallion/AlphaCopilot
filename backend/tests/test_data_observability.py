@@ -190,3 +190,78 @@ def test_gtimg_kline_reports_when_all_hosts_fail(monkeypatch):
         assert "501" in str(e), "错误信息必须带上游具体原因，否则无法判断该重试还是换源"
     else:
         raise AssertionError("两个域名都失败时必须抛 DataUnavailable")
+
+
+def test_gtimg_falls_back_to_unadjusted_endpoint(monkeypatch):
+    """`/fqkline/get` 被上游 WAF 拦时，必须回退到 `/kline/kline`。
+
+    2026-10-22 实测：`ifzq.gtimg.cn` 与 `web.ifzq.gtimg.cn` 的
+    `/appstock/app/fqkline/get` 全部返回 501（腾讯 WAF 拦截页），
+    而同一服务的 `/appstock/app/kline/kline` 正常。
+    只认 fqkline 会让整个回测页 503 —— 用户看到的是「数据源不可用」。
+
+    这不是「新增数据源」（那是数据层冻结禁止的），是**修阻断性 bug**：
+    同一个 gtimg 服务的另一个端点。
+    """
+    from research import astock
+
+    calls: list[str] = []
+
+    class _Resp:
+        def __init__(self, body: bytes) -> None:
+            self._b = body
+
+        def read(self) -> bytes:
+            return self._b
+
+    body = (
+        b'{"code":0,"msg":"","data":{"sh600519":{"day":'
+        b'[["2026-10-20","100.0","101.0","102.0","99.0","1000"]]}}}'
+    )
+
+    def fake_urlopen(req, timeout=0):  # noqa: ANN001
+        url = req.full_url
+        calls.append(url)
+        if "fqkline" in url:
+            raise OSError("HTTP Error 501: Not Implemented")
+        return _Resp(body)
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    rows = astock._tencent_kline("600519", category=4, offset=5)
+
+    assert rows, "fqkline 全挂时必须回退到 kline/kline"
+    assert rows[0]["close"] == 101.0
+    assert any("kline/kline" in u for u in calls), "必须真的试过非复权端点"
+    assert any("fqkline" in u for u in calls), "复权端点应优先尝试（有 qfq 更准）"
+
+
+def test_gtimg_prefers_adjusted_endpoint_when_it_works(monkeypatch):
+    """复权端点可用时**不该**去打非复权端点 —— 复权数据更准确。"""
+    from research import astock
+
+    calls: list[str] = []
+
+    class _Resp:
+        def __init__(self, body: bytes) -> None:
+            self._b = body
+
+        def read(self) -> bytes:
+            return self._b
+
+    body = (
+        b'{"code":0,"msg":"","data":{"sh600519":{"qfqday":'
+        b'[["2026-10-20","100.0","101.0","102.0","99.0","1000"]]}}}'
+    )
+
+    def fake_urlopen(req, timeout=0):  # noqa: ANN001
+        calls.append(req.full_url)
+        return _Resp(body)
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    rows = astock._tencent_kline("600519", category=4, offset=5)
+
+    assert rows[0]["close"] == 101.0
+    assert len(calls) == 1, "复权端点成功就不该再试非复权（避免无谓请求）"
+    assert "fqkline" in calls[0]

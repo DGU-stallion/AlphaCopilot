@@ -110,6 +110,74 @@ def closes(code: str, period: int = DAY, count: int = 250) -> list[float]:
     return out
 
 
+# 区间预设 → 根数。与 registry._coerce_date_range 的白名单**必须一致**：
+# 那里只认 3m/6m/1y 或 ISO 区间，所以前端也只能给这三个预设。
+# 曾经前端多给了 2y/3y，选一下就 400（ROUND2 A5 修）。
+RANGE_COUNT: dict[str, int] = {"3m": 63, "6m": 126, "1y": 250}
+
+# ISO 区间回溯时的根数上限（约 8 年日线）。
+#
+# 为什么是 2000：实测数据源的天花板就在这里 ——
+#   offset=1500 → 1500 根（首 2020-08-12）
+#   offset=2000 → 2000 根（首 2018-07-23）
+#   offset=3000 → 上游报错（且错误信息误导，说「代码可能不存在」）
+# 设更大的值只会把上游错误当成本地故障。
+# 上限的作用是防止「用户填了 2000 年」时去要一百万根，把数据源拖死。
+_RANGE_MAX_BARS = 2000
+
+
+def closes_for_range(
+    code: str,
+    range_spec: str,
+    period: int = DAY,
+    default_count: int = 250,
+) -> list[tuple[str, float]]:
+    """按**区间参数**取带日期的收盘价序列。
+
+    这是 `range` 参数的唯一正确消费方式。此前 5 处调用点各自写
+    `{"3m":63,"6m":126,"1y":250}.get(range, 250)` —— 于是传入
+    `"2024-01-01:2024-12-31"` 这种**校验层已经放过**的 ISO 区间时，
+    dict 查不到键就默默取最近 250 根：**用户选的年份被完全忽略，且无任何提示**。
+    「算错」比抛异常危险得多，所以统一收到这里。
+
+    两种形态：
+      · 预设（3m / 6m / 1y）→ 转换成根数，行为与旧实现一致
+      · ISO 区间（`YYYY-MM-DD:YYYY-MM-DD`）→ 按日期**真实过滤**
+      · 其它未知值 → `default_count` 根（保持旧兜底行为，不因一次改动改两件事）
+
+    ISO 区间为什么要先多取：`kline` 只能「取最近 N 根」，无法按日期范围拉。
+    所以按「今天到 start 的自然日跨度」估算需要多少根，再过滤。估算偏大无害
+    （多取几根），偏小会缺数据 —— 所以系数给 0.8 并留 40 根缓冲。
+    """
+    if not isinstance(range_spec, str):
+        return closes_with_dates(code, period=period, count=default_count)
+
+    if ":" not in range_spec:
+        count = RANGE_COUNT.get(range_spec, default_count)
+        return closes_with_dates(code, period=period, count=count)
+
+    import datetime as _dt
+
+    start_s, _, end_s = range_spec.partition(":")
+    try:
+        start = _dt.date.fromisoformat(start_s)
+        end = _dt.date.fromisoformat(end_s)
+    except ValueError as e:
+        raise ValueError(f"非法 ISO 日期区间 {range_spec!r}") from e
+    if start > end:
+        # 用户填反了。不猜他的意图（猜错就是算错），直接报错。
+        raise ValueError(f"区间起止颠倒：{start_s} > {end_s}")
+
+    # 从「今天」回溯到 start 需要多少根日线（自然日 × 0.8 + 缓冲）
+    today = _dt.date.today()
+    span_days = max((today - start).days, 1)
+    need = min(_RANGE_MAX_BARS, int(span_days * 0.8) + 40)
+
+    rows = closes_with_dates(code, period=period, count=need)
+    lo, hi = start.isoformat(), end.isoformat()
+    return [(d, c) for d, c in rows if lo <= d[:10] <= hi]
+
+
 def closes_with_dates(code: str, period: int = DAY, count: int = 250) -> list[tuple[str, float]]:
     """带日期的收盘价序列（相关性/对齐用）。基于 kline，抽 (date, close)。
 
