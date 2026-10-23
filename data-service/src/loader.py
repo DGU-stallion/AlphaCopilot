@@ -23,7 +23,7 @@ from typing import Any
 SKILL = Path(__file__).resolve().parents[1] / "vendor" / "a-stock-data" / "SKILL.md"
 
 # 匹配 ```python ... ``` 代码块。用非贪婪 + DOTALL。
-_BLOCK_RE = re.compile(r"```python\n(.*?)\n```", re.S)
+_BLOCK_RE = re.compile(r"```python\n(.*?)\n```", re.DOTALL)
 
 
 def blocks() -> list[str]:
@@ -83,7 +83,11 @@ def _is_example_fetch(node: ast.stmt, local_names: set[str], module_names: set[s
 
 
 # 构造值的裸名字内建（不是取数）。
-_PURE_BUILTINS = {"set", "list", "dict", "tuple", "frozenset", "int", "float", "str", "bool", "len", "sum", "min", "max"}
+_PURE_BUILTINS = {
+    "set", "list", "dict", "tuple", "frozenset",
+    "int", "float", "str", "bool",
+    "len", "sum", "min", "max",
+}
 
 
 def _strip(src: str) -> ast.Module:
@@ -102,7 +106,9 @@ def _strip(src: str) -> ast.Module:
     """
     tree = ast.parse(src)
     local_names = {
-        n.name for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+        n.name
+        for n in tree.body
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
     }
     module_names = _module_aliases(tree)
     # `from datetime import timezone` 这类符号也是纯构造来源，并入模块名集合
@@ -110,30 +116,33 @@ def _strip(src: str) -> ast.Module:
 
     keep: list[ast.stmt] = []
     for node in tree.body:
-        if isinstance(node, (ast.Expr, ast.For, ast.AsyncFor, ast.While, ast.With, ast.AsyncWith, ast.If)):
+        if isinstance(
+            node, (ast.Expr, ast.For, ast.AsyncFor, ast.While, ast.With, ast.AsyncWith, ast.If)
+        ):
             continue
-        if isinstance(node, (ast.Assign, ast.AnnAssign)):
-            # 判据：这次赋值是**构造一个值**，还是**发起一次取数**？
-            #
-            # 早先的规则是「右值含任何 Call 就丢」。它把示例取数（`cb = convertible_bonds()`）
-            # 挡掉的同时，也把**模块级常量**一起埋了：
-            #     _TICKER_RE   = re.compile(...)          → Ticker 归一化直接 NameError
-            #     EM_SESSION   = requests.Session()       → 所有东财函数 NameError
-            #     _CN_TZ       = timezone(timedelta(...)) → 时间戳解析 NameError
-            # 后果不是报错，而是**静默降级**：能力「存在」，一调就崩
-            # （LPR 端点就是因为这个一直返回 NameError，见 api/macro.py）。
-            #
-            # 现在的判据看**被调者是谁**：
-            #   · 裸名字调用（`f()`）→ 只有 f 来自 import 或内建（set/list/Counter/re.compile…）
-            #     才算构造；否则是块内 def（示例）或跨块取数函数（`tencent_quote`）→ 丢
-            #   · 属性调用（`a.b()`）→ 只有 a 是本块 import 进来的**模块**才算构造
-            #     （`re.compile` / `os.environ.get` / `requests.Session`）；
-            #     `ticks.loc[...]`、`client.bars(...)` 这类挂在**数据**上的调用 → 丢
-            #
-            # 这个判据把 143 处被剥的赋值分成了「常量（留）」与「示例取数（丢）」两堆，
-            # 且仍能挡住 block 78 那种纯示例块（实测加载后不再联网）。
-            if _is_example_fetch(node, local_names, module_names):
-                continue
+        # 判据：这次赋值是**构造一个值**，还是**发起一次取数**？
+        #
+        # 早先的规则是「右值含任何 Call 就丢」。它把示例取数（`cb = convertible_bonds()`）
+        # 挡掉的同时，也把**模块级常量**一起埋了：
+        #     _TICKER_RE   = re.compile(...)          → Ticker 归一化直接 NameError
+        #     EM_SESSION   = requests.Session()       → 所有东财函数 NameError
+        #     _CN_TZ       = timezone(timedelta(...)) → 时间戳解析 NameError
+        # 后果不是报错，而是**静默降级**：能力「存在」，一调就崩
+        # （LPR 端点就是因为这个一直返回 NameError，见 api/macro.py）。
+        #
+        # 现在的判据看**被调者是谁**：
+        #   · 裸名字调用（`f()`）→ 只有 f 来自 import 或内建（set/list/Counter/re.compile…）
+        #     才算构造；否则是块内 def（示例）或跨块取数函数（`tencent_quote`）→ 丢
+        #   · 属性调用（`a.b()`）→ 只有 a 是本块 import 进来的**模块**才算构造
+        #     （`re.compile` / `os.environ.get` / `requests.Session`）；
+        #     `ticks.loc[...]`、`client.bars(...)` 这类挂在**数据**上的调用 → 丢
+        #
+        # 这个判据把 143 处被剥的赋值分成了「常量（留）」与「示例取数（丢）」两堆，
+        # 且仍能挡住 block 78 那种纯示例块（实测加载后不再联网）。
+        if isinstance(node, (ast.Assign, ast.AnnAssign)) and _is_example_fetch(
+            node, local_names, module_names
+        ):
+            continue
         keep.append(node)
 
     tree.body = keep
@@ -189,7 +198,8 @@ def load() -> dict[str, Any]:
 
 def _summary(node: ast.AST) -> str:
     """取 docstring 首行作为说明；没有就空串。"""
-    doc = ast.get_docstring(node) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) else None
+    is_def = isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+    doc = ast.get_docstring(node) if is_def else None
     if not doc:
         return ""
     return doc.strip().splitlines()[0].strip()

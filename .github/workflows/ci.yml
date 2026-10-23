@@ -33,6 +33,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      # test_vendor_bridge.py 是对**真实** vendor 层做的集成测试（11 条）：
+      # 它会起子进程调 data-service/.venv/bin/python。venv 不存在就直接失败，
+      # 这是对的 —— 那些测试要证明的正是「跨进程契约能跑通」，用 mock 替掉
+      # 就等于把它们变成同义反复。所以 CI 必须把 venv 真的建出来。
+      #
+      # 两个环境必须隔离（mootdx 锁 httpx<0.26，主环境 mcp 要 >=0.27），
+      # 所以不能塞进当前解释器。
+      - name: Provision data-service venv
+        # 注意：不要在这里覆盖 working-directory。job 默认是 backend/，
+        # ../data-service 才能落到仓库根的 data-service/。
+        run: |
+          python -m venv ../data-service/.venv
+          ../data-service/.venv/bin/python -m pip install --upgrade pip
+          ../data-service/.venv/bin/python -m pip install -q -r ../data-service/requirements.txt
+          ../data-service/.venv/bin/python -c "import pandas, requests; print('data-service venv ok')"
+
       - name: Lint (ruff)
         run: ruff check .
 
@@ -115,8 +131,11 @@ jobs:
 
       - name: Lint (ruff)
         run: |
-          pip install ruff
-          ruff check src/
+          # 钉版本：不钉的话 CI 拿最新 ruff，而它的**默认规则集**会随版本变
+          # （实测 0.15 只有 E/F，0.17 又多了 FURB/SIM/S），于是「本地绿 CI 红」。
+          # data-service/pyproject.toml 里有显式规则集，钉版本是为了行为也稳定。
+          pip install ruff==0.17.2
+          python -m ruff check src/
 
       - name: Our tests (loader / worker)
         run: python -m pytest tests -q

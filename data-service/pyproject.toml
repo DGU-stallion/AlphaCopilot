@@ -1,0 +1,18 @@
+# data-service 自己的 lint 配置。
+#
+# 为什么必须显式写：没有配置文件时 ruff 用**它自己版本的默认规则集**，
+# 而 CI 是 `pip install ruff`（拿最新版），本地是半年前的版本 ——
+# 于是同一条命令在两端给出不同结果。实测：ruff 0.15 默认只有 E4/E7/E9/F，
+# 0.17 默认还带上了 FURB / SIM / S，CI 突然报 4 个「本地从没见过的错」。
+#
+# 规则集与 backend/pyproject.toml 保持一致，避免两处风格分叉。
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["vendor"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+# 注意：不要在 select 里加 "S"（bandit）。loader 的 `except: continue` 是
+# 「单块失败就跳过、报错留给调用阶段」的有意设计，加 S 会被逼着加 noqa。
