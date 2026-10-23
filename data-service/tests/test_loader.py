@@ -20,6 +20,11 @@ from pathlib import Path
 
 import pytest
 
+# 与 fixture 同名的 `loader` 会遮住模块，所以判据级测试用这个别名。
+# 放在模块级 import 而不是 fixture 里：判据测试是纯函数测试，不需要 fixture。
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+import loader as loader_mod  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[1]          # data-service/
 sys.path.insert(0, str(ROOT / "src"))
 
@@ -157,3 +162,71 @@ class TestReadOnlyVendor:
         mod.load()
         after = {p.name: p.stat().st_mtime for p in SKILL.parent.iterdir() if p.is_file()}
         assert before == after
+
+
+def _kept(src: str) -> set[str]:
+    """走**真实的剥除路径**，返回「保留」的顶层赋值目标名。
+
+    刻意不直接调 `_is_example_fetch`：那样会绕过调用点，把调用点改坏
+    （比如退回「右值含任何 Call 就丢」的旧规则）测试依然全绿 ——
+    等于测了一个没人用的函数。
+    """
+    import ast
+
+    tree = loader_mod.strip_examples(src)
+    return {
+        n.targets[0].id
+        for n in tree.body
+        if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)
+    }
+
+
+class TestStripRule:
+    """剥除规则的判据（ROUND3 修）。
+
+    为什么这里直接测判据而不是「加载一次看常量在不在」：判据写错时加载会
+    **真去联网**（实测 0.36s → 99.6s），测试会挂在超时而不是失败 ——
+    一个只会挂住的守卫等于没有守卫。纯函数判据秒级确定，变异立刻可见。
+    """
+
+    def test_module_level_constants_are_kept(self):
+        # 真事故：旧规则「右值含任何 Call 就丢」把这三个一起埋了 ——
+        #   _TICKER_RE = re.compile(...)     → Ticker 归一化 NameError
+        #   EM_SESSION = requests.Session()  → **所有东财函数** NameError
+        #   _CN_TZ     = timezone(...)       → 时间戳解析 NameError
+        # 后果不是导入失败，而是能力「存在」但一调就崩（LPR 因此一直返回
+        # NameError EM_SESSION，而 loader 自己的测试全绿）。
+        src = (
+            "import re\n"
+            "import requests\n"
+            "from datetime import timezone, timedelta\n"
+            "_TICKER_RE = re.compile(r'^x$')\n"
+            "EM_SESSION = requests.Session()\n"
+            "_CN_TZ = timezone(timedelta(hours=8))\n"
+        )
+        assert _kept(src) == {"_TICKER_RE", "EM_SESSION", "_CN_TZ"}
+
+    def test_example_fetches_are_dropped(self):
+        # 另一头：示例取数必须继续丢，否则 import 阶段就联网
+        src = (
+            "def tencent_quote(code):\n"
+            "    return {}\n"
+            "quotes = tencent_quote('600519')\n"          # 块内函数 → 示例
+            "snap = tdx_daily_package('2026-10-22')\n"    # 跨块取数函数 → 示例
+            "ticks = tencent_ticks('600519')\n"
+        )
+        assert _kept(src) == set()
+
+    def test_calls_on_data_objects_are_dropped(self):
+        # `df.dropna()` / `ticks.loc[...]` 挂在**数据**上，不是模块 → 示例
+        src = "df = x.dropna()\nn = df.shape[0]\n"
+        # df 被丢（挂在 x 上的调用），n 保留（纯取值，没有调用）
+        assert _kept(src) == {"n"}
+
+    def test_pure_builtins_are_kept(self):
+        src = "seen = set()\nn = len([1, 2])\n"
+        assert _kept(src) == {"seen", "n"}
+
+    def test_plain_literals_unaffected(self):
+        src = "API = 'https://x'\nX = 1 + 2\n"
+        assert _kept(src) == {"API", "X"}

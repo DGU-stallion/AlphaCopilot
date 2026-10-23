@@ -108,7 +108,7 @@ AI native 个人投研量化工作台。
 | M0-5 | **冻结旧数据层**：只修阻断性 bug，不再加功能（即将被 vendor 版替代） | 约定写入 AGENTS |
 | M0-6 | 前端删死代码：`AskAiButton`（**14 处 / 7 个文件**）/ `DeepDive`（11 处）/ `Placeholder` / `SaveNoteButton` / `lib/notes.ts`；`lib/api.ts` 里 `portfolio`（后端是 `/portfolios`）与 `myreports`（后端是 `/reports`）两组错路径 | `grep -rn "AskAiButton" frontend/src` 为空 |
 | M0-7 | 清 **28 行** vibe 痕迹（注释/文案）；`vibe` 全仓另有 docs/archive 里的历史记录，不动 | `grep -ri vibe frontend/src backend --include=*.ts* --include=*.py` 为空 |
-| M0-8 | `docs/TASKS.md` 重编号（T41–T48 各出现 2 次），且顶部标注「v2 期间以 REFACTOR-PLAN 为准」 | 编号唯一 |
+| M0-8 | `docs/TASKS.md`（已删除）重编号（T41–T48 各出现 2 次），且顶部标注「v2 期间以 REFACTOR-PLAN 为准」 | 编号唯一 |
 
 **为什么不是 M1 先做**：换 agent 的过程中你会反复跑测试。如果基线是红的，
 你无法区分「我改坏了」和「本来就坏」。

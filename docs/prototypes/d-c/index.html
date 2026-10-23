@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D-C 杂志式 · 复盘看板 + 宏观看板</title>
+<style>
+  /* ============================================================
+     D-C 杂志式原型
+     主字号 14px / 次字号 13px / 行高 1.6 / panel 间距 20px
+     颜色全部来自 frontend/src/theme/tokens.ts DARK 调色板
+     禁：渐变 / box-shadow / backdrop-filter / 圆角 > 6px
+     ============================================================ */
+  :root {
+    --bg:            #0B0E14;
+    --panel:         #12161F;
+    --raised:        #1A1F2B;
+    --border:        #232936;
+    --border-strong: #2E3546;
+    --text:          #E6E9EF;
+    --text-2:        #9BA3B4;
+    --text-3:        #6B7385;
+    --text-disabled: #4A5162;
+    --accent:        #3B82F6;
+    --up:            #D9534F;  /* A 股口径：涨 = 红 */
+    --down:          #3FAE7A;  /* A 股口径：跌 = 绿 */
+    --warning:       #D99A4E;
+    --info:          #5B8DEF;
+
+    --font-ui:   "Inter Variable", Inter, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --gap: 20px;      /* D-C panel 间距 */
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    font-family: var(--font-ui);
+    font-size: 14px;          /* 主字号 */
+    line-height: 1.6;         /* 行高 */
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1240px; margin: 0 auto; padding: 40px 48px 32px; }
+
+  /* ---------------- 数字：等宽 + tabular-nums（硬规则） ---------------- */
+  .num, .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+  .up   { color: var(--up); }
+  .down { color: var(--down); }
+  .flat { color: var(--text-2); }
+
+  /* ---------------- 排版层级：大标题 → 导语 → 关键指标 → 明细 ---------------- */
+
+  /* ① kicker：期号行，杂志页眉 */
+  .kicker {
+    font-size: 13px;
+    color: var(--text-3);
+    letter-spacing: 0.22em;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .kicker .issue { color: var(--text-2); }
+  .kicker .caliber-note { margin-left: auto; letter-spacing: 0.05em; color: var(--text-3); }
+
+  /* ① 大标题：视觉第一锚点 */
+  .masthead { padding: 28px 0 0; }
+  h1.headline {
+    font-size: 32px;
+    line-height: 1.3;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    max-width: 900px;
+  }
+  .headline .hl-up   { color: var(--up); }
+  .headline .hl-down { color: var(--down); }
+
+  /* ② 导语：lede，限定行宽做阅读层次 */
+  .lede {
+    margin-top: 16px;
+    font-size: 14px;
+    color: var(--text-2);
+    max-width: 860px;
+  }
+  .lede .date-tag { color: var(--warning); }
+
+  /* ③ 关键指标：大数字横排，视觉第二锚点 */
+  .hero-metrics {
+    margin-top: 32px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--gap);
+  }
+  .hero-cell {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px 16px;
+  }
+  .hero-cell .k {
+    font-size: 13px;
+    color: var(--text-3);
+  }
+  .hero-cell .v {
+    margin-top: 6px;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .hero-cell .pct {
+    margin-top: 4px;
+    font-size: 13px;
+  }
+  .hero-cell .sub {
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--text-3);
+  }
+
+  /* ---------------- 双看板并排 ---------------- */
+  .boards {
+    margin-top: 32px;
+    display: grid;
+    grid-template-columns: 1.42fr 1fr;
+    gap: var(--gap);
+    align-items: start;
+  }
+
+  /* 栏目题：小标 + 通栏细线，杂志的 section 规则 */
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 10px;
+    margin-bottom: var(--gap);
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .section-head .tag {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.12em;
+  }
+  .section-head .tag::before {
+    content: "";
+    display: inline-block;
+    width: 4px; height: 12px;
+    margin-right: 8px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+  .section-head .desc { font-size: 13px; color: var(--text-3); }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px 22px;
+  }
+  .col { display: flex; flex-direction: column; gap: var(--gap); }
+
+  .panel-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+    margin-bottom: 14px;
+  }
+  .panel-title .note { font-weight: 400; color: var(--text-3); margin-left: 8px; }
+
+  /* 情绪指标格 */
+  .mood-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px 20px;
+  }
+  .mood-cell .k { font-size: 13px; color: var(--text-3); }
+  .mood-cell .v {
+    margin-top: 2px;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  .mood-cell .s { font-size: 13px; color: var(--text-3); }
+
+  /* 明细行（宏观看板用）：名称 + 数字右对齐，行线分隔 */
+  .rows { display: flex; flex-direction: column; }
+  .row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .row:last-child { border-bottom: none; }
+  .row .name { flex: 1; font-size: 14px; color: var(--text); }
+  .row .name .en { font-size: 13px; color: var(--text-3); margin-left: 6px; }
+  .row .px  { font-size: 14px; color: var(--text); min-width: 88px; text-align: right; }
+  .row .chg { font-size: 13px; min-width: 64px; text-align: right; }
+
+  /* 美债收益率：四格 */
+  .rates-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .rate-cell .k { font-size: 13px; color: var(--text-3); }
+  .rate-cell .v { margin-top: 2px; font-size: 20px; font-weight: 700; }
+  .rates-note { margin-top: 14px; font-size: 13px; color: var(--text-2); }
+  .rates-note .num { color: var(--text); }
+
+  /* 页脚 */
+  .colophon {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-strong);
+    font-size: 13px;
+    color: var(--text-3);
+    display: flex;
+    gap: 24px;
+  }
+  .colophon .right { margin-left: auto; }
+
+  svg text { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  svg .axis-label { fill: var(--text-3); font-size: 11px; }
+  svg .bar-label  { fill: var(--text-2); font-size: 11.5px; font-family: var(--font-ui); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══════════ ① 期号行 ═══════════ -->
+  <div class="kicker">
+    <span>ALPHACOPILOT</span>
+    <span class="issue">第 214 期 · 复盘日报</span>
+    <span class="caliber-note">D-C 杂志式原型 · 14px / 1.6 / 20px 间距</span>
+  </div>
+
+  <!-- ═══════════ ① 大标题 ═══════════ -->
+  <header class="masthead">
+    <h1 class="headline">
+      普涨收官：沪指站上 <span class="hl-up num">3,290</span>，
+      量能重回 <span class="hl-up num">1.7</span> 万亿
+    </h1>
+    <p class="lede">
+      <span class="date-tag">2026年10月22日 星期四 · 收盘定稿</span> ——
+      隔夜美股走强叠加增量资金回流，三大指数高开后单边走高，半导体与券商领涨；
+      两市成交 <span class="num">16,842</span> 亿元，较上一交易日放量 <span class="num up">+21.4%</span>。
+      涨停 <span class="num up">68</span> 家、最高连板升至 <span class="num">6</span> 板，
+      短线情绪由中性修复至偏强；但银行、白酒逆势净流出，风格切换的分歧仍在。
+    </p>
+  </header>
+
+  <!-- ═══════════ ③ 关键指标（大数字锚点） ═══════════ -->
+  <div class="hero-metrics">
+    <div class="hero-cell">
+      <div class="k">上证指数</div>
+      <div class="v num">3,298.55</div>
+      <div class="pct num up">+0.84%</div>
+    </div>
+    <div class="hero-cell">
+      <div class="k">深证成指</div>
+      <div class="v num">10,587.33</div>
+      <div class="pct num up">+1.02%</div>
+    </div>
+    <div class="hero-cell">
+      <div class="k">创业板指</div>
+      <div class="v num">2,214.68</div>
+      <div class="pct num up">+1.35%</div>
+    </div>
+    <div class="hero-cell">
+      <div class="k">两市成交额</div>
+      <div class="v num">16,842<span style="font-size:14px;"> 亿</span></div>
+      <div class="pct num up">较昨 +21.4%</div>
+    </div>
+    <div class="hero-cell">
+      <div class="k">涨跌家数（上涨）</div>
+      <div class="v num up">3,124</div>
+      <div class="sub num">下跌 1,942 · 平盘 178</div>
+    </div>
+  </div>
+
+  <!-- ═══════════ ④ 双看板并排：复盘（左）+ 宏观（右） ═══════════ -->
+  <div class="boards">
+
+    <!-- ─────────── 左：复盘看板 ─────────── -->
+    <section class="col">
+      <div class="section-head">
+        <span class="tag">复盘 · DAILY REVIEW</span>
+        <span class="desc">盘面 · 情绪 · 资金</span>
+      </div>
+
+      <!-- 分时图 -->
+      <div class="panel">
+        <div class="panel-title">上证指数 · 分时走势<span class="note">9:30 – 15:00 · 昨收 3,271.02</span></div>
+        <svg id="chart-intraday" width="100%" viewBox="0 0 660 216" role="img" aria-label="上证指数分时走势折线图"></svg>
+      </div>
+
+      <!-- 市场情绪 -->
+      <div class="panel">
+        <div class="panel-title">市场情绪 · 打板口径<span class="note">收盘定稿</span></div>
+        <div class="mood-grid">
+          <div class="mood-cell">
+            <div class="k">涨停 / 真实涨停</div>
+            <div class="v num up">68 <span style="font-size:13px; color:var(--text-3);">/ 55</span></div>
+          </div>
+          <div class="mood-cell">
+            <div class="k">跌停 / 真实跌停</div>
+            <div class="v num down">12 <span style="font-size:13px; color:var(--text-3);">/ 9</span></div>
+          </div>
+          <div class="mood-cell">
+            <div class="k">最高连板</div>
+            <div class="v num up">6 板</div>
+            <div class="s">连板 23 家（2 板以上）</div>
+          </div>
+          <div class="mood-cell">
+            <div class="k">封板率</div>
+            <div class="v num up">76.5%</div>
+            <div class="s">封住 / 尝试涨停 89 家</div>
+          </div>
+          <div class="mood-cell">
+            <div class="k">炸板率</div>
+            <div class="v num down">23.5%</div>
+            <div class="s">炸板未回封 21 家</div>
+          </div>
+          <div class="mood-cell">
+            <div class="k">大盘宽度</div>
+            <div class="v">偏强</div>
+            <div class="s">上涨 ÷ 下跌 = 1.61</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 板块资金 -->
+      <div class="panel">
+        <div class="panel-title">板块资金 · 行业净流入<span class="note">单位 亿元 · 红流入 / 绿流出</span></div>
+        <svg id="chart-sectors" width="100%" viewBox="0 0 660 240" role="img" aria-label="行业资金净流入柱状图"></svg>
+      </div>
+    </section>
+
+    <!-- ─────────── 右：宏观看板 ─────────── -->
+    <section class="col">
+      <div class="section-head">
+        <span class="tag">宏观 · MACRO</span>
+        <span class="desc">外围 · 大宗 · 债市</span>
+      </div>
+
+      <!-- 隔夜外围 -->
+      <div class="panel">
+        <div class="panel-title">隔夜外围指数<span class="note">对比各自前一交易日收盘</span></div>
+        <div class="rows">
+          <div class="row"><span class="name">道琼斯<span class="en">DJI</span></span><span class="px num">43,215.66</span><span class="chg num up">+0.42%</span></div>
+          <div class="row"><span class="name">纳斯达克<span class="en">IXIC</span></span><span class="px num">19,128.79</span><span class="chg num up">+1.13%</span></div>
+          <div class="row"><span class="name">标普 500<span class="en">SPX</span></span><span class="px num">5,988.35</span><span class="chg num up">+0.65%</span></div>
+          <div class="row"><span class="name">恒生指数<span class="en">HSI</span></span><span class="px num">20,664.02</span><span class="chg num up">+0.92%</span></div>
+          <div class="row"><span class="name">日经 225<span class="en">N225</span></span><span class="px num">39,481.25</span><span class="chg num down">−0.35%</span></div>
+        </div>
+      </div>
+
+      <!-- 大宗与汇率 -->
+      <div class="panel">
+        <div class="panel-title">大宗商品与汇率<span class="note">国际报价 · 现价</span></div>
+        <div class="rows">
+          <div class="row"><span class="name">COMEX 黄金</span><span class="px num">2,738.4</span><span class="chg num up">+0.55%</span></div>
+          <div class="row"><span class="name">WTI 原油</span><span class="px num">71.86</span><span class="chg num down">−1.02%</span></div>
+          <div class="row"><span class="name">布伦特原油</span><span class="px num">75.94</span><span class="chg num down">−0.88%</span></div>
+          <div class="row"><span class="name">LME 铜</span><span class="px num">9,642.0</span><span class="chg num up">+1.12%</span></div>
+          <div class="row"><span class="name">美元指数<span class="en">DXY</span></span><span class="px num">104.32</span><span class="chg num up">+0.15%</span></div>
+          <div class="row"><span class="name">离岸人民币<span class="en">USDCNH</span></span><span class="px num">7.1352</span><span class="chg num up">+0.08%</span></div>
+        </div>
+      </div>
+
+      <!-- 美债收益率 -->
+      <div class="panel">
+        <div class="panel-title">美债收益率 · 关键期限<span class="note">2026-10-21</span></div>
+        <div class="rates-grid">
+          <div class="rate-cell"><div class="k">2 年期</div><div class="v num">4.12%</div></div>
+          <div class="rate-cell"><div class="k">5 年期</div><div class="v num">4.08%</div></div>
+          <div class="rate-cell"><div class="k">10 年期</div><div class="v num">4.05%</div></div>
+          <div class="rate-cell"><div class="k">30 年期</div><div class="v num">4.28%</div></div>
+        </div>
+        <svg id="chart-curve" width="100%" viewBox="0 0 320 88" role="img" aria-label="美债收益率曲线"></svg>
+        <p class="rates-note">10Y − 2Y 利差 <span class="num">−7bp</span>，倒挂收窄；长端受降息预期压制小幅回落。</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- ═══════════ 页脚 ═══════════ -->
+  <div class="colophon">
+    <span>口径：红涨绿跌（A 股口径），外围市场沿用红涨惯例</span>
+    <span>涨停 / 连板 / 资金统计来自公开行情与同花顺行业资金流（盘中即时值）</span>
+    <span class="right">静态设计原型 · 不构成投资建议</span>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   内联手绘 SVG 图表（无任何外部依赖）
+   ============================================================ */
+(function () {
+  const C = {
+    bg: "#0B0E14", panel: "#12161F", raised: "#1A1F2B",
+    border: "#232936", borderStrong: "#2E3546",
+    text: "#E6E9EF", text2: "#9BA3B4", text3: "#6B7385",
+    accent: "#3B82F6", up: "#D9534F", down: "#3FAE7A",
+    warning: "#D99A4E",
+  };
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  };
+  const fmt = (v, d = 2) =>
+    v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  /* ─────────────── 图 1：上证指数分时折线 ─────────────── */
+  (function intraday() {
+    const svg = document.getElementById("chart-intraday");
+    const W = 660, H = 216, L = 54, R = 10, T = 8, B = 26;
+    // 9:30 → 15:00 每 15 分钟一个点（含 11:30/13:00 拼接，原型按连续横轴处理）
+    const data = [
+      3276.1, 3272.4, 3269.8, 3271.5, 3275.2, 3280.0, 3278.3, 3283.6,
+      3286.4, 3284.1, 3288.9, 3291.2, 3289.5, 3292.8, 3295.6, 3293.9,
+      3296.2, 3294.7, 3297.5, 3299.8, 3296.9, 3297.2, 3298.55,
+    ];
+    const prevClose = 3271.02;
+    const lo = 3260, hi = 3305;
+    const x = i => L + (W - L - R) * (i / (data.length - 1));
+    const y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+
+    // 横向网格与刻度
+    [3260, 3270, 3280, 3290, 3300].forEach(g => {
+      svg.appendChild(el("line", {
+        x1: L, x2: W - R, y1: y(g), y2: y(g),
+        stroke: C.border, "stroke-width": 1,
+      }));
+      const t = el("text", { x: L - 8, y: y(g) + 3.5, "text-anchor": "end", "font-size": 11, fill: C.text3 });
+      t.textContent = fmt(g, 0);
+      svg.appendChild(t);
+    });
+    // 时间刻度（首尾用端点锚定，避免中间锚在边缘被裁掉半截）
+    [["9:30", 0, "start"], ["10:30", 4, "middle"], ["11:30", 8, "middle"], ["14:00", 15, "middle"], ["15:00", 22, "end"]]
+      .forEach(([m, idx, anchor]) => {
+      const t = el("text", { x: anchor === "end" ? W - R : x(idx), y: H - 8, "text-anchor": anchor, "font-size": 11, fill: C.text3 });
+      t.textContent = m;
+      svg.appendChild(t);
+    });
+    // 昨收基准线（虚线）
+    svg.appendChild(el("line", {
+      x1: L, x2: W - R, y1: y(prevClose), y2: y(prevClose),
+      stroke: C.text3, "stroke-width": 1, "stroke-dasharray": "3 4",
+    }));
+    const bt = el("text", { x: W - R, y: y(prevClose) - 5, "text-anchor": "end", "font-size": 11, fill: C.text3 });
+    bt.textContent = "昨收 " + fmt(prevClose);
+    svg.appendChild(bt);
+
+    // 面积基线下的区域不上色（禁渐变），只画主线 + 收盘点
+    const pts = data.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    svg.appendChild(el("polyline", {
+      points: pts, fill: "none", stroke: C.up, "stroke-width": 2,
+      "stroke-linejoin": "round", "stroke-linecap": "round",
+    }));
+    // 收盘点
+    svg.appendChild(el("circle", {
+      cx: x(data.length - 1), cy: y(data[data.length - 1]), r: 3.5,
+      fill: C.up, stroke: C.panel, "stroke-width": 2,
+    }));
+    const ct = el("text", {
+      x: x(data.length - 1) - 8, y: y(data[data.length - 1]) - 10,
+      "text-anchor": "end", "font-size": 12, fill: C.up, "font-weight": 700,
+    });
+    ct.textContent = fmt(data[data.length - 1]);
+    svg.appendChild(ct);
+  })();
+
+  /* ─────────────── 图 2：行业资金净流入横柱 ─────────────── */
+  (function sectors() {
+    const svg = document.getElementById("chart-sectors");
+    const W = 660, rowH = 26, nameX = 0, axisX = 92;
+    const rows = [
+      { name: "半导体",     v:  42.6 },
+      { name: "证券",       v:  31.2 },
+      { name: "光伏设备",   v:  28.4 },
+      { name: "算力租赁",   v:  22.1 },
+      { name: "军工电子",   v:  18.7 },
+      { name: "汽车零部件", v:  15.3 },
+      { name: "银行",       v: -12.8 },
+      { name: "白酒",       v:  -9.6 },
+      { name: "煤炭",       v:  -7.2 },
+    ];
+    const maxAbs = Math.max(...rows.map(r => Math.abs(r.v)));
+    const barMax = W - axisX - 74; // 右侧留数值标签
+    const scale = barMax / maxAbs;
+
+    rows.forEach((r, i) => {
+      const cy = i * rowH + 14;
+      // 名称
+      const nt = el("text", { x: nameX, y: cy + 4, "font-size": 12.5, fill: C.text2 });
+      nt.textContent = r.name;
+      svg.appendChild(nt);
+      // 轴线槽（细）
+      svg.appendChild(el("line", {
+        x1: axisX, x2: axisX, y1: cy - 9, y2: cy + 9,
+        stroke: C.borderStrong, "stroke-width": 1,
+      }));
+      const w = Math.max(2, Math.abs(r.v) * scale);
+      const isIn = r.v > 0;
+      svg.appendChild(el("rect", {
+        x: axisX + 1, y: cy - 8, width: w, height: 16,
+        fill: isIn ? C.up : C.down, rx: 2,
+      }));
+      // 数值标签
+      const vt = el("text", {
+        x: axisX + w + 8, y: cy + 4, "font-size": 12, fill: isIn ? C.up : C.down, "font-weight": 600,
+      });
+      vt.textContent = (isIn ? "+" : "−") + fmt(Math.abs(r.v), 1);
+      svg.appendChild(vt);
+    });
+  })();
+
+  /* ─────────────── 图 3：美债收益率曲线（迷你） ─────────────── */
+  (function curve() {
+    const svg = document.getElementById("chart-curve");
+    const pts = [
+      { t: "2Y", v: 4.12 }, { t: "5Y", v: 4.08 },
+      { t: "10Y", v: 4.05 }, { t: "30Y", v: 4.28 },
+    ];
+    const W = 320, H = 88, L = 14, R = 14, T = 12, B = 22;
+    const lo = 3.95, hi = 4.35;
+    const x = i => L + (W - L - R) * (i / (pts.length - 1));
+    const y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+    const d = pts.map((p, i) => `${x(i)},${y(p.v)}`).join(" ");
+    // 基线
+    [4.0, 4.2].forEach(g => {
+      svg.appendChild(el("line", {
+        x1: L, x2: W - R, y1: y(g), y2: y(g), stroke: C.border, "stroke-width": 1,
+      }));
+      const t = el("text", { x: L, y: y(g) - 4, "text-anchor": "start", "font-size": 10, fill: C.text3 });
+      t.textContent = g.toFixed(1) + "%";
+      svg.appendChild(t);
+    });
+    svg.appendChild(el("polyline", {
+      points: d, fill: "none", stroke: C.accent, "stroke-width": 2,
+      "stroke-linejoin": "round", "stroke-linecap": "round",
+    }));
+    pts.forEach((p, i) => {
+      svg.appendChild(el("circle", { cx: x(i), cy: y(p.v), r: 3, fill: C.accent, stroke: C.panel, "stroke-width": 2 }));
+      const t = el("text", { x: x(i), y: H - 6, "text-anchor": "middle", "font-size": 11, fill: C.text3 });
+      t.textContent = p.t;
+      svg.appendChild(t);
+    });
+  })();
+})();
+</script>
+</body>
+</html>

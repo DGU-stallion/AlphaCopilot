@@ -95,6 +95,7 @@ ADR-0004/0005 把 AlphaCopilot 整体重写为 5 个 dsh 插件，产品形态�
 
 - README / AGENTS.md 硬规则重写（原第 2/3/5 条是 TS 插件规则，已失效）
 - `docs/PLAN.md`、`docs/TASKS.md` 重写；任务号从 **T21** 续编，不复用 T01–T20
+  > 两份文档均已于 2026-10-23 删除（本 ADR 已于 ADR-0009/0010 被取代）
 - `packages/dsh-alphacopilot-research` 迁入 `backend/mcp/`（与业务层同 venv，
   `run_python` 才能注入 `alpha.*`）；另 4 个包随 tag 归档，不进新工作线
 - 工具层方向调整：**不再把 65 个数据函数包成 MCP 工具**，收缩为

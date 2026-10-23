@@ -14,8 +14,11 @@
 
 ```
 frontend/       React 19 + Vite + TS（Lightweight Charts + ECharts）
+  pages/        手写页（看板/CRUD）+ PageView（/p/:slug 通用渲染）
+  components/page/  BlockRenderer · PageCanvas · ParamBar（ADR-0016）
 backend/        Python 3.13 + FastAPI
   api/          session / artifact / view / page / job / SSE / runs / vendor
+                emotion_store（emotion_daily 情绪历史表，ROUND2 阶段 1）
   agent/        AgentProvider 契约 + PiProvider
   research/ duanxian/ alpha/   纯函数数据与计算层（不持状态、禁框架依赖）
 data-service/   **vendor 运行时宿主**（不是数据服务）：vendor/a-stock-data
@@ -26,8 +29,13 @@ workspace/      agent 可写区（pi 的 cwd）+ runs/<run_id>/
   .pi/mcp.json  Pi 的项目级 MCP 配置（exposure 必须为 direct）
   .pi-sessions/ Pi session JSONL
 skills/         白名单内的 SKILL.md（13 个；不是 88 个全量）
-docs/           REFACTOR-PLAN.md · PLAN.md · TASKS.md · adr/ · research/
+docs/           文档地图见 docs/README.md
+  README.md     哪份是活的、哪份是历史（先读这个）
+  REFACTOR-PLAN.md  当前计划 M0–M5
+  adr/          0001–0016（0001–0008 已被 0009/0010 取代，勿据此实现）
+  ROUND2-BRIEF.md · ROUND3-PLAN.md   轮次记录（含诚实清单）
 scripts/        vendor-a-stock-data.sh（vendor 同步，只读区靠它更新）
+                backfill-emotion.py（情绪历史回填；上游只留 ~28 天）
 ```
 
 **为什么没有 apps/web + apps/server**（ADR-0015）：monorepo 的收益是多包共享
@@ -80,7 +88,8 @@ Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共
    - 后果：agent 用 bash 自己手算的数字照样能显示，但**带 AI 角标**，用户知道它不可信。
      这就是本规则的全部效力——不再假装能审计 agent 的代码。
 7. **颜色/主题只有一个真源：`frontend/src/theme/tokens.ts`**（ADR-0014）。
-   antd 主题、Lightweight Charts、ECharts 都从它读；`index.css` 不再定义颜色。
+   Lightweight Charts、ECharts 都从它读；`index.css` 不再定义颜色。
+   （antd 已于 2026-10-23 从依赖中移除：组件全部手写，`antdTheme()` 一并删除。）
    双主题 + 涨跌双口径。**组件里出现 `#` 开头的颜色字面量即违规**；
    **数字一律走 `<Num>` 组件**（等宽 + tabular-nums + 涨跌色），不裸写 `.toFixed()`。
 8. 图表分工：K 线/净值/回撤/买卖点 → **Lightweight Charts**；
@@ -88,19 +97,50 @@ Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共
    （`addSeries(..., paneIndex)`），不叠加两个 chart 实例**——两个实例会导致
    左右边缘不齐、缩放与十字光标不联动（ADR-0014 §6，实测）。。
    block 必须带 `renderer` 判别符，不能只看 `kind: "chart"`
-9. **agent 拥有完整工具集（含 bash / read / write / edit）**（ADR-0010）。
+9. **页面是数据，不是手写 TSX**（ADR-0016）。图表型页面写成 page spec
+   （`params` + `blocks[]`），走 `/p/:slug` 通用渲染；加一个分析页**不写 React**。
+   agent 只能产 spec，且 `analysis_ref.fn` 必须已在 `alpha.registry` 白名单——
+   它无法凭空造取数函数。**不做拖拽编辑器**（span 是固定三列栅格，不是自由坐标）。
+   新增 lwc 图表时要同时想清楚「要不要回撤」（`api/page_spec.py` 的 `DRAWDOWN_FNS`）。
+10. **agent 拥有完整工具集（含 bash / read / write / edit）**（ADR-0010）。
    这是显式接受的风险，不是疏忽：agent 以 OS 用户权限执行。
    必须有：pi cwd = `workspace/`、`--no-context-files`、session 落 `workspace/.pi-sessions`、
    **`--approve`**（**不要**设 `PI_CODING_AGENT_DIR`，会丢凭据）
    （不加后者，RPC 模式拿不到 project trust → MCP 与 skills 静默不加载，ADR-0010 修订 §1）
-10. 不引入实盘/live/channels/qveris/scheduled 相关任何代码。
+11. 不引入实盘/live/channels/qveris/scheduled 相关任何代码。
     **skills 也不得全量恢复**：`qveris` / crypto 系列（`okx-market` `ccxt` `perp-funding-basis`
     `crypto-derivatives` `token-unlock` `stablecoin-flow` `onchain-analysis` `defi-yield`）/
     `shadow-account` / `vnpy-export` / `mootdx` / `tushare` / `yfinance` 一律不迁移。
     白名单见 ADR-0010 修订 §2。
-11. LLM 输出合规底线：不荐股、不预测涨跌、不给买卖时机（persona 固化）。
+12. LLM 输出合规底线：不荐股、不预测涨跌、不给买卖时机（persona 固化）。
     **这是 prompt 层约束，不是运行时限制**——agent 能力不受限，输出有底线
-12. **派发 subagent 不得使用 `commandcode-plan/*claude*` 系列模型**（成本过高，
+13. **「图表优先」= 能用图表表达的就不留纯数字**（ROUND2 §9）。孤立数字无法比对，
+    必须配历史序列。历史数据在 `emotion_daily` 表（`api/emotion_store.py`）；
+    回填用 `scripts/backfill-emotion.py`。
+    **东财跌停池只认 `sort=fund:asc`** —— 其余排序返回空数组而不报错，会静默写成
+    「这天 0 跌停」（实测 10-21：默认 0 条、`fund:asc` 5 条）。
+    上游涨停池只保留约 28 天历史，amcharts/akshare 同源同限制。
+    **`range` 参数必须走 `alpha/data.py: closes_for_range()`** —— 直接写
+    `{"3m":63,"6m":126,"1y":250}.get(range, 250)` 会让 ISO 日期被静默忽略
+    （用户选 2024 却拿到最近 250 天）。前端 date_range 预设也只能给后端认的
+    3m/6m/1y，否则就是 UI 撒谎（选 2y 直接 400）。
+14. **破坏性操作必须可撤销，不能靠「应该能重新生成」自我说服**（ROUND2 §10.1 事故）。
+    用户手写的页面 / 笔记 / 组合**都不是可再生资源**。删除一律软删 + 撤销入口；
+    只给确认弹窗不够（弹窗防手滑，防不了「确认了才发现想错了」）。
+    实际事故：`PageRepo` 曾是硬 DELETE、前端无确认，一个自定义页被删后
+    SQLite 页面重用、无法恢复。
+15. **markdown 只有一个引擎：`react-markdown` + `remark-gfm`**（ROUND3）。
+    agent 对话（`components/agent/ChatMessage`）与研报（`MyReports`）共用它。
+    **不要**再手写第二套解析器 —— 两套并存必然导致同一个回答在两处长不一样，
+    而手写版通常还不支持嵌套列表/引用/斜体。想加渲染能力就写
+    `components` 映射，不要另起炉灶。
+
+16. **Agent 栏是浮窗，不是常驻右栏**（ROUND3 C2）。它不参与布局流 ——
+    `data-region="agent"` 不该存在于 Layout 里，否则又会吃掉一列宽度
+    （这正是 ROUND2-C1 修掉的问题）。位置/尺寸/吸附在 `AgentWindow`，
+    浮层本身在 `AiConsole`，Layout 只负责渲染 `<AiConsole />`。
+
+17. **派发 subagent 不得使用 `commandcode-plan/*claude*` 系列模型**（成本过高，
     额度已接近耗尽）。可用：`magpie/commandcode-plan/z-ai/glm-5.3-flash`、
     `magpie/commandcode-plan/zai-org/GLM-5.3`、`magpie/commandcode-plan/gpt-5.6-*`、
     `deepseek/deepseek-flash` 等。`pi --list-models` 是唯一权威，但**先看清价格档位**。
@@ -111,6 +151,8 @@ Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共
 - ❌ 给页面加「问 AI」占位按钮（旧 `AskAiButton`/`DeepDive` 已删）
 - ❌ 用 `glass` / `shadow-glow` / 渐变 / `rounded-2xl` 表达层次
 - ❌ 让 agent 生成前端代码或直接改 DOM（它只能产 View / artifact）
+- ❌ 图表型页面又写手写 TSX（该写 page spec，见 ADR-0016）
+- ❌ 给 Pi 传 baseURL/apiKey 并假装它生效（被忽略，见 `agent/provider.py:81`）
 - ❌ 在 `data-service` 里存应用状态（它必须无状态）
 - ❌ 新增只读分析页时先写 React 组件（先看能不能用确定性 View 组合出来）
 - ❌ 恢复 mootdx（K 线/盘口/逐笔 2026-09 起失效，本机连财务也取不到）
@@ -121,20 +163,24 @@ Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共
 - ❌ MCP server 不给 `exposure: "direct"` —— 默认 `codemode` 不把工具声明给模型
 - ❌ 在 RPC 模式下依赖 project trust 自动生效（不会弹窗，只会静默不加载）
 - ❌ 「反正重写 TS 就能解决」——后端就是 Python（ADR-0011 §0）
-- ❌ 把 88 个 skills 一次性拷进 `skills/`（白名单，见硬规则 10）
+- ❌ 把 88 个 skills 一次性拷进 `skills/`（白名单，见硬规则 11）
+- ❌ 只用当天快照做「趋势」判断（没有历史序列就没有趋势，见硬规则 13）
+- ❌ 手写第二套 markdown 解析器（见硬规则 15）
+- ❌ 把 Agent 栏做成布局内的常驻右栏（见硬规则 16）
+- ❌ 硬删除用户数据 / 只给确认弹窗不给撤销（见硬规则 14）
 
 ## 命令
 
 ```bash
 # 后端 + 数据与计算层（Python）
-cd backend && python3 -m pytest -q          # 358 passed
+cd backend && python3 -m pytest -q          # 523 passed
 cd backend && ruff check .
 
 # 前端（TS）
-cd frontend && npx tsc --noEmit && npx vitest --run && npx vite build
+cd frontend && npx tsc --noEmit && npx vitest --run && npx vite build   # 350 passed
 
 # vendor（独立 venv，M3-V1）
-cd data-service && .venv/bin/python -m pytest tests -q                 # loader/worker
+cd data-service && .venv/bin/python -m pytest tests -q                 # 19 passed
 cd data-service && .venv/bin/python -m pytest vendor/a-stock-data/tests -q   # 上游 179 条
 
 # vendor 同步（唯一合法的更新方式，vendor/ 是只读区）

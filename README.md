@@ -1,77 +1,80 @@
 # AlphaCopilot
 
-> ⚠️ **本文档部分已过期（2026-10-21）**。产品定位已于 ADR-0009 转为 **AI native**，
-> 「确定性计算为主 + 固定业务页面 + AI 只解释」已被取代。
-> **开工前以 [`docs/REFACTOR-PLAN.md`](docs/REFACTOR-PLAN.md) 与 ADR-0009–0013 为准。**
->
-> 历史轨迹：ADR-0002/0004/0005/0006/0007/0008 保留不删。
-> 历史决策：已放弃「对话驱动 + AI 写 Python + 页面可生长」旧北极星（ADR-0008，2026-09-05）。
+**AI native 的个人本地 A 股低频量化投研工作台。**
 
-**个人本地 A 股低频量化投研工作台**：以确定性数据和后端计算为主体——宏观看板、
-复盘看板（含涨停样本统计）、相关性分析、回测（多策略可插拔）、雪球式模拟组合、
-交易日志、研报管理。全局页面感知 Agent 作为「分析副驾」：解释当前页面数据、回答
-研究问题、提供观点，**不生成计算结果、不下单、不盯盘、不做多智能体辩论**。
-（Agent 已接入真实对话：dsh SDK + agnes 端点 + 项目专属 profile `alphacopilot-prod`，
-右下角可调整大小的对话面板，页面快照作上下文，合规底线由后端 persona 固化。）
-
-第一版策略：以 `AlphaTrading/` 下 vibe-astock、Vibe-Research 的现成能力为供体缝合，
-能复用就不重写；平台先搭起来，后续在使用中迭代。
+确定性计算提供可信数字，agent 提供探索与表达；两者按 provenance 区分，
+前端对 AI 产出的数字打角标。单机运行，不联网存数据，不做实盘。
 
 ```
-市场复盘 → 建立股票池 → 相关性/策略假设 → 确定性回测 → 模拟组合跟踪 → 日志/研报沉淀
-                              ↑ 全局 Agent 随时解释各页面数据、提供分析观点
+市场复盘 → 建立股票池 → 相关性/假设 → 确定性回测 → 模拟组合 → 日志/研报沉淀
+                                   ↑ 全局 agent 随时解释当前页面
 ```
 
-四项定位边界与页面清单见 [`docs/PLAN.md`](docs/PLAN.md)。
+## 快速开始
 
-## 架构分层
+```bash
+# 后端（FastAPI，8900）
+cd backend && python3 -m api.main
 
-```
-展示层  React SPA        固定业务页（缝合 vibe-astock/Vibe-Research）+ 全局 AI 对话面板
-业务层  FastAPI + alpha  REST 端点 / 页面渲染 / 领域存储 / 分析库 / 会话编排 + SSE
-AI 层   dsh runtime      agent loop / skills / MCP 工具（已接入：dsh SDK + agnes，node carrier）
-数据层  research + docs  A股·全球·宏观·资讯·持仓纯函数 + 文档库
-```
+# 前端（Vite，5899）
+cd frontend && npx vite --port 5899
 
-> 前端已由旧 page-spec 动态渲染整体替换为固定业务页（10 页缝合完成）；
-> 回测/相关性仍走 `/api/pages/{slug}/render`，其余页直连专用 REST 端点。
-> AI 对话走 `/api/sessions` + SSE（中立事件 text_delta/turn_end/…），provider 见 `backend/agent/`。
-
-## 项目结构
-
-```
-AlphaCopilot/
-├── backend/
-│   ├── research/    # 数据层：纯函数（A股/全球/宏观/资讯），禁加框架依赖
-│   ├── duanxian/    # 复盘/情绪/涨停样本等 A 股复盘计算（缝合自 vibe-astock）
-│   ├── alpha/       # 业务层库：data · chart · factor · backtest · portfolio · registry
-│   ├── api/         # FastAPI：会话编排 · SSE · artifact · page · job · 市场/业务端点
-│   ├── agent/       # dsh SDK 适配层（与 dsh 的唯一耦合点）+ 合规 persona + cordis
-│   └── mcpserver/   # 我们的 MCP server：run_python / get_quote / submit_backtest
-├── frontend/        # React SPA（固定业务页 + AiConsole 对话面板 + useAiChat）
-├── workspace/       # agent 可写工作区（sandbox 根），内含 runs/<run_id>/
-├── skills/          # 投研方法论 skills ×5
-└── docs/            # PLAN.md · TASKS.md · adr/ · spikes/
+# vendor 能力宿主（独立 venv。只跑加载器/能力时用得上，后端已内嵌调用）
+cd data-service && .venv/bin/python -m pytest tests -q
 ```
 
-> AI 运行时用项目专属 dsh profile `~/.dsh/profiles/alphacopilot-prod`（不在仓库内，
-> 见 `docs/adr/0007` 与 `backend/agent/`）；exe carrier 未构建的机器需 `DSH_RUNTIME_MODE=node`。
+依赖：Node ≥ 22.19、Python 3.13、`@earendil-works/pi-coding-agent`。
+密钥只在 `~/.dsh/.credentials.yaml`，不进仓库、不进 workspace、不写日志。
 
-## 开发
+## 目录
 
-- 北极星与计划：`docs/PLAN.md`；任务状态：`docs/TASKS.md`（改代码前先看）
-- 后续开发从 **`main`**（当前可用版本）拉功能分支：`feat/<slug>`，squash merge，conventional commits
-- 启动：
-  ```bash
-  cd backend && DSH_RUNTIME_MODE=node python -m api.main    # FastAPI :8900（AI 走 agnes+代理）
-  cd frontend && pnpm dev                                    # Vite :5899，/api 代理到 :8900
-  ```
-- 验证：`cd backend && pytest`（默认跳过 `-m live`；真实 agnes 用 `pytest -m live`）/ `ruff check .`；
-  `cd frontend && npx tsc --noEmit && npx vitest --run && npx vite build`
+```
+frontend/        React 19 + Vite + TS
+  pages/         手写页（看板/CRUD）+ PageView（/p/:slug 通用渲染）
+  components/page/  BlockRenderer · PageCanvas · ParamBar
+backend/         Python 3.13 + FastAPI
+  research/ duanxian/ alpha/   纯函数数据与计算层（不持状态、禁框架依赖）
+  api/           唯一持有数据库、唯一耦合 agent 运行时
+  agent/         AgentProvider 契约 + PiProvider（--mode rpc 子进程）
+data-service/    vendor 运行时宿主（不是数据服务）：a-stock-data + 独立 venv
+workspace/       agent 可写区（Pi 的 cwd）+ runs/<run_id>/
+skills/          白名单内的 13 个 SKILL.md（不是全量 88 个）
+docs/            见 docs/README.md（哪份是活的、哪份是历史）
+scripts/         vendor 同步脚本、情绪历史回填
+```
 
-## 安全须知
+## 页面
 
-AI 生成的 Python 在**本机**执行。隔离由 `run_python` 的 macOS Seatbelt profile 与
-dsh 的 `workspace-write` 文件沙箱承担，**不等于容器级隔离**：dsh 的 SandboxMode
-只管文件写入，不管读取与网络。请勿把密钥放在 workspace 内，详见
-[ADR-0006 残余风险](docs/adr/0006-app-owns-ui-dsh-as-sdk.md)。
+| 路径 | 类型 | 说明 |
+|---|---|---|
+| `/macro` | 手写 | 宏观看板：社融 / PMI / 国债曲线 / LPR / 回购 / 北向 / 两融 |
+| `/daily-review` | 手写 | 复盘看板：情绪趋势、连板梯队、封板率、板块资金 |
+| `/watchlist` `/reports` | 手写 | 股票池 / 研报归档 |
+| `/portfolios` `/journal` `/runs` | 手写 | 模拟组合 / 交易日志 / 回测记录 |
+| `/settings` | 手写 | 接入 AI：模型选择、连通自检、合规边界 |
+| `/p/:slug` | **page spec** | 数据驱动渲染（回测、相关性等）。加分析页不写 React |
+
+`/p/*` 由后端 page spec（`params` + `blocks[]`）驱动，见 ADR-0016。
+新增只读分析页优先组合确定性 block，而不是写新组件。
+
+## 文档
+
+| 想看什么 | 去哪 |
+|---|---|
+| 当前要做什么 | [`docs/REFACTOR-PLAN.md`](docs/REFACTOR-PLAN.md)（M0–M5） |
+| 硬规则（改代码前必读） | [`AGENTS.md`](AGENTS.md) |
+| 术语 | [`CONTEXT.md`](CONTEXT.md) |
+| 为什么这么设计 | [`docs/adr/`](docs/adr/)（0001–0016，含被取代的旧决策） |
+| 最近两轮改了什么 | [`docs/ROUND2-BRIEF.md`](docs/ROUND2-BRIEF.md) · [`docs/ROUND3-PLAN.md`](docs/ROUND3-PLAN.md) |
+| 上游能力清单 | [`docs/research/a-stock-data-v3.10.md`](docs/research/a-stock-data-v3.10.md) |
+
+## 四条最容易踩的线
+
+1. **产品真源是数据库，不是 agent 的会话文件。** 前端永不读 Pi 的 JSONL。
+2. **`provenance.kind = "deterministic"` 只能服务端铸造。** agent 在 manifest 里
+   声称的一律改写为 `agent`，前端显示 AI 角标 —— 数字照样能显示，但用户知道它不可信。
+3. **颜色只有一个真源** `frontend/src/theme/tokens.ts`；组件里出现 `#` 颜色字面量即违规，
+   数字一律走 `<Num>`。
+4. **破坏性操作必须可撤销**，不能靠「应该能重新生成」自我说服。
+
+完整清单见 `AGENTS.md` 的「硬规则」。
