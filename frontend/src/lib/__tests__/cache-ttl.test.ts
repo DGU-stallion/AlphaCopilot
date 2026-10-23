@@ -136,3 +136,39 @@ describe("key 变化时不能残留上一个 key 的数据", () => {
     await waitFor(() => expect(result.current.data).toBe("B-value"));
   });
 });
+
+/**
+ * TTL 分级（ROUND2 §13，A4）。
+ *
+ * 原来全站共用一个 60 秒。问题不是长短，而是**所有数据一个值**：
+ * 回测实测单次 8s，60s TTL 等于「每次切回页面都重算」。
+ * 分级依据是「取数代价 × 变化频率」。
+ */
+describe("TTL 分级", () => {
+  it("四档单调递增：LIVE < DEFAULT < COMPUTE < ARCHIVE", async () => {
+    const { TTL } = await import("@/lib/cache");
+    expect(TTL.LIVE).toBeLessThan(TTL.DEFAULT);
+    expect(TTL.DEFAULT).toBeLessThan(TTL.COMPUTE);
+    expect(TTL.COMPUTE).toBeLessThan(TTL.ARCHIVE);
+  });
+
+  it("昂贵重算的 TTL 至少是 10 分钟（否则等于没缓存）", async () => {
+    // 回测/净值/页面渲染实测单次约 8s。TTL 若只有 60s，
+    // 「切走再切回」几乎必然重算 —— 缓存形同虚设。
+    const { TTL } = await import("@/lib/cache");
+    expect(TTL.COMPUTE).toBeGreaterThanOrEqual(10 * 60_000);
+  });
+
+  it("行情类必须短（> 60s 会让盘中看起来卡住）", async () => {
+    const { TTL } = await import("@/lib/cache");
+    expect(TTL.LIVE).toBeLessThanOrEqual(60_000);
+  });
+
+  it("长 TTL 不会把昨天的数据当今天：跨日依然强制失效", async () => {
+    // 这是 COMPUTE 敢给 30 分钟的前提 —— 没有跨日失效，长 TTL 就是数据事故。
+    const { isFresh, TTL } = await import("@/lib/cache");
+    const entry = { fetchedAt: at("2026-10-21T14:00:00"), dataAsOf: "2026-10-21" };
+    expect(isFresh(entry, at("2026-10-21T14:20:00"), TTL.COMPUTE)).toBe(true);
+    expect(isFresh(entry, at("2026-10-22T09:00:00"), TTL.COMPUTE)).toBe(false);
+  });
+});

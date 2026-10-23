@@ -3,7 +3,7 @@ import { TrendingDown, Loader2, RefreshCw, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Num } from "@/components/Num";
 import { api, type BacktestData, type SampleStats, type SampleDay } from "@/lib/api";
-import { useCachedResource } from "@/lib/cache";
+import { TTL, useCachedResource } from "@/lib/cache";
 
 // 涨停样本统计（缝合搬运自上游项目的 Backtest.tsx）。确定性统计，非 AI。
 // 定位改造：接 useCachedResource（按天数缓存，切页不重取，刷新按钮 POST 重算）；
@@ -34,7 +34,8 @@ function finite(v?: number | null): number | null {
 export function LimitUpStats() {
   // 默认 30：数据源对更早的日期留存有限，拉 60/90 会有大量必然失败的请求空等
   const [days, setDays] = useState(30);
-  const res = useCachedResource<BacktestData>(`bt:${days}`, () => api.backtest(days));
+  const res = useCachedResource<BacktestData>(
+    `bt:${days}`, () => api.backtest(days), { ttlMs: TTL.COMPUTE });
   const data = res.data;
   const loading = res.loading;
 
@@ -152,15 +153,15 @@ export function LimitUpStats() {
               isBase ? "border-dashed border-border" : "border-border")}>
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <h3 className="text-base font-bold">{name}</h3>
-                {isBase && <span className="rounded bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">基准</span>}
+                {isBase && <span className="rounded bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">基准</span>}
                 {excess != null && (
-                  <span className={cn("rounded px-2 py-0.5 text-[10px] font-bold",
+                  <span className={cn("rounded px-2 py-0.5 text-[11px] font-bold",
                     excess > 0 ? "bg-danger/15 text-danger" : "bg-success/15 text-success")}>
                     超额 <Num v={excess} pct inheritColor />
                   </span>
                 )}
                 {!!o.sample && o.sample < 60 && (
-                  <span className="rounded bg-warning/15 px-2 py-0.5 text-[10px] font-bold text-warning">样本偏小</span>
+                  <span className="rounded bg-warning/15 px-2 py-0.5 text-[11px] font-bold text-warning">样本偏小</span>
                 )}
               </div>
               <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground/70">{s.desc}</p>

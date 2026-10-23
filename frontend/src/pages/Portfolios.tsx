@@ -2,11 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2, Loader2, X, CalendarClock } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import { Disclaimer } from "@/components/ui/Disclaimer";
 import { Caliber } from "@/components/ui/Caliber";
 import { EChart } from "@/components/ui/EChart";
 import { Num } from "@/components/Num";
-import { useCachedResource, dropCache } from "@/lib/cache";
+import { TTL, dropCache, useCachedResource } from "@/lib/cache";
 import { useAiPage } from "@/lib/ai-page";
 import {
   listPortfolios, createPortfolio, deletePortfolio, addRebalance, portfolioNav,
@@ -21,7 +20,8 @@ import { ApiError } from "@/lib/api";
 interface WeightRow { code: string; weight: string }
 
 export function Portfolios() {
-  const list = useCachedResource<Portfolio[]>("pf:list", () => listPortfolios());
+  const list = useCachedResource<Portfolio[]>(
+    "pf:list", () => listPortfolios(), { ttlMs: TTL.DEFAULT });
   const [selected, setSelected] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -198,7 +198,6 @@ export function Portfolios() {
       </div>
 
       {err && <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{err}</div>}
-      <Disclaimer />
     </div>
   );
 }
@@ -207,7 +206,8 @@ export function Portfolios() {
 // 同一 key 与父组件共享缓存：这里把最新的净值/累计收益率汇总回填给父组件的 AI 登记快照。
 function PortfolioDetail({ portfolio, onNavSummary }: { portfolio: Portfolio; onNavSummary: (s: string) => void }) {
   const key = `pf:nav:${portfolio.id}:${portfolio.rebalances.length}`;
-  const nav = useCachedResource<NavResult>(key, () => portfolioNav(portfolio.id));
+  const nav = useCachedResource<NavResult>(
+    key, () => portfolioNav(portfolio.id), { ttlMs: TTL.COMPUTE });
   const option = nav.data?.option ?? null;
 
   useEffect(() => {

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * 同一个应用里的输入框圆角、高度、底色都不一样，用户会觉得"没做完"。
  *
  * 统一到：高 28（CONTROL_MD）、圆角 4、实色 panel 底、聚焦时边框变 accent。
- * 高度走 token 而不是类名，因为 antd 的 controlHeight 也是 28，两边要对齐。
+ * 高度走 token 而不是类名：28 是全局控件高度基线，各处要对齐。
  */
 
 const base =

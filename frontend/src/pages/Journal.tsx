@@ -3,9 +3,8 @@ import { Plus, X, RefreshCw, NotebookPen } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Num } from "@/components/Num";
-import { Disclaimer } from "@/components/ui/Disclaimer";
 import { api, type JournalRow } from "@/lib/api";
-import { useCachedResource, dropCache } from "@/lib/cache";
+import { TTL, dropCache, useCachedResource } from "@/lib/cache";
 import { useAiPage } from "@/lib/ai-page";
 import { cn } from "@/lib/utils";
 import { SIZE, ROW } from "@/theme/tokens";
@@ -40,7 +39,8 @@ function cashflowByCode(rows: JournalRow[]) {
 }
 
 export function Journal() {
-  const res = useCachedResource<JournalRow[]>(CACHE_KEY, () => api.journal());
+  const res = useCachedResource<JournalRow[]>(
+    CACHE_KEY, () => api.journal(), { ttlMs: TTL.DEFAULT });
   const rows = res.data ?? [];
   const [form, setForm] = useState<Form>(EMPTY_FORM);
   const [err, setErr] = useState<string | null>(null);
@@ -99,7 +99,7 @@ export function Journal() {
   });
 
   const set = (k: keyof Form, v: string) => setForm((f) => ({ ...f, [k]: v }));
-  // 统一控件样式（ADR-0014 §5）：高 28 / 圆角 4 / 实色底，与 antd controlHeight 对齐。
+  // 统一控件样式（ADR-0014 §5）：高 28 / 圆角 4 / 实色底，对齐全局控件基线。
   // 原来这里用 rounded-lg + bg-black/20，和股票池/研报页的输入框长得不一样。
   const inputCls = "h-7 rounded-[4px] border border-border bg-[hsl(var(--card))] px-2.5 text-[13px] outline-none placeholder:text-muted-foreground/60 focus:border-[hsl(var(--primary))]";
 
@@ -155,7 +155,7 @@ export function Journal() {
                 <p className="mt-0.5 text-lg font-bold">
                   <Num v={v.net} signed colorBySign />
                 </p>
-                <p className="mt-0.5 text-[10px] text-muted-foreground/60">买 <Num v={v.buy} digits={2} inheritColor /> · 卖 <Num v={v.sell} digits={2} inheritColor /></p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground/60">买 <Num v={v.buy} digits={2} inheritColor /> · 卖 <Num v={v.sell} digits={2} inheritColor /></p>
               </div>
             ))}
           </div>
@@ -215,7 +215,6 @@ export function Journal() {
         )}
       </Panel>
 
-      <Disclaimer />
     </div>
   );
 }

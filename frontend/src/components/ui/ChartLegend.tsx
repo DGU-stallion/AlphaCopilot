@@ -67,3 +67,43 @@ export function bareChartOption(
   delete rest.legend;
   return rest;
 }
+
+/**
+ * 语义图例（ROUND2 阶段 2）：与 `ChartLegend` 的区别是**颜色由语义决定**，
+ * 不按系列序取 `seriesColors`。
+ *
+ * 为什么需要它：情绪图里「涨停」必须永远是涨色、「跌停」永远是跌色 ——
+ * 按序取色的话涨停会拿到 warning 橙、跌停在切口径后颜色还能不变，
+ * 图例和柱子对不上，等于没图例。
+ *
+ * `neutral` 回落到 `seriesColors[0]`（与 EChart 对不标语义的系列的处理一致）。
+ */
+export function ToneLegend({
+  items,
+  className,
+}: {
+  items: { label: string; tone?: "up" | "down" | "neutral" }[];
+  className?: string;
+}) {
+  usePalette();
+  const t = getChartTheme();
+  const shown = items.filter((i) => i.label);
+  if (shown.length === 0) return null;
+  const colorOf = (tone?: "up" | "down" | "neutral") =>
+    tone === "up" ? t.upColor : tone === "down" ? t.downColor : t.seriesColors[0];
+  return (
+    <div className={cn("mb-1 flex flex-wrap items-center gap-x-4 gap-y-1", className)}>
+      {shown.map((it) => (
+        <span key={it.label} className="inline-flex items-center gap-1.5">
+          <span
+            className="inline-block h-2 w-2 shrink-0 rounded-[2px]"
+            style={{ background: colorOf(it.tone) }}
+          />
+          <span className="text-muted-foreground" style={{ fontSize: SIZE.xs }}>
+            {it.label}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}

@@ -30,7 +30,7 @@ export interface ChartTheme {
   tooltipText: string;
 }
 
-/** 判断当前是否深色。DOM class 为准（与 antd/useDarkMode 同一判定源）。 */
+/** 判断当前是否深色。DOM class 为准（与 useDarkMode 同一判定源）。 */
 function isDarkNow(): boolean {
   return document.documentElement.classList.contains("dark");
 }

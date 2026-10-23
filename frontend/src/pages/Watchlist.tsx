@@ -3,11 +3,10 @@ import { Plus, X, RefreshCw, Star } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Num } from "@/components/Num";
-import { Disclaimer } from "@/components/ui/Disclaimer";
 import { api, type Quote, type KlineBar } from "@/lib/api";
 import { PriceChart } from "@/components/charts/PriceChart";
 import { loadWatch, saveWatch, addCodes } from "@/lib/watchlist";
-import { useCachedResource, dropCache } from "@/lib/cache";
+import { TTL, dropCache, useCachedResource } from "@/lib/cache";
 import { useAiPage } from "@/lib/ai-page";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +47,8 @@ export function Watchlist() {
   const quotesRes = useCachedResource<Record<string, Quote>>(
     CACHE_KEY,
     () => (codes.length ? api.quote(codes.join(",")) : Promise.resolve({})),
+    // 行情变动快但取数便宜 → 短 TTL（30s）。默认 60s 会让盘中看着像卡住。
+    { ttlMs: TTL.LIVE },
   );
   const quotes = quotesRes.data ?? {};
 
@@ -217,7 +218,6 @@ export function Watchlist() {
         )}
       </Panel>
 
-      <Disclaimer />
     </div>
   );
 }

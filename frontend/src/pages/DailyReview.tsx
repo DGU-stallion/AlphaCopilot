@@ -1,12 +1,15 @@
 import { useState, useEffect, Fragment } from "react";
 import { Num } from "@/components/Num";
-import { RefreshCw, Gauge, ArrowDownUp, TrendingUp, TrendingDown, Flame, BarChart3 } from "lucide-react";
+import { RefreshCw, Gauge, ArrowDownUp, TrendingUp, Flame, BarChart3 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Caliber } from "@/components/ui/Caliber";
-import { Disclaimer } from "@/components/ui/Disclaimer";
-import { finite } from "@/lib/agent";
-import { api, type Quote, type MarketOverview, type ShortTermEmotion, type TurnoverTop, type MarketSession, type LiveEmotion } from "@/lib/api";
+import { finite } from "@/lib/coerce";
+import { api, type Quote, type MarketOverview, type ShortTermEmotion, type TurnoverTop, type MarketSession, type LiveEmotion, type EmotionHistoryRow } from "@/lib/api";
+import { ztDtZbOption, maxBoardsOption, sealBreakOption, ladderOption } from "@/lib/emotion-charts";
+import { sectorFlowOption } from "@/lib/market-charts";
+import { EChart } from "@/components/ui/EChart";
+import { ToneLegend, ChartLegend } from "@/components/ui/ChartLegend";
 import { cn } from "@/lib/utils";
 import { getCache, setCache, hasCache } from "@/lib/cache";
 import { LimitUpStats } from "./LimitUpStats";
@@ -25,6 +28,8 @@ const yiV = (v: number | null | undefined) => (v == null ? null : v / 1e8); // �
 export function DailyReview() {
   const [overview, setOverview] = useState<MarketOverview | null>(() => getCache<MarketOverview>("dr:overview") ?? null);
   const [emotion, setEmotion] = useState<ShortTermEmotion | null>(() => getCache<ShortTermEmotion>("dr:emotion") ?? null);
+  // 情绪历史（ROUND2 阶段 1/2）：画趋势图用。空数组 = 还没回填/数据源不可用。
+  const [emoHist, setEmoHist] = useState<EmotionHistoryRow[]>([]);
   const [turnover, setTurnover] = useState<TurnoverTop | null>(() => getCache<TurnoverTop>("dr:turnover") ?? null);
   // 实时行情属于哪一场：盘前接口返回的是上一场收盘，不标出来会被当成今天的
   const [session, setSession] = useState<MarketSession | null>(() => getCache<MarketSession>("dr:session") ?? null);
@@ -58,7 +63,6 @@ export function DailyReview() {
     // 连板股名单来自「昨日」那份，这里只刷它们的实时价
     refreshLianban((emotion?.lianban_stocks ?? []).map((s) => s.code));
   };
-
   // 重量组：板块资金走 akshare + JS 引擎（90 个行业）、成交额榜走东财 clist。
   // **不能跟着 5 秒刷** —— 会撞限流，而且这两样本身变化慢。
   const loadHeavy = () => {
@@ -69,6 +73,9 @@ export function DailyReview() {
   // 短线情绪锚在已收盘那一场，只在进页面时取一次，不参与任何轮询
   const loadSettled = () => {
     api.emotion().then((d) => { setCache("dr:emotion", d); setEmotion(d); }).catch(() => {}).finally(() => setEmoDone(true));
+    // 情绪历史（ROUND2 阶段 1）：只在进页时取。历史一天只变一次，
+    // 跟 5 秒轮询毫无意义。
+    api.emotionHistory(30).then((rows) => setEmoHist(rows ?? [])).catch(() => setEmoHist([]));
   };
 
   const loadIndices = () => { loadLive(); loadHeavy(); loadSettled(); };
@@ -201,121 +208,135 @@ export function DailyReview() {
         } />
         {sentiment?.date && <span className="text-[11px] text-muted-foreground/50">{sentiment.date}</span>}
       </div>
+      {/* ROUND2 §9：这块原来是两个 2xl 大字卡 + 8 个数字格，占掉半屏却只给 8 个数。
+          用户反复说「留白太多」，而这是最典型的例子：容器很大、信息很少。
+          改成一行紧凑摘要 —— 分档结论用徽标、8 个数并排；
+          真正的「看趋势」交给下面的情绪趋势图（那里才有历史可比）。 */}
       <Panel className="mb-6">
         {!sentiment?.breadth ? (
           pending(ovDone)
         ) : (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                { k: "大盘宽度", v: sentiment.breadth, hint: "冰点 / 偏弱 / 中性 / 偏强 / 普涨" },
-                { k: "题材投机", v: sentiment.speculation, hint: "冰点 / 普通 / 活跃 / 亢奋" },
-              ].map((m) => (
-                <div key={m.k} className="rounded-lg bg-muted/25 p-4">
-                  <p className="text-xs text-muted-foreground">{m.k}</p>
-                  <p className="mt-1 text-2xl font-bold text-primary">{m.v}</p>
-                  <p className="mt-1 text-[11px] text-muted-foreground/60">{m.hint}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 grid grid-cols-4 gap-2">
-              {sentCells.map((c) => (
-                <div key={c.k} className="rounded-lg bg-muted/20 p-2 text-center">
-                  <p className="truncate text-[11px] text-muted-foreground">{c.k}</p>
-                  <p className={cn("mt-0.5 font-mono text-sm font-bold", c.up === null ? "text-foreground" : c.up ? "text-danger" : "text-success")}>
-                    <Num v={c.v} digits={0} inheritColor />
-                  </p>
-                </div>
-              ))}
-            </div>
-          </>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            {[
+              { k: "大盘宽度", v: sentiment.breadth },
+              { k: "题材投机", v: sentiment.speculation },
+            ].map((m) => (
+              <span key={m.k} className="inline-flex items-baseline gap-1.5">
+                <span className="text-[11px] text-muted-foreground">{m.k}</span>
+                <span className="rounded-[2px] bg-muted/40 px-1.5 py-0.5 text-[13px] font-semibold text-primary">
+                  {m.v}
+                </span>
+              </span>
+            ))}
+            <span className="h-4 w-px bg-border" />
+            {sentCells.map((c) => (
+              <span key={c.k} className="inline-flex items-baseline gap-1.5">
+                <span className="text-[11px] text-muted-foreground">{c.k}</span>
+                <span className={cn(
+                  "font-mono text-[13px] font-semibold",
+                  c.up === null ? "text-foreground" : c.up ? "text-danger" : "text-success",
+                )}>
+                  <Num v={c.v} digits={0} inheritColor />
+                </span>
+              </span>
+            ))}
+          </div>
         )}
       </Panel>
 
-      {/* 4a. 今日实时打板情绪 —— 这页是盘面数据，得有今天的 */}
-      {liveEmo && (
-        <>
-          <div className="mb-3 flex flex-wrap items-baseline gap-2">
-            <h3 className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
-              <Flame className="h-4 w-4" /> 今日实时打板情绪
-              <Caliber text={
-                "封板率 = 最终封住家数 ÷ 摸板家数；炸板率 = 炸板未回封家数 ÷ 摸板家数。\n" +
-                "摸板家数 = 涨停 + 炸板，**按家数算，不按炸板次数算**。\n" +
-                "最高连板只给板数，具体是哪只票看下面那张连板股表。"
-              } />
-            </h3>
-            {liveEmo.available ? (
-              <span className="text-[11px] text-warning">
-                {liveEmo.date} {liveEmo.as_of} · {liveEmo.phase}（随盘变化）
-              </span>
-            ) : (
-              <span className="text-[11px] text-muted-foreground/50">{liveEmo.reason}</span>
-            )}
-          </div>
-          <Panel className="mb-6">
-            {!liveEmo.available ? (
-              <p className="py-4 text-center text-sm text-muted-foreground/60">
-                {liveEmo.reason || "今日暂无数据"}
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {[
-                  { k: "涨停", v: liveEmo.zt_count, unit: "", up: true },
-                  { k: "跌停", v: liveEmo.dt_count, unit: "", up: false },
-                  { k: "最高连板", v: liveEmo.max_boards, unit: " 板", up: true },
-                  { k: "连板（2板+）", v: liveEmo.lianban_count, unit: " 家", up: true },
-                ].map((c) => (
-                  <div key={c.k} className="rounded-lg bg-muted/30 p-3 text-center">
-                    <p className="text-xs text-muted-foreground">{c.k}</p>
-                    <p className={cn("mt-1 font-mono text-xl font-bold",
-                                     c.v == null ? "text-muted-foreground/40"
-                                                 : c.up ? "text-danger" : "text-success")}>
-                      {c.v ?? "—"}{c.v != null && c.unit}
-                    </p>
-                  </div>
-                ))}
-                {[
-                  { k: "封板率", v: liveEmo.seal_rate, sub: "封住 / 尝试涨停", up: true },
-                  { k: "炸板率", v: liveEmo.break_rate, sub: "炸板 / 尝试涨停", up: false },
-                  {
-                    k: "晋级率", v: liveEmo.promotion_rate, up: true,
-                    sub: liveEmo.promotion_base != null
-                      ? `${liveEmo.promotion_base_date || "上一场"} 涨停 ${liveEmo.promotion_base} 家，今天又封住`
-                      : "上一场涨停的票，今天又封住",
-                  },
-                  { k: "炸板家数", v: null as number | null, raw: liveEmo.zb_count, sub: "炸板未回封", up: false },
-                ].map((c) => (
-                  <div key={c.k} className="rounded-lg bg-muted/30 p-3 text-center">
-                    <p className="text-xs text-muted-foreground">{c.k}</p>
-                    <p className={cn("mt-1 font-mono text-xl font-bold",
-                                     (c.raw ?? c.v) == null ? "text-muted-foreground/40"
-                                                            : c.up ? "text-danger" : "text-success")}>
-                      {c.raw != null ? <Num v={c.raw} digits={0} inheritColor />
-                        : <Num v={c.v} rate digits={1} inheritColor />}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-muted-foreground/50">{c.sub}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Panel>
-        </>
-      )}
+      {/* 4b. 情绪趋势（ROUND2 阶段 2）—— 把孤立数字变成可比对的曲线。
 
-      {/* 4b. 短线情绪（连板梯队 / 打板情绪，聚合口径零个股名） */}
-      <div className="mb-3 flex items-center gap-2">
-        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground"><Flame className="h-4 w-4" /> 昨日短线情绪</h3>
+          用户原话：「单纯的独立的数字是看不出来什么的，需要跟之前的数据进行
+          比对才知道」。上面那些面板全是当日快照，看不出「今天是变好还是变差」。
+
+          四张图的分工：
+            · 涨停/跌停/炸板 —— 同一件事的三个侧面，必须并排
+            · 最高连板     —— 短线情绪最关键的一条线（高度 = 接力意愿）
+            · 封板率/炸板率 —— 互补值，一起看才知道是强是弱
+            · 连板梯队     —— 阶梯形状本身就是信息（有没有高标孤挂）
+
+          全部走 EChart；不传 legend（窄容器会压绘图区）。 */}
+      <div className="mb-3 flex flex-wrap items-baseline gap-2">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+          <TrendingUp className="h-4 w-4" /> 情绪趋势
+        </h3>
+        {emoHist.length > 0 && (
+          <span className="text-[11px] text-muted-foreground/50">
+            {emoHist.length} 个交易日（{emoHist[0].date} ~ {emoHist[emoHist.length - 1].date}）
+          </span>
+        )}
         <Caliber text={
-          "封板率 / 炸板率与上面那张实时卡同一个算法：分母是摸板家数（涨停 + 炸板），按家数不按次数。\n" +
-          "表里的「行业 / 概念」经常只有四个字（像「互联网电」「汽车零部」）——是上游把名字截到四字，\n" +
-          "不是这里显示不全；怕猜错所以不替它补全称。"
+          "数据来自东财涨停板四池（涨停/炸板/跌停/昨涨停），按交易日聚合。\n" +
+          "上游只保留约 28 天历史，所以左侧起点不会是「30 天前」，而是能取到的最早一天；\n" +
+          "之后靠每日落库慢慢向前延伸。\n" +
+          "封板率 = 涨停 ÷（涨停 + 炸板）；炸板率是它的补数。\n" +
+          "空白的点是当天取不到该字段，不是 0（补 0 会在图上造出假的断崖）。"
         } />
-        <span className="text-[11px] text-muted-foreground/50">已收盘那一场的定稿 · 连板股 · 客观公开榜单</span>
-        {/* 这块锚在**已收盘那一场**（复盘口径），不跟上面的实时行情一起刷 ——
-            不标出来会和上面的实时块混在一起，让人以为它也在跳 */}
+      </div>
+      <Panel className="mb-6">
+        {emoHist.length === 0 ? (
+          <p className="py-6 text-center text-[12px] text-muted-foreground/60">
+            还没有情绪历史。跑一次 <code className="font-mono">python3 scripts/backfill-emotion.py</code> 回填，
+            之后每天自动积累。
+          </p>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <p className="mb-1 text-[11px] text-muted-foreground">涨停 / 跌停 / 炸板（家）</p>
+              <ToneLegend
+                items={[
+                  { label: "涨停", tone: "up" },
+                  { label: "跌停", tone: "down" },
+                  { label: "炸板", tone: "neutral" },
+                ]}
+              />
+              <EChart option={ztDtZbOption(emoHist as never)} height={190} />
+            </div>
+            <div>
+              <p className="mb-1 text-[11px] text-muted-foreground">最高连板（板）</p>
+              <EChart option={maxBoardsOption(emoHist as never)} height={190} />
+            </div>
+            <div>
+              <p className="mb-1 text-[11px] text-muted-foreground">封板率 / 炸板率</p>
+              <ChartLegend items={["封板率", "炸板率"]} />
+              <EChart option={sealBreakOption(emoHist as never)} height={190} />
+            </div>
+            <div>
+              <p className="mb-1 text-[11px] text-muted-foreground">连板梯队（家）</p>
+              <EChart option={ladderOption((emotion?.ladder ?? []) as never)} height={190} />
+            </div>
+          </div>
+        )}
+      </Panel>
+
+      {/* 4a/4b 合并：打板情绪（实时 vs 收盘定稿）—— ROUND2 §9 续。
+
+          原来这里是**两个几乎一样的面板**：各 4 个大数字卡 + 3~4 个比率卡，
+          同样的 7 个指标写两遍，吃掉将近两屏。这是「留白多」和「数字多」
+          最典型的一处。
+
+          合并成一张对照表，还有额外好处：**两源的差异本身就是信息**。
+          实测 2026-10-22 实时跌停 0 家、收盘定稿 49 家 —— 并排放才看得出
+          「实时源那一路没在跟跌停」，而不是让人在两张卡之间来回对。 */}
+      <div className="mb-3 flex flex-wrap items-baseline gap-2">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+          <Flame className="h-4 w-4" /> 打板情绪
+        </h3>
+        <Caliber text={
+          "左列是**实时**（随盘变化），右列是**已收盘定稿**（复盘口径）。\n" +
+          "两列来自不同数据源，数值不一致是正常的 —— 并排是为了让你看见差异，\n" +
+          "不是为了「取哪个更准」。\n" +
+          "封板率 = 最终封住家数 ÷ 摸板家数；炸板率 = 炸板未回封家数 ÷ 摸板家数。\n" +
+          "摸板家数 = 涨停 + 炸板，**按家数算，不按炸板次数算**。"
+        } />
+        {liveEmo?.available && (
+          <span className="text-[11px] text-warning">
+            实时 {liveEmo.date} {liveEmo.as_of} · {liveEmo.phase}
+          </span>
+        )}
         {emotion?.date && (
           <span className="ml-auto text-[11px] text-muted-foreground/50">
-            {emotion.date} 收盘定稿 · 只有表格里标（实时）的两列随盘刷新
+            定稿 {emotion.date} 收盘
           </span>
         )}
       </div>
@@ -323,43 +344,99 @@ export function DailyReview() {
         {!emotion || emotion.zt_count === undefined ? (
           pending(emoDone)
         ) : (
+          (() => {
+            // 每行 = 一个指标；live 缺值就留 —，**不要**用定稿值顶替
+            // （顶替会让人以为实时源也是这个数）。
+            const rows: { k: string; live: number | null | undefined; settled: number | null | undefined;
+                          tone: "up" | "down" | "neutral"; pct?: boolean; unit?: string }[] = [
+              { k: "涨停", live: liveEmo?.zt_count, settled: emotion.zt_count, tone: "up", unit: " 家" },
+              { k: "跌停", live: liveEmo?.dt_count, settled: emotion.dt_count, tone: "down", unit: " 家" },
+              { k: "炸板", live: liveEmo?.zb_count, settled: emotion.zb_count, tone: "neutral", unit: " 家" },
+              { k: "最高连板", live: liveEmo?.max_boards, settled: emotion.max_boards, tone: "up", unit: " 板" },
+              { k: "连板（2板+）", live: liveEmo?.lianban_count, settled: emotion.lianban_count, tone: "up", unit: " 家" },
+              { k: "封板率", live: liveEmo?.seal_rate, settled: emotion.seal_rate, tone: "up", pct: true },
+              { k: "炸板率", live: liveEmo?.break_rate, settled: emotion.break_rate, tone: "down", pct: true },
+              { k: "晋级率", live: liveEmo?.promotion_rate, settled: emotion.promotion_rate, tone: "up", pct: true },
+            ];
+            const toneCls = (t: string) => t === "up" ? "text-danger" : t === "down" ? "text-success" : "text-foreground";
+            return (
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr className="border-b border-border text-left text-[11px] text-muted-foreground">
+                    <th className="px-2 py-1.5 font-medium">指标</th>
+                    <th className="px-2 py-1.5 text-right font-medium">实时</th>
+                    <th className="px-2 py-1.5 text-right font-medium">收盘定稿</th>
+                    <th className="px-2 py-1.5 text-right font-medium">差异</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => {
+                    const l = r.live, st = r.settled;
+                    const diff = (typeof l === "number" && typeof st === "number") ? l - st : null;
+                    // 差异显著才标色：小差异（如晋级率 18.0% vs 17.6%）只是取整，不是信号
+                    const notable = diff != null && (r.pct ? Math.abs(diff) >= 0.02 : Math.abs(diff) >= 3);
+                    return (
+                      <tr key={r.k} className="border-b border-border/40">
+                        <td className="px-2 py-1.5 text-muted-foreground">{r.k}</td>
+                        <td className={cn("px-2 py-1.5 text-right font-mono", toneCls(r.tone))}>
+                          {typeof l === "number"
+                            ? (r.pct ? <Num v={l} rate digits={1} inheritColor />
+                                     : <Num v={l} digits={0} suffix={r.unit} inheritColor />)
+                            : <span className="text-muted-foreground/40">—</span>}
+                        </td>
+                        <td className={cn("px-2 py-1.5 text-right font-mono", toneCls(r.tone))}>
+                          {typeof st === "number"
+                            ? (r.pct ? <Num v={st} rate digits={1} inheritColor />
+                                     : <Num v={st} digits={0} suffix={r.unit} inheritColor />)
+                            : <span className="text-muted-foreground/40">—</span>}
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-mono text-[11px]">
+                          {diff == null ? (
+                            <span className="text-muted-foreground/40">—</span>
+                          ) : notable ? (
+                            /* 差异列**不按正负上色**：它表达的是「两源不一致」，
+                               不是市场方向。曾经按正负染色，结果跌停差 −49 被染成
+                               绿色（看着像好事），而它其实只是实时源没在跟跌停。
+                               用 warning 色明确标「这一行要留意」。 */
+                            <span className="text-[hsl(var(--warning))]">
+                              <Num v={r.pct ? diff * 100 : diff} digits={r.pct ? 1 : 0}
+                                   signed inheritColor suffix={r.pct ? "%" : ""} />
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/50">
+                              <Num v={r.pct ? diff * 100 : diff} digits={r.pct ? 1 : 0}
+                                   signed inheritColor suffix={r.pct ? "%" : ""} />
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            );
+          })()
+        )}
+      </Panel>
+
+      {/* 4c. 连板股清单（原在「昨日短线情绪」面板内，独立成块） */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+          <Flame className="h-4 w-4" /> 连板股
+        </h3>
+        <Caliber text={
+          "表里的「行业 / 概念」经常只有四个字（像「互联网电」「汽车零部」）——是上游把名字截到四字，\n" +
+          "不是这里显示不全；怕猜错所以不替它补全称。\n" +
+          "只有标（实时）的两列随盘刷新，其余是上一场收盘的数据。"
+        } />
+        <span className="text-[11px] text-muted-foreground/50">2 板以上 · 客观公开榜单，非推荐 / 非预测</span>
+      </div>
+      <Panel className="mb-6">
+        {!emotion || emotion.zt_count === undefined ? (
+          pending(emoDone)
+        ) : (
           <>
-            {/* 关键计数 */}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {[
-                { k: "涨停", v: <Num v={emotion.zt_count} digits={0} inheritColor className="text-danger" /> },
-                { k: "跌停", v: <Num v={emotion.dt_count} digits={0} inheritColor className="text-success" /> },
-                { k: "最高连板", v: <Num v={emotion.max_boards} digits={0} suffix=" 板" inheritColor className="text-primary" /> },
-                { k: "连板（2板+）", v: <Num v={emotion.lianban_count} digits={0} suffix=" 家" inheritColor className="text-primary" /> },
-              ].map((c) => (
-                <div key={c.k} className="rounded-lg bg-muted/25 p-3 text-center">
-                  <p className="text-[11px] text-muted-foreground">{c.k}</p>
-                  <p className="mt-0.5 font-mono text-xl font-bold">{c.v}</p>
-                </div>
-              ))}
-            </div>
-            {/* 打板情绪比率 */}
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              {[
-                { k: "封板率", v: emotion.seal_rate, hint: "封住 / 尝试涨停", strong: true },
-                { k: "炸板率", v: emotion.break_rate, hint: "炸板 / 尝试涨停", strong: false },
-                { k: "晋级率", v: emotion.promotion_rate,
-                  hint: `前一交易日涨停的票，${emotion.date} 又封住`, strong: true },
-              ].map((c) => (
-                <div key={c.k} className="rounded-lg bg-muted/20 p-2.5 text-center">
-                  <p className="text-[11px] text-muted-foreground">{c.k}</p>
-                  <p className={cn("mt-0.5 font-mono text-sm font-bold", c.strong ? "text-danger" : "text-success")}>
-                    <Num v={c.v} rate digits={1} inheritColor />
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground/50">{c.hint}</p>
-                </div>
-              ))}
-            </div>
-            {/* 连板股清单（2 板以上，客观公开榜单） */}
-            <div className="mt-3">
-              <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                <p className="text-[11px] text-muted-foreground">连板股（2 板以上连续涨停）· 客观公开榜单，非推荐 / 非预测</p>
-              </div>
+            <div>
               {emotion.lianban_stocks.length === 0 ? (
                 <p className="text-xs text-muted-foreground/50">今日无 2 板以上个股</p>
               ) : (
@@ -494,58 +571,35 @@ export function DailyReview() {
         )}
       </Panel>
 
-      {/* 6. 资金轮动 */}
+      {/* 6. 资金轮动 —— 改为正负双向柱状图（ROUND2 阶段 2）。
+
+          原来这里是两个列表（流入 Top 6 / 流出 Top 6），内容与上面那张表
+          的头部完全重复，等于同一份数据抄了两遍。换成双向柱之后：
+            · 流入流出在同一根轴上，正负方向一眼可辨（列表要读符号）
+            · 长短直接可比（列表要比较数字大小）
+            · 不再和上面那张表重复 —— 表留明细，图给形状
+          用户原话：「资金流入流出可以做成面积图或者 whatever」。 */}
       <div className="mb-3 flex items-center gap-2">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground"><ArrowDownUp className="h-4 w-4" /> 资金轮动</h3>
         <Caliber text={
-          "就是上面那张榜的两头：流入榜只放净流入为正的、流出榜只放为负的，各取前六。\n" +
-          "某一边不足六个就只列够格的那几个 —— 普跌日往往只有两三个行业真净流入。\n" +
+          "就是上面那张榜的两头：净流入为正的向上、为负的向下，按金额排序取前 15 个行业。\n" +
           "口径同上：同花顺行业资金流盘中即时值，不能当主力净流入读。"
         } />
-        <span className="text-[11px] text-muted-foreground/50">板块级净流入 / 流出</span>
+        <span className="text-[11px] text-muted-foreground/50">板块级净流入（亿）</span>
       </div>
-      <div className="mb-2 grid gap-4 md:grid-cols-2">
-        {[
-          {
-            title: "流入 Top", icon: TrendingUp, color: "text-danger",
-            rows: sectors.filter((s) => s.net > 0).slice(0, 6),
-            empty: "今日没有行业净流入",
-          },
-          {
-            title: "流出 Top", icon: TrendingDown, color: "text-success",
-            rows: sectors.filter((s) => s.net < 0)
-              .sort((a, b) => a.net - b.net).slice(0, 6),
-            empty: "今日没有行业净流出",
-          },
-        ].map((col) => (
-          <Panel key={col.title}>
-            <h4 className={cn("mb-3 flex items-center gap-1.5 text-sm font-semibold", col.color)}><col.icon className="h-4 w-4" /> {col.title}</h4>
-            {col.rows.length === 0 ? (
-              ovDone && sectors.length > 0
-                ? <p className="py-4 text-center text-sm text-muted-foreground/60">{col.empty}</p>
-                : pending(ovDone)
-            ) : (
-              <div className="space-y-1.5">
-                {col.rows.map((s, i) => (
-                  <div key={s.name} className="flex items-center gap-3 border-b border-border/30 pb-1.5 text-sm last:border-0">
-                    <span className="w-5 text-xs text-muted-foreground/50">{i + 1}</span>
-                    <span className="flex-1 truncate">{s.name}</span>
-                    <Num v={s.pct} pct digits={2} size="sm" />
-                    <Num v={s.net} signed colorBySign digits={2} suffix=" 亿" size="sm" />
-                  </div>
-                ))}
-              </div>
-            )}
-          </Panel>
-        ))}
-      </div>
+      <Panel className="mb-6">
+        {sectors.length === 0 ? (
+          pending(ovDone)
+        ) : (
+          <EChart option={sectorFlowOption(sectors as never, 15)} height={360} />
+        )}
+      </Panel>
 
       {/* 7. 涨停样本统计（原独立页并入：确定性市场现象统计，非策略回测） */}
       <div className="mt-8 border-t border-border/50 pt-6">
         <LimitUpStats />
       </div>
 
-      <Disclaimer />
     </div>
   );
 }

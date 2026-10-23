@@ -1,15 +1,16 @@
 /**
  * 设计 token 单一真源（ADR-0014）。
  *
- * 为什么要有这个文件：AGENTS 硬规则 7 说「颜色只写在 index.css 与 chart-theme.ts 两处」。
- * 引入 antd 后这句话要改 —— antd 不吃 CSS 变量做主题，它要 JS 对象。所以：
+ * 为什么要有这个文件：AGENTS 硬规则 7 —— 颜色只有一个真源，组件里出现
+ * `#` 开头字面量即违规。消费者全部从这里读：
  *
  *   tokens.ts  ← 唯一真源（这个文件）
- *      ├→ antd 主题（ConfigProvider theme）
  *      ├→ CSS 变量（index.css 由它生成，见 gen-css-vars）
  *      └→ LWC / ECharts（chart-theme.ts 从它读）
  *
  * 这样「改一个颜色」只改一处，图表和 UI 不会漂移。
+ * （曾有第四个消费者：antd 的 ConfigProvider theme。antd 已不再使用，
+ *   `antdTheme()` 于 2026-10-23 删除。）
  *
  * 数值来自 docs/research/ui-design-2026-10.md，那里有出处。
  */
@@ -132,10 +133,56 @@ export const FONT = {
 } as const;
 
 // 间距 8 基准；数据密集区用 4
+//
+// ROUND2-D1 定案：基准间距从 8 提到 12（D-A 基座放松一档）——
+// 面板之间 12px、面板内 12px。`md` 就是它；其它值按比例留着备用。
 export const SPACE = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 
-// 字号：11 表头 / 12 正文 / 13 强调 / 16 页标 / 20 大数字
-export const SIZE = { xs: 11, sm: 12, md: 13, lg: 16, xl: 20, xxl: 28 } as const;
+/**
+ * 字号与行高标度（ROUND2-D1 定案 = D-A 彭博终端放松一档）。
+ *
+ * 为什么不是原来零散的 10/11/12/13px：没有体系就无法回答「这一级该用哪个」，
+ * 结果同一个页面里同时出现 10/11/12/13 四种字号，看着就是不统一。
+ *
+ * 为什么是 12 而不是 D-A 原型的 11：11px 中文接近可读下限，实测「医疗器械」
+ * 这类笔画密的四字词开始粘连。数字仍为 12px 等宽（读盘读数不吃亏）。
+ *
+ * 基调（用户原话）：
+ *   - 信息密集、图表为主体，而不是一堆大号数字
+ *   - 不要求一屏塞满，允许上下滚动
+ */
+export const TYPE = {
+  /** 表格/密集区的辅助标签（列头、时间戳） */
+  label: 11,
+  /** 正文与表格内容 —— 全站默认 */
+  body: 12,
+  /** 需要一眼抓住的数字与短标题 */
+  emphasis: 13,
+  /** 页标题 */
+  pageTitle: 16,
+  /** 关键指标大数字 */
+  metric: 20,
+} as const;
+
+/** 行高。1.35 是正文；紧凑表格和长文本分开放，不要一个值打天下。 */
+export const LINE = {
+  tight: 1.2,
+  /** 正文默认 */
+  body: 1.35,
+  /** 长文本（研报正文、归因说明） */
+  loose: 1.6,
+} as const;
+
+// 字号：与 TYPE 同名映射，保留旧导出名以免大范围改调用方。
+// 新代码优先用 TYPE.*（语义清晰）；SIZE.* 留给按 key 取尺寸的地方。
+export const SIZE = {
+  xs: TYPE.label,
+  sm: TYPE.body,
+  md: TYPE.emphasis,
+  lg: TYPE.pageTitle,
+  xl: TYPE.metric,
+  xxl: 28,
+} as const;
 
 // 行高：表格紧凑 28，常规 32
 export const ROW = { compact: 28, regular: 32 } as const;
@@ -143,111 +190,3 @@ export const ROW = { compact: 28, regular: 32 } as const;
 // 圆角：标签 2 / 输入按钮 4 / 卡片 6
 export const RADIUS = { sm: 2, md: 4, lg: 6 } as const;
 
-/** 生成 antd 的 theme 配置。algorithm 由调用方给（dark/default/compact）。 */
-export function antdTheme(p: Palette) {
-  return {
-    token: {
-      colorPrimary: p.accent,
-      colorInfo: p.info,
-      // 注意用 danger/success 而**不是** up/down：
-      // antd 的这两个槽位是「操作成功/失败」的界面反馈，
-      // 国际口径下把 up/down 换过来后，保存成功的提示不该变成红色。
-      colorSuccess: p.success,
-      colorError: p.danger,
-      colorWarning: p.warning,
-
-      colorBgBase: p.bg,
-      colorBgLayout: p.bg,
-      colorBgContainer: p.panel,
-      colorBgElevated: p.raised,
-
-      colorText: p.text,
-      colorTextSecondary: p.textSecondary,
-      colorTextTertiary: p.textTertiary,
-      colorTextQuaternary: p.textDisabled,
-      colorBorder: p.border,
-      colorBorderSecondary: p.border,
-
-      borderRadius: RADIUS.md,
-      borderRadiusLG: RADIUS.lg,
-      borderRadiusSM: RADIUS.sm,
-
-      fontFamily: FONT.ui,
-      fontFamilyCode: FONT.mono,
-      fontSize: SIZE.sm,
-      fontSizeSM: SIZE.xs,
-      fontSizeLG: SIZE.md,
-      fontSizeHeading5: SIZE.lg,
-      fontSizeHeading4: SIZE.lg,
-      fontSizeHeading3: SIZE.xl,
-
-      controlHeight: 28,
-      controlHeightSM: 24,
-      controlHeightLG: 32,
-      lineWidth: 1,
-      wireframe: false,
-    },
-    components: {
-      // 表格是主战场：压行高、去掉斑马纹、分隔线只留横向且要淡
-      Table: {
-        headerBg: p.panel,
-        headerColor: p.textTertiary,
-        headerSplitColor: "transparent",
-        rowHoverBg: p.raised,
-        cellPaddingBlock: 6,
-        cellPaddingInline: 12,
-        borderColor: p.border,
-        fontSize: SIZE.sm,
-      },
-      // Menu 深色下不要 antd 默认的选中块，只留一条左侧竖线 + 文字变色
-      Menu: {
-        itemBg: "transparent",
-        itemSelectedBg: p.raised,
-        itemSelectedColor: p.text,
-        itemColor: p.textSecondary,
-        itemHoverBg: p.raised,
-        itemHoverColor: p.text,
-        itemHeight: 32,
-        iconSize: 14,
-      },
-      Card: {
-        colorBgContainer: p.panel,
-        paddingLG: SPACE.md,
-        headerBg: "transparent",
-        headerFontSize: SIZE.sm,
-        headerHeight: 36,
-      },
-      Tabs: {
-        itemColor: p.textSecondary,
-        itemSelectedColor: p.text,
-        itemHoverColor: p.text,
-        inkBarColor: p.accent,
-        horizontalItemPadding: "6px 0",
-        horizontalItemGutter: 20,
-        titleFontSize: SIZE.sm,
-      },
-      Segmented: {
-        itemSelectedBg: p.raised,
-        itemSelectedColor: p.text,
-        itemColor: p.textSecondary,
-        trackBg: p.bg,
-      },
-      Statistic: {
-        contentFontSize: SIZE.xl,
-        titleFontSize: SIZE.xs,
-      },
-      Descriptions: {
-        labelBg: "transparent",
-        titleColor: p.textTertiary,
-        labelColor: p.textTertiary,
-        contentColor: p.text,
-      },
-      Divider: { colorSplit: p.border },
-      Layout: {
-        bodyBg: p.bg,
-        headerBg: p.panel,
-        siderBg: p.panel,
-      },
-    },
-  } satisfies import("antd").ThemeConfig;
-}

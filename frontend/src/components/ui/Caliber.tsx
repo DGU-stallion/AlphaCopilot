@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { HelpCircle } from "lucide-react";
-import { plain } from "@/lib/agent";
+import { plain } from "@/lib/coerce";
 
 export function Caliber({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
@@ -21,7 +21,7 @@ export function Caliber({ text }: { text: string }) {
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         title="这个数怎么算的"
-        className="flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+        className="flex items-center gap-0.5 rounded px-1 py-0.5 text-[11px] font-medium text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
       >
         <HelpCircle className="h-3 w-3" />
         口径

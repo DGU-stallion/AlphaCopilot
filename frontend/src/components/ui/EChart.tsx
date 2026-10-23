@@ -29,7 +29,31 @@ function retintBars(series: any, t: ReturnType<typeof getChartTheme>): any {
   });
 }
 
-/** 把带 semanticScale="pnl" 的 visualMap 用当前 palette 重上色。 */
+/** 把带 `semanticTone` 的系列按当前 palette 上色（ROUND2 阶段 2）。
+ *
+ * 为什么需要它：情绪图里的「涨停」必须是涨色、「跌停」必须是跌色，但**颜色
+ * 真源在 tokens.ts**（AGENTS 硬规则 7），前端 option 里不能写 `#` 字面量。
+ * 所以 option 只标语义（up/down/neutral），由这里换成具体色值。
+ *
+ * 与 `semanticScale: "pnl-bars"`（逐柱按正负）的区别：那个表达「数值的正负」，
+ * 这个表达「这一条线代表的含义就是涨/跌」—— 涨停家数本身永远是正数，
+ * 不能靠正负判断。
+ */
+function retintTone(series: any, t: ReturnType<typeof getChartTheme>): any {
+  if (!Array.isArray(series)) return series;
+  return series.map((s: any) => {
+    if (!s || !s.semanticTone || s.semanticTone === "neutral") return s;
+    const { semanticTone, ...rest } = s;
+    const color = semanticTone === "up" ? t.upColor : t.downColor;
+    return {
+      ...rest,
+      itemStyle: { ...(s.itemStyle ?? {}), color },
+      ...(s.type === "line" ? { lineStyle: { ...(s.lineStyle ?? {}), color } } : {}),
+    };
+  });
+}
+
+/** 把带语义标记的 visualMap 用当前 palette 重上色。 */
 function retintPnl(vm: any, t: ReturnType<typeof getChartTheme>): any {
   const apply = (one: any) => {
     if (!one || one.semanticScale !== "pnl") return one;
@@ -74,7 +98,7 @@ function themed(option: Record<string, any>): Record<string, any> {
     visualMap: retintPnl(option.visualMap, t),
     // 柱状图逐柱按正负上色（后端标 semanticScale: "pnl-bars"）。
     // 不做的话「选股 +5%」和「择时 -12%」是一个颜色，归因图等于没读。
-    series: retintBars(option.series, t),
+    series: retintTone(retintBars(option.series, t), t),
     xAxis: option.xAxis ? applyAxis(option.xAxis) : undefined,
     yAxis: option.yAxis ? applyAxis(option.yAxis) : undefined,
   };

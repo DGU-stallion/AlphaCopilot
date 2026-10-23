@@ -24,8 +24,38 @@ interface Entry<T> {
   error: unknown;
 }
 
-/** 默认 TTL：60 秒。盘面类数据够用，又不会长时间停在旧值上。 */
-export const DEFAULT_TTL_MS = 60_000;
+/**
+ * TTL 分级（ROUND2 §13，A4）。
+ *
+ * 之前全站只有一个 60 秒。问题不是"太短"或"太长"，而是**所有数据共用一个值**：
+ *   - 行情类（自选股报价）60s 是对的
+ *   - 重算类（回测/净值/页面渲染，实测单次 8s）60s 等于"每次切回来都要重算"
+ *   - 归档类（研报列表）60s 纯属浪费
+ *
+ * 分级的依据是**取数代价 × 变化频率**，不是"感觉"：
+ *   变动快 + 便宜 → 短 TTL（LIVE）
+ *   变动慢 + 昂贵 → 长 TTL（COMPUTE）
+ *
+ * 注意 `isFresh` 里**跨日必定失效**，所以长 TTL 不会把昨天的数字当成今天的 ——
+ * 长 TTL 只在同一天内复用。这也是 COMPUTE 敢给 30 分钟的前提。
+ */
+export const TTL = {
+  /** 盘中会变、取数便宜：自选股报价、盘口。 */
+  LIVE: 30_000,
+  /** 列表/轻查询的默认值。 */
+  DEFAULT: 60_000,
+  /**
+   * 昂贵的确定性重算：回测、组合净值、页面渲染（实测单次约 8s）。
+   * 参数变了 key 就变（不会串数据），跨日又会强制失效，所以同一天内
+   * 长缓存是纯赚。给 30 分钟，够"来回切页面看同一张图"不重算。
+   */
+  COMPUTE: 30 * 60_000,
+  /** 按日/按周更新的归档数据：研报列表、历史序列。 */
+  ARCHIVE: 6 * 60 * 60_000,
+} as const;
+
+/** 默认 TTL：60 秒。保留这个名字是为了不破坏已有调用与测试。 */
+export const DEFAULT_TTL_MS = TTL.DEFAULT;
 
 const store = new Map<string, CacheEntry<unknown>>();
 const inflight = new Map<string, Promise<unknown>>();
@@ -153,6 +183,19 @@ export function useCachedResource<T>(
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
 
+  /**
+   * 当前 key 的最新值。用来丢弃**已过期请求**的结果。
+   *
+   * 真 bug（ROUND2 A5，浏览器实测）：快速改参数时先发的慢请求后回来，会覆盖
+   * 后发的快请求结果 —— 界面停在一个「用户已经改掉」的参数上。
+   * 回测页连续改区间就复现：半年的图最快回来，1.8 年那次最慢，最后显示的是
+   * 1.8 年的图，而参数框里写着半年。
+   *
+   * 这类竞态在数值场景里最难发现：图看起来完全合理，只是不是你要的那一次。
+   */
+  const currentKey = useRef(key);
+  currentKey.current = key;
+
   const run = useCallback(
     (force: boolean): Promise<void> => {
       const entry = store.get(key);
@@ -169,10 +212,14 @@ export function useCachedResource<T>(
       }
       return p
         .then((data) => {
+          // 缓存照写（数据本身是对的，别的 key 将来会用上），
+          // 但**只有当这个 key 仍是当前 key 时**才更新界面状态。
           setCache(key, data, "");
+          if (currentKey.current !== key) return;
           setState({ data, loading: false, error: null });
         })
         .catch((error) => {
+          if (currentKey.current !== key) return;
           setState((s) => ({ ...s, loading: false, error }));
         })
         .finally(() => {
