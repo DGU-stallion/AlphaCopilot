@@ -29,20 +29,21 @@ from alpha import registry
 #   · echarts —— 二维聚合 / 统计对比类：热力图 / 分层 / 散点 / 归因 / 矩阵。
 #
 # ADR-0012「未决 1」的明确裁决：backtest.equity / backtest.drawdown 产 LWC 输入，
-# correlation.* 一类产 ECharts option。逐 fn 理由：
+# correlation.matrix 产 ECharts option。逐 fn 理由：
 #
 #   backtest.equity      → lwc      净值曲线（含策略 vs 买入持有多条线），
 #                                   金融时间序列，未来与回撤同 chart 多 pane（M2-6）。
 #   backtest.drawdown    → lwc      回撤曲线，净值域内同一金融坐标语义，pane 1。
-#   correlation.overlay  → echarts  多标的归一化相对强弱对比，ADR-0012 点名 ECharts
-#                                   option；是统计对比而非单资产价格轨迹。
+#   correlation.overlay  → lwc      多标的归一化相对强弱叠加：时间序列轨迹，用户要
+#                                   TradingView 式十字光标/拖拽缩放（ROUND3 D5）。
+#                                   **多条 series 叠在同一 pane**（量纲同为「起点=100」），
+#                                   前端由 MultiLineChart 渲染；相关性与「回撤」无关，
+#                                   故不进 DRAWDOWN_FNS。
 #   correlation.matrix   → echarts  相关矩阵热力图，二维聚合，LWC 无此图形。
-#   correlation.rolling  → echarts  滚动相关系数（有争议，见下）：它本质是统计衍生
-#                                   序列随时间变化，语义上偏时间序列；但它是两个标的
-#                                   收益率的衍生统计（非价格轨迹），payload 现为
-#                                   ECharts option，且与 matrix/overlay 同属相关性族
-#                                   的指标轴（%格式、统计口径）。裁决为 echarts；
-#                                   若未来要与净值同 pane 共享十字光标缩放再迁 lwc。
+#   correlation.rolling  → lwc      滚动相关系数随时间变化（单条序列）—— 同样是时间
+#                                   序列轨迹，与 overlay 一起迁到 LWC（ROUND3 D5）。
+#                                   单条走 PriceChart（line 模式），多条走 MultiLineChart；
+#                                   同样不进 DRAWDOWN_FNS（不是净值，没有回撤）。
 #
 # 不在表里的：backtest.metrics 是 metric block（非 chart，无 renderer）；
 # 未注册的 fn 根本到不了这里（registry 校验先行）。
@@ -58,10 +59,11 @@ RENDERER_BY_FN: dict[str, str] = {
     # LWC 语义：金融时间序列轨迹
     "backtest.equity": RENDERER_LWC,
     "backtest.drawdown": RENDERER_LWC,
-    # ECharts 语义：聚合 / 统计对比
-    "correlation.overlay": RENDERER_ECHARTS,
+    # ROUND3 D5：相关性走势（叠加 / 滚动）迁 LWC —— 用户要 TradingView 式交互
+    "correlation.overlay": RENDERER_LWC,      # 多标的归一化叠加（MultiLineChart，单 pane 多线）
+    "correlation.rolling": RENDERER_LWC,      # 滚动相关单线（PriceChart line 模式）
+    # ECharts 语义：二维聚合 / 统计对比（LWC 无热力图）
     "correlation.matrix": RENDERER_ECHARTS,
-    "correlation.rolling": RENDERER_ECHARTS,
     # M4-1 因子实验室
     "factorlab.ic_series": RENDERER_LWC,            # IC 时间序列
     "factorlab.ic_decay": RENDERER_LWC,             # 衰减曲线（横轴为期限 t+N）
@@ -85,6 +87,29 @@ def renderer_for_fn(fn: str | None) -> str | None:
     if fn is None:
         return None
     return RENDERER_BY_FN.get(fn)
+
+
+# ---------------------------------------------------------------------------
+# 「这个 fn 的载荷要不要带回撤」白名单。
+#
+# 为什么要单独一张表而不默认都算：回撤只对**净值类**曲线有意义。
+# 默认都算曾经导致一个真 bug（截图发现）——同一屏出现两份回撤：
+#   · backtest.equity 自带回撤 → EquityChart 加回撤 pane（正确，ADR-0014 §6）
+#   · backtest.drawdown 被再算一份「回撤的回撤」→ 又画一遍
+#   · tearsheet.rolling_sharpe 被算了「Sharpe 的回撤」→ 毫无意义
+#
+# 判据：曲线本身是「从 1.0 起算的资产价值」才谈得上回撤。
+# IC 序列、滚动 Sharpe、回撤曲线本身都不是。
+# ---------------------------------------------------------------------------
+DRAWDOWN_FNS: frozenset[str] = frozenset({
+    "backtest.equity",
+    "walkforward.oos_equity",
+})
+
+
+def wants_drawdown(fn: str | None) -> bool:
+    """该 fn 的 lwc 载荷是否该带回撤数组。"""
+    return fn in DRAWDOWN_FNS
 
 # 完整 page spec 的 JSON schema（校验形状；fn 白名单校验在 validate_spec 里另做）。
 # M2-7：renderer 只做形状外的语义校验（值域 + 与 fn 的映射一致性），schema 不锁它，

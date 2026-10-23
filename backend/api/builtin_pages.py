@@ -2,6 +2,7 @@
 
 两个 kind=builtin 固定页，create_app 时经 register_builtin_pages 幂等 upsert 入库：
   correlation   相关性分析（三图：叠加走势 / 相关矩阵 / 滚动相关），analysis_ref 走白名单
+                —— 叠加走势与滚动相关走 LWC（ROUND3 D5），相关矩阵走 ECharts
   backtest      回测（指标 + 净值 + 回撤），支持多策略
 
 注：盘面数据 / 每日复盘 / 涨停样本统计已改由前端直连专用端点
@@ -42,12 +43,14 @@ CORRELATION_SPEC: dict[str, Any] = {
         {"name": "range", "type": "date_range", "label": "区间", "default": "1y"},
     ],
     "blocks": [
-        # M2-7：renderer 由服务端映射裁决（correlation.* 全族为 ECharts option，ADR-0012）。
-        {"kind": "chart", "span": 2, "renderer": "echarts",
+        # M2-7：renderer 由服务端映射裁决（api.page_spec.RENDERER_BY_FN）。
+        # ROUND3 D5：overlay / rolling 两条**走势**已迁 LWC（TradingView 式交互）；
+        # matrix 是热力图，LWC 画不出来，仍走 ECharts。
+        {"kind": "chart", "span": 2, "renderer": "lwc",
          "analysis_ref": {"fn": "correlation.overlay"}},
         {"kind": "chart", "span": 1, "renderer": "echarts",
          "analysis_ref": {"fn": "correlation.matrix"}},
-        {"kind": "chart", "span": 1, "renderer": "echarts",
+        {"kind": "chart", "span": 1, "renderer": "lwc",
          "analysis_ref": {"fn": "correlation.rolling"}},
     ],
     "refresh": {"mode": "manual"},

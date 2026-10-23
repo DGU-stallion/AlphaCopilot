@@ -27,7 +27,8 @@ def _valid_spec() -> dict:
              "default": ["600519", "000858"], "max": 8},
         ],
         "blocks": [
-            {"kind": "chart", "span": 2, "renderer": "echarts",
+            # ROUND3 D5：overlay 已迁 LWC（相关性走势 = 时间序列轨迹）
+            {"kind": "chart", "span": 2, "renderer": "lwc",
              "analysis_ref": {"fn": "correlation.overlay"}},
             {"kind": "chart", "span": 1, "renderer": "echarts",
              "analysis_ref": {"fn": "correlation.matrix"}},
@@ -100,7 +101,7 @@ def test_valid_renderers_pass():
              "analysis_ref": {"fn": "backtest.drawdown"}},
             {"kind": "chart", "span": 1, "renderer": "echarts",
              "analysis_ref": {"fn": "correlation.matrix"}},
-            {"kind": "chart", "span": 1, "renderer": "echarts",
+            {"kind": "chart", "span": 1, "renderer": "lwc",
              "analysis_ref": {"fn": "correlation.overlay"}},
             {"kind": "metric", "span": 3, "analysis_ref": {"fn": "backtest.metrics"}},
         ],
@@ -231,8 +232,8 @@ def test_normalize_spec_idempotent_and_not_mutating():
     snapshot = [dict(b) for b in spec["blocks"]]
     out1 = normalize_spec(spec)
     out2 = normalize_spec(out1)
-    assert out1["blocks"][0]["renderer"] == "echarts"
-    assert out2["blocks"][0]["renderer"] == "echarts"
+    assert out1["blocks"][0]["renderer"] == "lwc"
+    assert out2["blocks"][0]["renderer"] == "lwc"
     assert spec["blocks"] == snapshot
 
 
