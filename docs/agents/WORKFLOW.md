@@ -154,3 +154,46 @@ pi-agents --summary          # 跨项目：哪个项目在动
 
 **什么时候该换**：任务数稳定超过 30 条、依赖跨 3 层以上、同时开 5 个以上 worktree，
 且开始需要「自动算出当前什么能开工」。那时再评估。
+
+---
+
+## 工具：`pi-agents`
+
+看 session 里到底发生了什么。数据源全部是 pi 已经写在硬盘上的东西，不产生新数据。
+
+```bash
+# 装一次（全局可用）
+ln -sf ~/Project/AlphaCopilot/tools/pi-agents ~/.local/bin/pi-agents
+
+pi-agents                       # 当前项目最近的 session
+pi-agents -s <id前缀> --git     # 单个 session：每个 subagent 改了哪些文件、留下哪些提交
+pi-agents --summary             # 跨项目：哪个项目在动、多少个 subagent
+pi-agents --json                # 机器可读
+```
+
+**解决什么**：`agent / subagent 多了之后，改了什么、有什么后果我不知道`。
+
+输出示例：
+
+```
+session 01a1624a  /Users/a19150/Project/AlphaCopilot
+  2026-10-22 06:26 → 10-23 10:12  (27h45m)
+  你发了 17 条 · agent 回了 966 轮 · compact 2 次 · in 2,623,488 / out 422,590
+  工具: bash×821, edit×54, read×46, subagent×10, ask_user_question×13
+  subagent 10 个:
+    名字                     状态          轮次     改文件   bash  最后事件
+    B3-runs                done        65       4     41  session_shutdown
+    B4-reports             done        51       4     59  session_shutdown
+    D5-lwc                 done        81      11     71  agent_end
+```
+
+`--git` 会进一步把「改了哪些文件」映射到「留下哪些提交」—— 这是从「改了什么」
+到「有什么后果」的那一步。
+
+**数据源**：
+
+```
+~/.pi/agent/sessions/<cwd>/<ts>_<id>.jsonl                        session 全文
+~/.pi/agent/sessions/<cwd>/artifacts/<id>/subagent-registry.json  名字 → session 文件
+~/.pi/agent/sessions/<cwd>/artifacts/<id>/subagent-activity/*.json 实时状态
+```
