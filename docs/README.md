@@ -8,17 +8,9 @@
 | 文件 | 是什么 | 什么时候读 |
 |---|---|---|
 | [`../AGENTS.md`](../AGENTS.md) | 硬规则 + 目录职责 + 反模式 | **每次动代码前**。规则 1 条就能让你少走一天弯路 |
-| [`agents/WORKFLOW.md`](agents/WORKFLOW.md) | **流程硬规则 P1–P8**（任务怎么进 issue、治理 vs 执行、一任务一 PR） | 开工前；觉得「不知道 agent 在干什么」时 |
 | [`../CONTEXT.md`](../CONTEXT.md) | 领域词汇表（纯词汇，无实现） | 不确定某个词在项目里指什么 |
-| [`REFACTOR-PLAN.md`](REFACTOR-PLAN.md) | v2 重构的**决策依据**、目标架构、风险对策（**不含进度**） | 想知道当初为什么这么设计 |
+| [`REFACTOR-PLAN.md`](REFACTOR-PLAN.md) | v2 重构计划 M0–M5 与验收标准 | 要知道下一步做什么 |
 | [`adr/`](adr/) | 架构决策记录 0001–0016 | 想知道「为什么不是另一种做法」 |
-
-**进度和任务状态不在 `docs/` 里，在 issue tracker**（P6）：
-
-```bash
-gh issue list --repo DGU-stallion/AlphaCopilot --state open
-gh issue list --repo DGU-stallion/AlphaCopilot --label ready-for-agent
-```
 
 ADR 里 **0001–0008 已被取代**（插件化 / dsh SDK 路线 → ADR-0009/0010 的 Pi 路线）。
 保留不删是因为它们记录了试错过程；但**不要把 0001–0008 当实现依据**。
@@ -40,7 +32,7 @@ ADR 里 **0001–0008 已被取代**（插件化 / dsh SDK 路线 → ADR-0009/0
 |---|---|
 | [`research/`](research/) | 上游能力清单（a-stock-data v3.10）、UI 设计调研 |
 | [`prototypes/`](prototypes/) | 三版设计原型（D-A/B/C）+ 截图，ADR-0014 取舍的视觉依据 |
-| [`agents/`](agents/) | **流程规则**：`WORKFLOW.md`（P1–P8 硬规则）、`issue-tracker.md`（agent 怎么取活）、`triage-labels.md`（标签映射）、`domain.md` |
+| [`agents/`](agents/) | 本机工程技能（issue tracker / triage labels）的仓库级配置 |
 
 ## 已删除（2026-10-23）
 

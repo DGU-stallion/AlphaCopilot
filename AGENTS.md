@@ -66,9 +66,7 @@ Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共
 
 ## 硬规则
 
-1. 从 `main` 拉分支 `feat/<slug>` → squash PR，conventional commits。
-   **没有 issue 不开分支**；PR 正文必须写 `Closes #N`；分支活不过两周。
-   完整流程规则见 [`docs/agents/WORKFLOW.md`](docs/agents/WORKFLOW.md)（P1–P8）。
+1. 从 `main` 拉分支 `feat/<slug>` → squash PR，conventional commits
 2. **产品真源在我们的数据库**。agent 的 session 文件是它的内部记忆，前端永不读取；
    `backend/api` 负责把消息与 artifact 落库
 3. **agent 不直接写数据库**：写库一律经 `backend/api` 校验（artifact manifest /
@@ -169,10 +167,6 @@ Pi 走 `--mode rpc` 子进程，这是语言中立边界；不存在跨语言共
 - ❌ 只用当天快照做「趋势」判断（没有历史序列就没有趋势，见硬规则 13）
 - ❌ 手写第二套 markdown 解析器（见硬规则 15）
 - ❌ 把 Agent 栏做成布局内的常驻右栏（见硬规则 16）
-- ❌ 没有 issue 就直接开分支、开 session（见 `docs/agents/WORKFLOW.md` P1）
-- ❌ 把治理项（要不要做、要不要下线）丢给 agent 队列（见 P4）
-- ❌ 在 `docs/` 里维护里程碑进度快照 —— 进度属于 issue tracker（见 P6）
-- ❌ 给 agent 派没有「验收」的活（见 P5）
 - ❌ 硬删除用户数据 / 只给确认弹窗不给撤销（见硬规则 14）
 
 ## 命令

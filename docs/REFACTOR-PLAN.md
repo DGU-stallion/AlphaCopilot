@@ -3,25 +3,15 @@
 > 决策依据：ADR-0010（agent→pi）、ADR-0011（前端 TS + 后端/数据 Python）、
 > ADR-0012（双轨产物）、ADR-0013（UI 设计系统 v1）、**ADR-0014（UI 设计系统 v2，取代 0013 §1–3）**、
 > **ADR-0015（M3 三处不做：monorepo 搬迁 / 删 astock / data-service 定位）**
-> 编写：2026-10-20 · 修订：**2026-11-07** · 基准 commit：`84198c5`（main）
+> 编写：2026-10-20 · 修订：**2026-10-21** · 基准 commit：`84198c5`（main）
 >
-> ## 进度不在这里
->
-> **本文件只保留「为什么这么做」（决策依据、目标架构、风险对策）。
-> 进度、任务状态、谁在做哪条 —— 一律去 issue tracker。**
->
-> ```bash
-> gh issue list --repo DGU-stallion/AlphaCopilot --state open
-> gh issue list --repo DGU-stallion/AlphaCopilot --label ready-for-agent
-> ```
->
-> 理由见 [`agents/WORKFLOW.md`](agents/WORKFLOW.md) P6：计划会变，文档不会。
-> 一个写着「全部里程碑 ✅」的快照，在 main 落后 9 周时是主动误导 ——
-> 这个坑已经踩过一次（2026-11-07 才发现 main 停在 9 周前，而本文件写着全绿）。
->
-> **历史结果（仅供了解，不作为当前状态）**：M0–M5 已于 2026-10-23 前完成并合入 main
-> （PR #19，56 commits，302 文件）。M3-5 与 M3-7 已取消（ADR-0015：monorepo 无收益、
-> astock 是语义封装不是重复实现）。vendor 经 `/api/v1/invoke` 可调 104 个能力（给 agent）。
+> **2026-10-22 进度快照**：M0 ✅ M1 ✅ M2 ✅（11/11）·
+> M3 部分完成（1/2/3/4 后端、V1/V2/V3）· M4-1 ✅ · M5-4/M5-5 ✅。
+> M3 完成（1/2/3/4 全部、V1~V6）；**M3-5 与 M3-7 已取消**（ADR-0015：
+> monorepo 无收益、astock 是语义封装不是重复实现）。
+> M4 全部 ✅（tear sheet / 参数扫描 / walk-forward / 归因）· M5 全部 ✅。
+> **全部里程碑：M0 ✅ M1 ✅ M2 ✅ M3 ✅（M3-5/M3-7 按 ADR-0015 取消）M4 ✅ M5 ✅**
+> vendor 经 `/api/v1/invoke` 可调 104 个能力（给 agent）。
 >
 > **2026-10-21 修订要点**（重要，先看这个）：
 > 1. **应用后端保留 Python**，不做 TS 重写（ADR-0011 §0）——M1/M3 任务表已同步
