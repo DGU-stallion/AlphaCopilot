@@ -19,7 +19,7 @@ AlphaCopilot 原为 FastAPI（:8900）+ React 15 页（:5899）的单体：投�
 3. **裁剪**：quant 实盘/live/channels/qveris/scheduled、FastAPI 路由胶水、
    React 前端 15 页，全部不进新 main（需要时去 archive 分支查）。
 4. **交付形态**：5 个 dsh 包 + 独立 profile `alphacopilot`
-   （详见 PLAN.md），启动 `dsh --profile alphacopilot`，不影响本机默认 dsh。
+   （详见 PLAN.md，该文档已于 2026-10-23 删除），启动 `dsh --profile alphacopilot`，不影响本机默认 dsh。
 
 ## 权衡
 
@@ -33,4 +33,4 @@ AlphaCopilot 原为 FastAPI（:8900）+ React 15 页（:5899）的单体：投�
 ## 影响
 
 - README/AGENTS.md 全部重写；CONTEXT.md 领域词汇表原样保留
-- 后续所有开发遵循 docs/TASKS.md 的任务流与分支规范
+- 后续所有开发遵循 docs/TASKS.md 的任务流与分支规范（该文档已于 2026-10-23 删除；现以 `docs/REFACTOR-PLAN.md` 为准）

@@ -1,10 +1,10 @@
-// Vibe-Research 系 4 页的后端客户端。对接 AlphaCopilot FastAPI（/api，vite 代理到 8900）：
+// 复盘/量化系 4 页的后端客户端。对接 AlphaCopilot FastAPI（/api，vite 代理到 8900）：
 //   回测 / 相关性 → POST /api/pages/{slug}/render（白名单分析函数产 ECharts option）
 //   模拟组合     → /api/portfolios CRUD + rebalance + nav
 //   我的研报     → /api/reports（复用 doc 表）list/add/delete
 // 复用 base.ts 的 apiUrl、api.ts 的 ApiError/authHeaders，避免重复实现。
 import { apiUrl } from "./base";
-import { ApiError, authHeaders } from "./api";
+import { ApiError, authHeaders, type ChartRenderer } from "./api";
 
 // ---- 通用请求（与 api.ts 同风格：401 提示、连不上后端提示、payload.data 解包）----
 async function req<T>(path: string, method: "GET" | "POST" | "DELETE" = "GET", body?: unknown): Promise<T> {
@@ -44,14 +44,33 @@ export interface MetricItem {
 export interface RenderBlock {
   kind: "chart" | "metric" | "table" | "markdown";
   span: number;
+  /** M2-7：仅 chart 块有；后端已按 RENDERER_BY_FN 校验/补全，前端只分派不猜。 */
+  renderer?: ChartRenderer;
   title?: string;
   option?: Record<string, unknown>;
+  /**
+   * renderer === "lwc" 时后端额外给的时间序列（alpha/lwc.py 产）。
+   * option 仍保留（向后兼容 ECharts 消费方），但 LWC 只需读这个，
+   * 不去反解 option（那是渲染层结构，反解脆且方向错）。
+   */
+  lwc?: import("@/components/charts/equity-data").LwcPayload;
   metric?: { items: MetricItem[] };
   table?: { columns: string[]; rows: unknown[][] };
   text?: string;
 }
 export interface RenderResult {
   blocks: RenderBlock[];
+}
+
+/**
+ * M2-7：chart 块的渲染器分派。.renderer 由后端校验层保证与 fn 语义匹配
+ * （ADR-0012 未决 1 + RENDERER_BY_FN）。返回 undefined 表示非 chart 块，
+ * 或老数据里 fn 未登记（补不了）——调用方不应在此时猜默认值：
+ * ECharts 是当前唯一已落地的 chart 渲染层，LWC chart 组件随 M2-6/M2-8 落地；
+ * 落地前临时按 ECharts 兜底，仅此一处、带注释，不是规则。
+ */
+export function rendererOf(block: RenderBlock): ChartRenderer | undefined {
+  return block.kind === "chart" ? block.renderer : undefined;
 }
 
 // values 为参数值（symbol/fast/slow/range 或 symbols/window/range）；后端按 ParamSpec 校验缺省取默认。

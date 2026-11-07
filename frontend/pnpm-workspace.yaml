@@ -1,3 +1,11 @@
+# pnpm 11 起，构建脚本白名单只能从这里读（package.json 的 "pnpm" 字段已失效）。
+#
+# ⚠️ 键名是 allowBuilds（package → bool 的映射），不是 pnpm 10 的
+# onlyBuiltDependencies（字符串数组）。旧键在 v11 里被**静默忽略** ——
+# 写了看起来生效，实际不生效，直到在一个干净的 CI runner 上才炸：
+#   ERR_PNPM_IGNORED_BUILDS: Ignored build scripts: esbuild@0.19.3, esbuild@0.25.0
+# 本机永远复现不了，因为 node_modules 里的 esbuild 早就编译好了。
+#
+# esbuild 必须允许：vite / vitest 的打包与转换都靠它的原生二进制。
 allowBuilds:
-  esbuild: set this to true or false
-verifyDepsBeforeRun: false
+  esbuild: true

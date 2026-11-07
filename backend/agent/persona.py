@@ -1,7 +1,8 @@
 """合规 persona —— 从插件路线的 desk/src/index.ts 迁入（T31 落位）。
 
 固化 LLM 输出合规底线：不荐股、不预测涨跌、不给买卖时机。
-经 harness 的 DSH_SYSTEM_PROMPT 注入 cordis agent-spine 的 persona，对模型可见。
+经 ProviderSpec.system_prompt → `pi --append-system-prompt` 注入运行时，对模型可见。
+（tests/test_compliance.py 断言它完整抵达，未被截断。）
 """
 
 # 五维分析框架 —— 合规 persona 内自持（原 research/chat.py 已于清理中移除）。
@@ -32,5 +33,5 @@ COMPLIANCE_SECTION = f"""你是 AlphaCopilot 投研助理。你可以调用数�
 
 
 def system_prompt() -> str:
-    """返回注入 dsh persona 的完整 system prompt 文本。"""
+    """返回注入 agent 运行时的完整 system prompt 文本（含合规底线）。"""
     return COMPLIANCE_SECTION

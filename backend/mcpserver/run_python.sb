@@ -37,5 +37,18 @@
 (allow sysctl-read)
 (allow signal (target self))
 
-;; ---- 网络：全禁（LLM 代码不得外传数据） ----
-(deny network*)
+;; ---- 网络：放行 ----
+;;
+;; 这里曾经是 (deny network*)，理由是「让取数走我们的数据层成为默认习惯」。
+;; 实测证伪：agent 有 bash 和 web_fetch，禁网对它**毫无约束力**。唯一实际效果是
+;; 把取数赶到 bash + curl 那条路上——而那条路没有 run_id、没有 code.py、
+;; 没有 provenance，等于为了一个不存在的安全收益，主动放弃了本模块唯一的真价值。
+;;
+;; 实测对比（同一任务，真 pi + 真模型）：
+;;   禁网    → 10 次工具调用：web_fetch 抓腾讯 → bash curl 落 CSV →
+;;             run_python 读 CSV → 自己实现指标 → matplotlib 画图。零留档。
+;;   放行    → 1 次工具调用：run_python 里 alpha.data.kline 取数，有 run_id 可审计。
+;;
+;; 结论：本模块的价值是**留档 + 可复现**，不是隔离（见 ADR-0012 已决 2）。
+;; 安全模型见 ADR-0010 §3：接受 OS 级权限，靠配置与人工看护降低风险。
+(allow network*)

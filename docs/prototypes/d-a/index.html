@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>D-A 彭博终端 · 复盘 + 宏观 · 原型</title>
+<style>
+/* ============ 颜色唯一来源：frontend/src/theme/tokens.ts DARK（只许这 14 个） ============ */
+:root{
+  --bg:#0B0E14; --panel:#12161F; --raised:#1A1F2B; --border:#232936; --borderStrong:#2E3546;
+  --text:#E6E9EF; --textSecondary:#9BA3B4; --textTertiary:#6B7385; --textDisabled:#4A5162;
+  --accent:#3B82F6; --up:#D9534F; --down:#3FAE7A; --warning:#D99A4E; --info:#5B8DEF;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:"Inter Variable",Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:12px;line-height:1.2;
+  font-variant-numeric:tabular-nums;
+  display:flex;flex-direction:column;gap:8px;padding:8px;overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+.mono,.n{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+.up{color:var(--up)}.down{color:var(--down)}.dim{color:var(--textSecondary)}.ter{color:var(--textTertiary)}
+.warn{color:var(--warning)}.acc{color:var(--accent)}.inf{color:var(--info)}
+b{font-weight:700}
+
+/* ============ 顶栏（标题层） ============ */
+#topbar{flex:0 0 26px;display:flex;align-items:center;gap:2px;background:var(--panel);border:1px solid var(--border);border-radius:2px;padding:0 8px}
+#brand{display:flex;align-items:center;gap:6px;font-weight:700;letter-spacing:.12em;margin-right:10px;white-space:nowrap}
+#brand::before{content:'';width:8px;height:8px;background:var(--accent)}
+.tab{padding:4px 9px;color:var(--textSecondary);white-space:nowrap;border-bottom:2px solid var(--borderStrong)}
+.tab.on{color:var(--text);border-bottom-color:var(--accent);background:var(--raised)}
+#cmd{flex:1;min-width:0;margin:0 10px;padding:2px 8px;background:var(--bg);border:1px solid var(--border);border-radius:2px;color:var(--textTertiary);white-space:nowrap;overflow:hidden}
+#cmd .cur{color:var(--accent)}
+#clock{color:var(--textSecondary);white-space:nowrap}
+#clock .warn{margin-left:6px}
+
+/* ============ 关键指标条（第二层：标题 → 关键指标 → 明细） ============ */
+#keystrip{flex:0 0 52px;display:flex;background:var(--panel);border:1px solid var(--border);border-radius:2px;overflow:hidden}
+.kcell{flex:1;min-width:0;padding:5px 8px 4px;border-left:1px solid var(--border);display:flex;flex-direction:column;justify-content:space-between}
+.kcell:first-child{border-left:none}
+.kcell .k{font-size:11px;color:var(--textTertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kcell .v{font-size:12px;font-weight:700;white-space:nowrap}
+.kcell .v .n{font-size:12px}
+.kcell .s{font-size:11px;color:var(--textTertiary)}
+
+/* ============ 主区两列 ============ */
+#main{flex:1;min-height:0;display:flex;gap:8px}
+.col{min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px}
+#col-review{flex:58 1 0}
+#col-macro{flex:42 1 0}
+.colhead{flex:0 0 22px;display:flex;align-items:center;gap:8px;padding:0 8px;background:var(--raised);border:1px solid var(--border);border-radius:2px;font-size:11px;font-weight:700;letter-spacing:.08em}
+.colhead::before{content:'';width:8px;height:8px;background:var(--accent)}
+.colhead .meta{margin-left:auto;font-weight:400;color:var(--textTertiary);letter-spacing:0}
+
+/* ============ panel ============ */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:2px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.phead{flex:0 0 20px;display:flex;align-items:center;gap:6px;padding:0 8px;font-size:11px;color:var(--textSecondary);border-bottom:1px solid var(--borderStrong);white-space:nowrap}
+.phead::before{content:'';width:5px;height:5px;background:var(--accent)}
+.phead .meta{margin-left:auto;color:var(--textTertiary)}
+.pbody{flex:1;min-height:0;overflow:hidden}
+
+/* 表格 */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-size:11px;font-weight:500;color:var(--textTertiary);text-align:left;padding:2px 6px;border-bottom:1px solid var(--borderStrong);white-space:nowrap}
+td{padding:2px 6px;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+tr:last-child td{border-bottom:none}
+th.n,td.n{text-align:right}
+th:first-child,td:first-child{padding-left:8px}
+th:last-child,td:last-child{padding-right:8px}
+.code{color:var(--textDisabled);font-size:11px}
+.board{display:inline-block;min-width:30px;text-align:center;background:var(--raised);border:1px solid var(--borderStrong);border-radius:2px;padding:0 3px;color:var(--up);font-weight:700}
+
+/* 情绪 stat 格 */
+.statgrid{display:grid;grid-template-columns:repeat(12,1fr);height:44px}
+.stat{min-width:0;padding:4px 0 3px 8px;border-left:1px solid var(--border);display:flex;flex-direction:column;justify-content:space-between}
+.stat:first-child{border-left:none}
+.stat .k{font-size:11px;color:var(--textTertiary);white-space:nowrap;overflow:hidden}
+.stat .v{font-weight:700;white-space:nowrap}
+
+/* 宽度条 */
+.breadth{display:flex;align-items:center;gap:8px;padding:4px 8px 5px}
+.bbar{flex:1;height:8px;display:flex;border-radius:2px;overflow:hidden}
+.bbar i{display:block;height:100%}
+.breadth .lab{font-size:11px;color:var(--textTertiary);white-space:nowrap}
+
+/* 引用小格（宏观） */
+.qgrid{display:grid;grid-template-columns:repeat(5,1fr);height:100%}
+.qrow{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--border)}
+.qrow:last-child{border-bottom:none}
+.qcell{min-width:0;padding:4px 0 3px 8px;border-left:1px solid var(--border);display:flex;flex-direction:column;justify-content:space-between}
+.qcell:first-child{border-left:none}
+.qcell .k{font-size:11px;color:var(--textTertiary);white-space:nowrap;overflow:hidden}
+.qcell .v{font-weight:700;white-space:nowrap}
+.qcell .v .p{font-size:11px;font-weight:400;margin-left:4px}
+.qcell .p{font-size:11px}
+.qcell .s{font-size:11px;color:var(--textDisabled)}
+
+/* mag7 */
+#mag7{display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--border)}
+#mag7 .qcell .k{overflow:hidden;text-overflow:ellipsis}
+
+/* 图表容器 */
+.chartwrap{position:relative;width:100%;height:100%}
+.chartwrap svg{display:block}
+#p-charts .pbody{display:flex}
+.subplot{flex:1;min-width:0;display:flex;flex-direction:column;border-left:1px solid var(--border)}
+.subplot:first-child{border-left:none}
+.subtitle{flex:0 0 16px;display:flex;align-items:center;gap:6px;padding:0 8px;font-size:11px;color:var(--textTertiary);border-bottom:1px solid var(--border)}
+.subtitle .val{color:var(--text);font-weight:700}
+
+/* 底部双表行 */
+.prow{display:flex;gap:8px;flex:0 0 214px;min-height:0}
+.prow .panel{flex:1}
+
+/* 底栏 */
+#statusbar{flex:0 0 20px;display:flex;align-items:center;padding:0 8px;background:var(--panel);border:1px solid var(--border);border-radius:2px;font-size:11px;color:var(--textTertiary);white-space:nowrap;overflow:hidden}
+#statusbar .r{margin-left:auto}
+#statusbar b{color:var(--textSecondary);font-weight:500}
+</style>
+</head>
+<body>
+
+<!-- 第 1 层：标题 -->
+<header id="topbar">
+  <span id="brand">ALPHACOPIOT</span>
+  <span class="tab on">复盘看板</span>
+  <span class="tab">宏观看板</span>
+  <span class="tab">回测</span>
+  <span class="tab">相关性</span>
+  <span class="tab">Runs</span>
+  <span class="tab">报告库</span>
+  <span id="cmd">桌面&gt; 复盘 2026-10-22 &nbsp;<span class="cur">▮</span></span>
+  <span id="clock">2026-10-22 15:00:03<span class="warn">已收盘</span></span>
+</header>
+
+<!-- 第 2 层：关键指标 -->
+<div id="keystrip"></div>
+
+<!-- 第 3 层：明细 -->
+<main id="main">
+
+  <!-- ============ 左列：复盘看板 ============ -->
+  <section class="col" id="col-review">
+    <div class="colhead">复盘看板 REVIEW<span class="meta">2026-10-22 收盘 · 沪深京 A 股</span></div>
+
+    <div class="panel" style="flex:0 0 138px">
+      <div class="phead">市场情绪 SENTIMENT<span class="meta">大盘宽度 <b class="up">偏强</b> · 题材投机 <b class="warn">活跃</b> · 乐咕乐股口径</span></div>
+      <div class="pbody">
+        <div class="statgrid" id="sentgrid"></div>
+        <div class="breadth">
+          <span class="lab">市场宽度</span>
+          <div class="bbar" id="breadthbar"></div>
+          <span class="lab"><b class="up n">2986</b> · 55.2% &nbsp;/&nbsp; 平 <b class="n">197</b> &nbsp;/&nbsp; <b class="down n">2231</b> · 41.2%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="p-charts" style="flex:0 0 162px">
+      <div class="pbody">
+        <div class="subplot">
+          <div class="subtitle">沪深300 分时&nbsp;<span class="val n">3864.15</span><span class="val up n">+0.67%</span><span style="margin-left:auto">昨收 <span class="n">3838.25</span></span></div>
+          <div class="chartwrap" id="c-intraday"></div>
+        </div>
+        <div class="subplot">
+          <div class="subtitle">近 10 日两市成交额（亿元）<span style="margin-left:auto">今日 <b class="n">13,278</b> 放量 +8.8%</span></div>
+          <div class="chartwrap" id="c-amounts"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:1">
+      <div class="phead">连板梯队 LIANBAN<span class="meta">2 板以上 23 家 · 客观公开榜单 非推荐 非预测</span></div>
+      <div class="pbody" id="t-lianban"></div>
+    </div>
+
+    <div class="prow">
+      <div class="panel">
+        <div class="phead">板块资金 SECTOR FLOW<span class="meta">行业 · 按净流入排序 · 同花顺口径</span></div>
+        <div class="pbody" id="t-sector"></div>
+      </div>
+      <div class="panel">
+        <div class="phead">成交额 TOP TURNOVER<span class="meta">沪深京全市场</span></div>
+        <div class="pbody" id="t-turnover"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 右列：宏观看板 ============ -->
+  <section class="col" id="col-macro">
+    <div class="colhead">宏观看板 MACRO<span class="meta">外围为隔夜收盘 2026-10-21</span></div>
+
+    <div class="panel" style="flex:0 0 198px">
+      <div class="phead">隔夜外围 OVERNIGHT<span class="meta">美股/港股对比各自前一交易日收盘</span></div>
+      <div class="pbody">
+        <div id="t-overseas"></div>
+        <div id="mag7"></div>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:0 0 130px">
+      <div class="phead">大宗商品 · 汇率 COMMODITY / FX<span class="meta">国际报价 涨跌幅对比前一交易日</span></div>
+      <div class="pbody" id="q-macro"></div>
+    </div>
+
+    <div class="panel" style="flex:0 0 132px">
+      <div class="phead">美债收益率曲线 UST CURVE<span class="meta">2026-10-21 · 2s10s <b class="inf">+6bp</b></span></div>
+      <div class="pbody"><div class="chartwrap" id="c-rates"></div></div>
+    </div>
+
+    <div class="panel" style="flex:1">
+      <div class="phead">全市场涨跌分布 BREADTH<span class="meta">5,414 只 · 涨停 <b class="up">89</b> · 跌停 <b class="down">12</b></span></div>
+      <div class="pbody"><div class="chartwrap" id="c-breadth"></div></div>
+    </div>
+
+    <div class="panel" style="flex:0 0 54px">
+      <div class="phead">加密货币 CRYPTO<span class="meta">现货 24h</span></div>
+      <div class="pbody" id="q-crypto"></div>
+    </div>
+  </section>
+</main>
+
+<footer id="statusbar">
+  <span><b>数据源</b> 东财 · 同花顺 · 乐咕乐股 · 美国财政部 &nbsp;|&nbsp; <b>口径</b> A股 红涨绿跌 · 单位 人民币</span>
+  <span class="r">AS-OF 2026-10-22 15:00 &nbsp;·&nbsp; PROTOTYPE <b>D-A 彭博终端</b> v1 &nbsp;·&nbsp; 仅供研究 不构成投资建议</span>
+</footer>
+
+<script>
+'use strict';
+/* 颜色与 tokens.ts DARK 一一对应 */
+const C={bg:'#0B0E14',panel:'#12161F',raised:'#1A1F2B',border:'#232936',borderStrong:'#2E3546',
+text:'#E6E9EF',textSecondary:'#9BA3B4',textTertiary:'#6B7385',textDisabled:'#4A5162',
+accent:'#3B82F6',up:'#D9534F',down:'#3FAE7A',warning:'#D99A4E',info:'#5B8DEF'};
+
+const fmt=(v,d=2)=>v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const pct=v=>(v>0?'+':'')+fmt(v,2)+'%';
+const cls=v=>v>0?'up':v<0?'down':'dim';
+const $=id=>document.getElementById(id);
+
+/* ============ 关键指标条 ============ */
+const indices=[
+  {n:'上证指数',v:3308.42,p:0.68},{n:'深证成指',v:10573.66,p:0.81},
+  {n:'创业板指',v:2196.30,p:0.85},{n:'科创50',v:1012.87,p:-0.64},
+  {n:'沪深300',v:3864.15,p:0.67},{n:'北证50',v:1398.24,p:2.54},
+];
+$('keystrip').innerHTML =
+  indices.map(i=>`<div class="kcell"><span class="k">${i.n}</span><span class="v n">${fmt(i.v)}</span><span class="s n ${cls(i.p)}">${pct(i.p)}</span></div>`).join('')
+  +`<div class="kcell"><span class="k">两市成交额</span><span class="v n">13,278 <span class="s" style="font-weight:400">亿</span></span><span class="s warn n">放量 +8.8%</span></div>`
+  +`<div class="kcell"><span class="k">涨跌家数</span><span class="v"><span class="n up">2986</span><span class="ter"> / </span><span class="n down">2231</span></span><span class="s">上涨 / 下跌</span></div>`
+  +`<div class="kcell"><span class="k">涨停 · 跌停</span><span class="v"><span class="n up">89</span><span class="ter"> · </span><span class="n down">12</span></span><span class="s">真实涨停 <span class="n">62</span></span></div>`
+  +`<div class="kcell"><span class="k">封板率</span><span class="v n up">69.7%</span><span class="s">摸板 128 家</span></div>`;
+
+/* ============ 市场情绪 ============ */
+const stats=[
+  ['上涨家数','2986','up'],['下跌家数','2231','down'],['平盘','197','dim'],
+  ['涨停','89','up'],['真实涨停','62','up'],['跌停','12','down'],['真实跌停','7','down'],
+  ['活跃度','55.16','inf'],['封板率','69.7%','up'],['炸板率','30.3%','down'],
+  ['晋级率','41.3%','up'],['最高连板','7 板','warn'],
+];
+$('sentgrid').innerHTML=stats.map(s=>`<div class="stat"><span class="k">${s[0]}</span><span class="v n ${s[2]}">${s[1]}</span></div>`).join('');
+$('breadthbar').innerHTML=
+  `<i style="width:55.2%;background:${C.up}"></i><i style="width:3.6%;background:${C.textTertiary}"></i><i style="width:41.2%;background:${C.down}"></i>`;
+
+/* ============ 连板梯队 ============ */
+const lianban=[
+  ['光启技术','002625',7,28.64,10.02,42.7,618.4,'超材料'],
+  ['海能达','002583',5,21.87,10.05,55.3,398.2,'专网通信'],
+  ['宗申动力','001696',4,33.51,9.98,38.2,246.8,'低空经济'],
+  ['大千生态','603955',4,12.06,10.00,8.9,51.6,'装配式建筑'],
+  ['华映科技','000536',3,5.83,9.95,21.4,203.5,'面板'],
+  ['岩山科技','002195',3,8.72,10.08,67.8,495.1,'AI 应用'],
+  ['电投产融','000958',3,6.15,9.97,15.6,113.2,'央企重组'],
+  ['双成药业','002693',2,18.33,9.96,12.3,151.8,'并购重组'],
+];
+$('t-lianban').innerHTML=`<table>
+<thead><tr><th>名称</th><th class="n">连板</th><th class="n">现价</th><th class="n">今日涨跌%</th><th class="n">昨成交额(亿)</th><th class="n">流通市值(亿)</th><th>概念</th></tr></thead>
+<tbody>${lianban.map(r=>`<tr>
+<td><b>${r[0]}</b> <span class="code n">${r[1]}</span></td>
+<td class="n"><span class="board">${r[2]}板</span></td>
+<td class="n">${fmt(r[3])}</td>
+<td class="n up">+${fmt(r[4])}</td>
+<td class="n dim">${fmt(r[5],1)}</td>
+<td class="n dim">${fmt(r[6],1)}</td>
+<td class="dim">${r[7]}</td></tr>`).join('')}</tbody></table>`;
+
+/* ============ 板块资金 ============ */
+const sectors=[
+  ['通信设备',3.12,28.64,156.3,127.7,118],['半导体',2.05,19.82,189.4,169.6,214],
+  ['软件开发',1.88,14.36,132.8,118.4,296],['光学光电子',1.44,9.15,87.2,78.1,105],
+  ['电池',1.22,7.68,76.4,68.7,87],['军工电子',0.96,5.43,61.9,56.5,64],
+  ['汽车零部件',0.71,3.87,92.5,88.6,231],['证券',-0.62,-8.91,45.3,54.2,49],
+  ['医疗器械',-0.44,-4.15,33.8,37.9,123],['有色金属',0.58,3.12,58.7,55.6,132],
+];
+$('t-sector').innerHTML=`<table>
+<thead><tr><th>行业</th><th class="n">涨跌%</th><th class="n">净流入(亿)</th><th class="n">流入(亿)</th><th class="n">流出(亿)</th><th class="n">家数</th></tr></thead>
+<tbody>${sectors.map(r=>`<tr>
+<td>${r[0]}</td>
+<td class="n ${cls(r[1])}">${pct(r[1])}</td>
+<td class="n ${cls(r[2])}">${(r[2]>0?'+':'')+fmt(r[2])}</td>
+<td class="n dim">${fmt(r[3],1)}</td>
+<td class="n dim">${fmt(r[4],1)}</td>
+<td class="n dim">${r[5]}</td></tr>`).join('')}</tbody></table>`;
+
+/* ============ 成交额 TOP ============ */
+const turnover=[
+  ['东方财富','300059',24.85,4.36,138.2,3906,'证券'],
+  ['中际旭创','300308',168.30,6.12,121.5,1864,'光模块'],
+  ['宁德时代','300750',291.40,1.85,96.8,12824,'电池'],
+  ['岩山科技','002195',8.72,10.08,87.4,495,'AI 应用'],
+  ['新易盛','300502',142.66,5.87,76.3,1342,'光模块'],
+  ['贵州茅台','600519',1482.00,-0.62,68.9,18608,'白酒'],
+  ['寒武纪','688256',1058.60,3.24,64.2,4408,'芯片'],
+  ['中芯国际','688981',96.44,2.18,59.7,7692,'晶圆代工'],
+];
+$('t-turnover').innerHTML=`<table>
+<thead><tr><th>#</th><th>名称</th><th class="n">现价</th><th class="n">涨跌%</th><th class="n">成交额(亿)</th><th class="n">总市值(亿)</th></tr></thead>
+<tbody>${turnover.map((r,i)=>`<tr>
+<td class="n ter">${i+1}</td>
+<td><b>${r[0]}</b> <span class="code n">${r[1]}</span></td>
+<td class="n">${fmt(r[2])}</td>
+<td class="n ${cls(r[3])}">${pct(r[3])}</td>
+<td class="n">${fmt(r[4],1)}</td>
+<td class="n dim">${fmt(r[5],0)}</td></tr>`).join('')}</tbody></table>`;
+
+/* ============ 隔夜外围 + Mag7 ============ */
+const overseas=[
+  ['美股','标普500',6012.45,0.42],['美股','纳斯达克',19876.31,0.68],['美股','道琼斯',44213.10,-0.12],
+  ['港股','恒生指数',26384.12,1.24],['港股','恒生科技',5842.77,2.05],['亚太','日经225',39428.60,0.35],
+];
+$('t-overseas').innerHTML=`<table>
+<thead><tr><th>市场</th><th>指数</th><th class="n">收盘</th><th class="n">涨跌幅</th></tr></thead>
+<tbody>${overseas.map(r=>`<tr>
+<td class="ter">${r[0]}</td><td>${r[1]}</td>
+<td class="n">${fmt(r[2])}</td>
+<td class="n ${cls(r[3])}">${pct(r[3])}</td></tr>`).join('')}</tbody></table>`;
+const mag7=[
+  ['苹果',235.18,0.32],['微软',438.92,0.55],['英伟达',154.28,2.14],['谷歌',198.44,-0.28],
+  ['亚马逊',226.35,0.85],['Meta',615.72,1.02],['特斯拉',428.66,-1.35],
+];
+$('mag7').innerHTML=mag7.map(r=>`<div class="qcell">
+<span class="k">${r[0]}</span><span class="v n">${fmt(r[1])}</span><span class="p n ${cls(r[2])}">${pct(r[2])}</span></div>`).join('');
+
+/* ============ 大宗 + 汇率 ============ */
+const commodities=[['布伦特原油',82.47,1.15],['WTI 原油',78.92,1.08],['COMEX 黄金',2784.30,0.54],['COMEX 白银',34.62,0.89],['LME 铜',9845.0,0.32]];
+const forex=[['美元/离岸人民币',7.0812,-0.08],['美元/在岸人民币',7.0785,-0.05],['美元指数 DXY',103.42,-0.21],['欧元/美元',1.0842,0.18],['美元/日元',148.62,-0.34]];
+const qrow=rows=>rows.map(r=>`<div class="qcell">
+<span class="k">${r[0]}</span><span class="v"><span class="n">${fmt(r[1])}</span><span class="p n ${cls(r[2])}">${pct(r[2])}</span></span></div>`).join('');
+$('q-macro').innerHTML=`<div style="display:flex;flex-direction:column;height:100%">
+<div class="qrow" style="flex:1">${qrow(commodities)}</div>
+<div class="qrow" style="flex:1">${qrow(forex)}</div>
+</div>`;
+
+/* ============ 加密 ============ */
+const crypto=[['比特币 BTC',97842,1.82],['以太坊 ETH',3486.5,2.15],['Solana SOL',214.35,3.42]];
+$('q-crypto').innerHTML=`<div class="qgrid" style="grid-template-columns:repeat(3,1fr)">${crypto.map(r=>`<div class="qcell">
+<span class="k">${r[0]}</span><span class="v"><span class="n">${fmt(r[1])}</span><span class="p n ${cls(r[2])}">${pct(r[2])}</span></span></div>`).join('')}</div>`;
+
+/* ================= SVG 图表（运行时按容器实际尺寸绘制） ================= */
+const F='JetBrains Mono,ui-monospace,Menlo,monospace';
+function svg(w,h,inner){return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;}
+function box(el){const w=el.clientWidth,h=el.clientHeight;return{w,h};}
+
+/* ---- 沪深300 分时 + 成交量 ---- */
+(function(){
+  const el=$('c-intraday');const {w,h}=box(el);
+  const N=241,prev=3838.25,end=3864.15;
+  let seed=20261022;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+  let v=prev+3;const pts=[v],vols=[];
+  for(let i=1;i<N;i++){v+=(rnd()-0.485)*2.0;pts.push(v);}
+  const drift=end-pts[N-1];for(let i=0;i<N;i++)pts[i]+=drift*(i/(N-1));
+  const avg=[];let s=0;for(let i=0;i<N;i++){s+=pts[i];avg.push(s/(i+1));}
+  for(let i=0;i<N;i++)vols.push(rnd()*0.7+((pts[i]>=avg[i])?0.3:0.1));
+  const H=h-14,ph=Math.round(H*0.72),vh=H-ph; // 价格区/量区，底部 14px 时间轴
+  const lo=Math.min(...pts,...avg)-4,hi=Math.max(...pts,...avg)+4;
+  const X=i=>4+(w-8)*i/(N-1), Y=p=>ph-4-(p-lo)/(hi-lo)*(ph-8);
+  let g='';
+  for(let k=1;k<4;k++){const y=4+(ph-8)*k/4;g+=`<line x1="4" y1="${y}" x2="${w-4}" y2="${y}" stroke="${C.border}" stroke-width="1"/>`;}
+  g+=`<line x1="4" y1="${Y(prev)}" x2="${w-4}" y2="${Y(prev)}" stroke="${C.borderStrong}" stroke-dasharray="3 3"/>`;
+  // 量
+  const vmax=Math.max(...vols);
+  for(let i=0;i<N;i++){const bh=Math.max(1,vols[i]/vmax*(vh-6));const up=i===0?true:pts[i]>=pts[i-1];
+    g+=`<rect x="${X(i)-0.9}" y="${ph+vh-bh}" width="1.8" height="${bh}" fill="${up?C.up:C.down}"/>`;}
+  // 均价
+  g+=`<polyline points="${avg.map((p,i)=>X(i)+','+Y(p)).join(' ')}" fill="none" stroke="${C.warning}" stroke-width="1" stroke-dasharray="4 2"/>`;
+  // 价格
+  g+=`<polyline points="${pts.map((p,i)=>X(i)+','+Y(p)).join(' ')}" fill="none" stroke="${C.accent}" stroke-width="1.2"/>`;
+  // 最新价标签
+  const ly=Y(pts[N-1]);
+  g+=`<rect x="${w-52}" y="${ly-7}" width="48" height="13" fill="${C.raised}" stroke="${C.borderStrong}"/>`+
+     `<text x="${w-28}" y="${ly+3}" font-family="${F}" font-size="11" fill="${C.text}" text-anchor="middle">${fmt(end)}</text>`;
+  // 时间轴
+  const tl=['09:30','10:30','11:30/13:00','14:00','15:00'];
+  tl.forEach((t,i)=>{const x=4+(w-8)*i/4;
+    g+=`<line x1="${x}" y1="4" x2="${x}" y2="${H}" stroke="${C.border}"/>`+
+       `<text x="${x}" y="${h-2}" font-family="${F}" font-size="11" fill="${C.textTertiary}" text-anchor="${i===0?'start':i===4?'end':'middle'}">${t}</text>`;});
+  el.innerHTML=svg(w,h,g);
+})();
+
+/* ---- 近10日成交额柱状图 ---- */
+(function(){
+  const el=$('c-amounts');const {w,h}=box(el);
+  const a=[9846,10432,11208,9687,12034,11452,10987,12203,11892,13278];
+  const days=['10/13','10/14','10/15','10/16','10/17','10/20','10/21','10/22','10/23','10/24'];
+  const top=14,bot=h-14,gap=6;
+  const bw=(w-8-gap*9)/10;
+  const max=14000;
+  let g='';
+  for(let k=1;k<3;k++){const y=top+(bot-top)*k/3;g+=`<line x1="4" y1="${y}" x2="${w-4}" y2="${y}" stroke="${C.border}"/>`;}
+  a.forEach((val,i)=>{
+    const bh=(val/max)*(bot-top);
+    const x=4+i*(bw+gap),color=i===a.length-1?C.accent:C.textDisabled;
+    g+=`<rect x="${x}" y="${bot-bh}" width="${bw}" height="${bh}" fill="${color}"/>`;
+    g+=`<text x="${x+bw/2}" y="${bot+10}" font-family="${F}" font-size="11" fill="${C.textTertiary}" text-anchor="middle">${days[i].slice(3)}</text>`;
+    if(i===a.length-1||val===Math.max(...a))
+      g+=`<text x="${x+bw/2}" y="${bot-bh-3}" font-family="${F}" font-size="11" fill="${i===a.length-1?C.accent:C.textSecondary}" text-anchor="middle">${val.toLocaleString('en-US')}</text>`;
+  });
+  g+=`<line x1="4" y1="${bot}" x2="${w-4}" y2="${bot}" stroke="${C.borderStrong}"/>`;
+  el.innerHTML=svg(w,h,g);
+})();
+
+/* ---- 美债收益率曲线 ---- */
+(function(){
+  const el=$('c-rates');const {w,h}=box(el);
+  const data=[['3M',4.58],['2Y',4.12],['5Y',4.05],['10Y',4.18],['30Y',4.36]];
+  const L=44,R=44,T=10,B=h-16;
+  const lo=3.95,hi=4.65;
+  const X=i=>L+(w-L-R)*i/(data.length-1);
+  const Y=v=>T+(B-T)*(1-(v-lo)/(hi-lo));
+  let g='';
+  for(let k=0;k<=3;k++){const vv=lo+(hi-lo)*k/3;const y=Y(vv);
+    g+=`<line x1="${L}" y1="${y}" x2="${w-4}" y2="${y}" stroke="${C.border}"/>`+
+       `<text x="${w-2}" y="${y+3}" font-family="${F}" font-size="11" fill="${C.textDisabled}" text-anchor="end">${vv.toFixed(2)}</text>`;}
+  g+=`<polyline points="${data.map((d,i)=>X(i)+','+Y(d[1])).join(' ')}" fill="none" stroke="${C.info}" stroke-width="1.4"/>`;
+  data.forEach((d,i)=>{
+    const anchor=i===0?'start':i===data.length-1?'end':'middle';
+    g+=`<circle cx="${X(i)}" cy="${Y(d[1])}" r="2.6" fill="${C.info}"/>`+
+       `<text x="${X(i)}" y="${Y(d[1])-6}" font-family="${F}" font-size="11" fill="${C.text}" text-anchor="${anchor}">${d[1].toFixed(2)}</text>`+
+       `<text x="${X(i)}" y="${h-3}" font-family="${F}" font-size="11" fill="${C.textTertiary}" text-anchor="${anchor}">${d[0]}</text>`;});
+  el.innerHTML=svg(w,h,g);
+})();
+
+/* ---- 全市场涨跌分布 ---- */
+(function(){
+  const el=$('c-breadth');const {w,h}=box(el);
+  const bins=[['≤-7',38],['-7~-5',92],['-5~-3',286],['-3~-1',641],['-1~0',1174],['0~1',1300],['1~3',920],['3~5',450],['5~7',225],['≥7',91]];
+  const upSum=2986,downSum=2231;
+  const L=4,R=4,T=14,B=h-14;
+  const bw=(w-L-R)/10;
+  const max=Math.max(...bins.map(b=>b[1]));
+  let g='';
+  for(let k=1;k<3;k++){const y=T+(B-T)*k/3;g+=`<line x1="${L}" y1="${y}" x2="${w-R}" y2="${y}" stroke="${C.border}"/>`;}
+  bins.forEach((b,i)=>{
+    const bh=(b[1]/max)*(B-T);
+    const x=L+i*bw+bw*0.15;
+    const color=i<=4?C.down:C.up;      // 左侧为跌幅区（绿），右侧涨幅区（红）—— A 股口径
+    g+=`<rect x="${x}" y="${B-bh}" width="${bw*0.7}" height="${bh}" fill="${color}"/>`+
+       `<text x="${L+i*bw+bw/2}" y="${B-bh-3}" font-family="${F}" font-size="11" fill="${C.textSecondary}" text-anchor="middle">${b[1]}</text>`+
+       `<text x="${L+i*bw+bw/2}" y="${h-3}" font-family="${F}" font-size="11" fill="${C.textTertiary}" text-anchor="middle">${b[0]}</text>`;});
+  g+=`<line x1="${L}" y1="${B}" x2="${w-R}" y2="${B}" stroke="${C.borderStrong}"/>`;
+  // 图例
+  g+=`<text x="${L+2}" y="10" font-family="${F}" font-size="11" fill="${C.textTertiary}">跌幅分布 </text>`+
+     `<text x="${L+62}" y="10" font-family="${F}" font-size="11" fill="${C.down}">${downSum} 家</text>`+
+     `<text x="${L+112}" y="10" font-family="${F}" font-size="11" fill="${C.textTertiary}"> 涨幅分布 </text>`+
+     `<text x="${L+172}" y="10" font-family="${F}" font-size="11" fill="${C.up}">${upSum} 家</text>`;
+  el.innerHTML=svg(w,h,g);
+})();
+</script>
+</body>
+</html>

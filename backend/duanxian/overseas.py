@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import urllib.request
-from typing import Optional
 
 _TENCENT = "http://qt.gtimg.cn/q="
 _F_NAME, _F_PRICE, _F_TIME, _F_PCT = 1, 3, 30, 32
@@ -40,7 +39,7 @@ _MAG7 = (
 )
 
 
-def _session_of(quote_time: str) -> Optional[str]:
+def _session_of(quote_time: str) -> str | None:
     """行情时间 → 交易日 YYYY-MM-DD。
 
     美股给 `2026-07-29 16:00:01`、港股给 `2026/07/29 16:08:46` —— 分隔符不同，
@@ -76,14 +75,14 @@ def _fetch(symbols: list[str]) -> dict[str, list[str]]:
     return out
 
 
-def _num(v: str) -> Optional[float]:
+def _num(v: str) -> float | None:
     try:
         return float(v)
     except (TypeError, ValueError):
         return None
 
 
-def _market_label(market: str, session: Optional[str]) -> Optional[str]:
+def _market_label(market: str, session: str | None) -> str | None:
     """「美股 2026-07-29 收盘」/「港股 2026-07-30 盘前」这类可直接展示的一句话。
 
     判断依据是**北京时间的钟点 + 这批行情属于哪一场**。只有这批行情的场次就是
@@ -121,7 +120,7 @@ def overseas_snapshot() -> dict:
     if not raw:
         return {"available": False, "reason": "腾讯海外行情取数失败"}
 
-    def row(symbol: str, name: str, extra: dict) -> Optional[dict]:
+    def row(symbol: str, name: str, extra: dict) -> dict | None:
         f = raw.get(symbol)
         if not f:
             return None
@@ -134,7 +133,7 @@ def overseas_snapshot() -> dict:
     indices = [r for s, n, reg in _INDICES if (r := row(s, n, {"region": reg}))]
     mag7 = [r for s, n, tk in _MAG7 if (r := row(s, n, {"ticker": tk}))]
 
-    def one_session(rows: list[dict], region: Optional[str] = None) -> Optional[str]:
+    def one_session(rows: list[dict], region: str | None = None) -> str | None:
         """这批里出现最多的那个交易日。同一市场理应一致，取众数可容忍个别异常。"""
         days = [r["session"] for r in rows
                 if r.get("session") and (region is None or r.get("region") == region)]

@@ -6,11 +6,10 @@ from __future__ import annotations
 import datetime
 import logging
 import threading
-from typing import Optional
-
-logger = logging.getLogger(__name__)
 
 from .util import china_now, china_today, is_a_share_closed, is_weekend
+
+logger = logging.getLogger(__name__)
 
 _REF_STOCK = "sh600000"  # 浦发银行，流动性好、每个交易日都有，用来取真实交易日序列
 
@@ -30,13 +29,15 @@ def _ref_dates(start: str, end: str) -> list[str]:
         return []
 
 
-def next_trade_date(date: str) -> Optional[str]:
+def next_trade_date(date: str) -> str | None:
     """date 的次一交易日。
 
     取不到交易日历时兜底『下一个工作日』——节假日兜底不精确没关系：
     若落到非交易日，个股 hist 查不到该日，调用方自然会跳过。
     """
-    end = (datetime.datetime.strptime(date, "%Y-%m-%d") + datetime.timedelta(days=12)).strftime("%Y-%m-%d")
+    end = (
+        datetime.datetime.strptime(date, "%Y-%m-%d") + datetime.timedelta(days=12)
+    ).strftime("%Y-%m-%d")
     for d in _ref_dates(date, end):
         if d > date:
             return d
@@ -48,9 +49,11 @@ def next_trade_date(date: str) -> Optional[str]:
     return None
 
 
-def prev_trade_date(date: str) -> Optional[str]:
+def prev_trade_date(date: str) -> str | None:
     """date 的前一交易日。取不到交易日历时兜底『上一个工作日』。"""
-    start = (datetime.datetime.strptime(date, "%Y-%m-%d") - datetime.timedelta(days=16)).strftime("%Y-%m-%d")
+    start = (
+        datetime.datetime.strptime(date, "%Y-%m-%d") - datetime.timedelta(days=16)
+    ).strftime("%Y-%m-%d")
     earlier = [d for d in _ref_dates(start, date) if d < date]
     if earlier:
         return earlier[-1]
@@ -104,7 +107,7 @@ def _seconds_to_next_boundary() -> float:
     return 24 * 3600 - now_s + first
 
 
-def quote_trade_day() -> Optional[str]:
+def quote_trade_day() -> str | None:
     """参考股**实时行情**里的交易日（YYYY-MM-DD）。判不了返回 None"""
     import time as _time
 
@@ -125,7 +128,8 @@ def quote_trade_day() -> Optional[str]:
         try:
             import urllib.request
 
-            raw = urllib.request.urlopen(_QUOTE_URL + _REF_STOCK, timeout=8).read().decode("gbk", "ignore")
+            resp = urllib.request.urlopen(_QUOTE_URL + _REF_STOCK, timeout=8)
+            raw = resp.read().decode("gbk", "ignore")
             f = raw.split("~")
             ts = f[_F_QUOTE_TIME].strip() if len(f) > _F_QUOTE_TIME else ""
             if len(ts) >= 8 and ts[:8].isdigit():
@@ -141,7 +145,7 @@ def quote_trade_day() -> Optional[str]:
         return day
 
 
-def latest_session() -> Optional[str]:
+def latest_session() -> str | None:
     """最近一个已收盘交易日。三层判据缺一不可："""
     today = china_today()
     if not is_weekend(today) and is_a_share_closed() and quote_trade_day() == today:

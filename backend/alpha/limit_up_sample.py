@@ -24,8 +24,8 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from statistics import mean, median
-from typing import Callable, Optional
 
 from duanxian import trade_calendar
 
@@ -50,7 +50,7 @@ _EARLY_SEAL = "100000"
 _LATE_SEAL = "143000"
 
 
-def _fetch_prev_pool(date: str) -> Optional[list[dict]]:
+def _fetch_prev_pool(date: str) -> list[dict] | None:
     """取「前一交易日涨停股在 date 当天的表现」，数据定稿后落盘缓存。取数失败返回 None。"""
     is_past = trade_calendar.is_settled(date)   # 含"今天且已收盘"——语料过期不候
     path = os.path.join(_CACHE_DIR, f"{date}.json")
@@ -160,7 +160,7 @@ SEAL_BUCKETS: list[tuple[str, str]] = [
 ]
 
 
-def _is_limit_up(row: dict) -> Optional[bool]:
+def _is_limit_up(row: dict) -> bool | None:
     """判该票次日收盘是否又涨停：现价==涨停价（数据源直接给的事实）。缺字段返回 None。"""
     close = row.get("close")
     limit = row.get("limit_price")
@@ -169,7 +169,7 @@ def _is_limit_up(row: dict) -> Optional[bool]:
     return abs(close - limit) < 1e-6
 
 
-def _stats(rets: list[float], rows: Optional[list[dict]] = None) -> dict:
+def _stats(rets: list[float], rows: list[dict] | None = None) -> dict:
     """一组收益的统计。样本为空返回 None 字段，不伪装成 0。"""
     if not rets:
         return {"sample": 0, "win_rate": None, "avg": None, "median": None,
@@ -220,7 +220,7 @@ def seal_time_curve(per_day: dict[str, list[dict]]) -> list[dict]:
     return out
 
 
-def run_backtest(days: int = 30, strategies: Optional[list[str]] = None) -> dict:
+def run_backtest(days: int = 30, strategies: list[str] | None = None) -> dict:
     """跑涨停样本统计。
 
     Args:

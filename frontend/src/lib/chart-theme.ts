@@ -1,65 +1,88 @@
-function css(name: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+/**
+ * 图表主题：从 `theme/tokens.ts` 读，不再自己定义颜色。
+ *
+ * ADR-0014 §2：颜色只有 tokens.ts 一个真源。本文件原来自己算 HSL→hex、
+ * 自己判断 zh/en 决定红绿方向，导致图表与 UI 会各走一套（同一屏里两种蓝）。
+ * 现在改成纯映射：取 palette，输出图表库需要的字段形状。
+ *
+ * 注意涨跌方向**不由语言决定**，由用户的「涨跌口径」决定（ADR-0014 §3）：
+ * A 股红涨绿跌是默认，国际口径可切。方向由 palette 的 up/down 承载，
+ * 本文件不判断 locale。
+ */
+import { DARK, LIGHT, type Palette } from "@/theme/tokens";
+
+export interface ChartTheme {
+  gridColor: string;
+  textColor: string;
+  axisColor: string;
+  upColor: string;
+  downColor: string;
+  maColors: string[];
+  bollColor: string;
+  volumeUp: string;
+  volumeDown: string;
+  infoColor: string;
+  warningColor: string;
+  accentColor: string;
+  seriesColors: string[];
+  tooltipBg: string;
+  tooltipBorder: string;
+  tooltipText: string;
 }
 
-function hslToHex(hsl: string): string {
-  if (!hsl) return "";
-  const [h, s, l] = hsl.split(/\s+/).map(parseFloat);
-  if (isNaN(h)) return "";
-  const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
-  const f = (n: number) => {
-    const k = (n + h / 30) % 12;
-    const color = l / 100 - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-    return Math.round(255 * color).toString(16).padStart(2, "0");
+/** 判断当前是否深色。DOM class 为准（与 useDarkMode 同一判定源）。 */
+function isDarkNow(): boolean {
+  return document.documentElement.classList.contains("dark");
+}
+
+/** 当前 palette。口径切换（红涨绿跌 ↔ 绿涨红跌）通过换 palette 的 up/down 实现。 */
+export function currentPalette(): Palette {
+  return isDarkNow() ? DARK : LIGHT;
+}
+
+function toChartTheme(p: Palette): ChartTheme {
+  return {
+    gridColor: p.border,
+    textColor: p.textTertiary,
+    axisColor: p.borderStrong,
+    upColor: p.up,
+    downColor: p.down,
+    maColors: [p.warning, p.accent, p.info],
+    bollColor: `${p.accent}80`,
+    volumeUp: `${p.up}66`,
+    volumeDown: `${p.down}66`,
+    infoColor: p.info,
+    warningColor: p.warning,
+    accentColor: p.accent,
+    // 分类系列色：语义色 + tokens 的补位色，多系列图按此顺序循环取色
+    seriesColors: [p.warning, p.catViolet, p.info, p.up, p.down, p.catTeal],
+    // tooltip 用 raised 而不是半透明黑：与面板同色，视觉上是「浮起的一层」
+    tooltipBg: p.raised,
+    tooltipBorder: p.border,
+    tooltipText: p.text,
   };
-  return `#${f(0)}${f(8)}${f(4)}`;
 }
 
-function isChinese(): boolean {
-  return (document.documentElement.lang || navigator.language || "").startsWith("zh");
-}
-
-let _cache: ReturnType<typeof buildTheme> | null = null;
+let _cache: ChartTheme | null = null;
 let _cacheKey = "";
 
-function buildTheme() {
-  const cn = isChinese();
-  const isDark = document.documentElement.classList.contains("dark");
-
-  const successHex = hslToHex(css("--success")) || "#22c55e";
-  const dangerHex = hslToHex(css("--danger")) || "#ef4444";
-  const infoHex = hslToHex(css("--info")) || "#3b82f6";
-  const warningHex = hslToHex(css("--warning")) || "#f59e0b";
-  const gridHex = hslToHex(css("--chart-grid")) || (isDark ? "#1e2433" : "#e5e7eb");
-  const textHex = hslToHex(css("--chart-text")) || "#6b7280";
-  const axisHex = hslToHex(css("--chart-axis")) || "#374151";
-
-  // Locale-aware candlestick colors: China = red up / green down
-  const upHex = cn ? dangerHex : successHex;
-  const downHex = cn ? successHex : dangerHex;
-
-  return {
-    gridColor: gridHex,
-    textColor: textHex,
-    axisColor: axisHex,
-    upColor: upHex,
-    downColor: downHex,
-    maColors: [warningHex, "#8b5cf6", infoHex],
-    bollColor: "rgba(99,102,241,0.5)",
-    volumeUp: upHex + "66",
-    volumeDown: downHex + "66",
-    infoColor: infoHex,
-    warningColor: warningHex,
-    tooltipBg: isDark ? "rgba(10,14,22,0.92)" : "rgba(255,255,255,0.96)",
-    tooltipBorder: isDark ? "#1e2433" : "#e5e7eb",
-    tooltipText: isDark ? "#d1d5db" : "#374151",
-  };
-}
-
-export function getChartTheme() {
-  const key = `${document.documentElement.className}|${document.documentElement.lang || navigator.language}`;
+/**
+ * 取当前图表主题。
+ *
+ * 缓存键包含 class 与 palette 的涨跌色 —— 只含 class 的话，
+ * 用户在浅色主题下切换涨跌口径时图表不会更新（class 没变）。
+ */
+export function getChartTheme(): ChartTheme {
+  const p = currentPalette();
+  const key = `${document.documentElement.className}|${p.up}|${p.down}`;
   if (_cache && _cacheKey === key) return _cache;
-  _cache = buildTheme();
+  _cache = toChartTheme(p);
   _cacheKey = key;
   return _cache;
+}
+
+/** 供测试用：清缓存。 */
+export function _resetChartThemeCache(): void {
+  _cache = null;
+  _cacheKey = "";
 }

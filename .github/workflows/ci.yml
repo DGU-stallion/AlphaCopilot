@@ -1,0 +1,167 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    # macos-latest 是硬性要求：test_sandbox.py 与 E2E 测试依赖
+    # macOS 的 /usr/bin/sandbox-exec，ubuntu 上会被静默跳过
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      # test_vendor_bridge.py 是对**真实** vendor 层做的集成测试（11 条）：
+      # 它会起子进程调 data-service/.venv/bin/python。venv 不存在就直接失败，
+      # 这是对的 —— 那些测试要证明的正是「跨进程契约能跑通」，用 mock 替掉
+      # 就等于把它们变成同义反复。所以 CI 必须把 venv 真的建出来。
+      #
+      # 两个环境必须隔离（mootdx 锁 httpx<0.26，主环境 mcp 要 >=0.27），
+      # 所以不能塞进当前解释器。
+      - name: Provision data-service venv
+        # 注意：不要在这里覆盖 working-directory。job 默认是 backend/，
+        # ../data-service 才能落到仓库根的 data-service/。
+        run: |
+          python -m venv ../data-service/.venv
+          ../data-service/.venv/bin/python -m pip install --upgrade pip
+          ../data-service/.venv/bin/python -m pip install -q -r ../data-service/requirements.txt
+          ../data-service/.venv/bin/python -c "import pandas, requests; print('data-service venv ok')"
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Test (pytest)
+        shell: bash
+        run: |
+          set -o pipefail
+          pytest -q | tee pytest.log
+
+      - name: Test summary
+        if: always()
+        working-directory: backend
+        shell: bash
+        run: |
+          {
+            echo "## Backend test summary"
+            echo '```'
+            grep -E '[0-9]+ (passed|failed|error|skipped|xfailed|xpassed|warning)' pytest.log | tail -1 || echo "no pytest summary line found"
+            echo '```'
+            # 逐项提取，便于在 PR 页面快速发现 macOS 专属测试被跳过 / xfail 数量变化
+            for kind in passed failed error skipped xfailed xpassed deselected warning; do
+              n=$(sed -nE "s/.*(^| )([0-9]+) ${kind},?.*/\2/p" pytest.log | tail -1)
+              if [ -n "$n" ]; then
+                echo "- ${kind}: ${n}"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  frontend:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npx vitest --run
+
+      - name: Build
+        run: npx vite build
+
+  # data-service：vendored 取数层的独立环境（M3-V1/V4）
+  #
+  # 为什么必须单独一个 job：它的依赖与 backend 冲突
+  # （vendored mootdx 要 httpx<0.26，backend 的 mcp 要 >=0.27），
+  # 装不进同一个解释器。也不能用 backend 的 python 跑。
+  data-service:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: data-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Lint (ruff)
+        run: |
+          # 钉版本：不钉的话 CI 拿最新 ruff，而它的**默认规则集**会随版本变
+          # （实测 0.15 只有 E/F，0.17 又多了 FURB/SIM/S），于是「本地绿 CI 红」。
+          # data-service/pyproject.toml 里有显式规则集，钉版本是为了行为也稳定。
+          pip install ruff==0.17.2
+          python -m ruff check src/
+
+      - name: Our tests (loader / worker)
+        run: python -m pytest tests -q
+
+      - name: Vendored upstream tests
+        # 179 passed / 4 skipped。这一层之前只在本地跑过，
+        # 漏掉 README.md 时「本地红而 CI 绿」就是这么发生的 —— 必须进 CI。
+        run: python -m pytest vendor/a-stock-data/tests -q
+
+  vendor-integrity:
+    # vendor/ 是只读区：任何人手改都会被这条抓住
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: vendor 目录无本地改动
+        run: |
+          # NOTICE 例外：它由 scripts/vendor-a-stock-data.sh 追加（同步记录），
+          # 是唯一允许变化的本地产物。其余文件必须与上游逐字节一致。
+          git diff --exit-code -- data-service/vendor/ ':(exclude)data-service/vendor/a-stock-data/NOTICE'
+          test -z "$(git status --porcelain data-service/vendor/ | grep -v 'a-stock-data/NOTICE')" || {
+            echo "::error::data-service/vendor/ 有未提交改动。它是只读区，同步请用 scripts/vendor-a-stock-data.sh"
+            git status --porcelain data-service/vendor/
+            exit 1
+          }
+
+      - name: SKILL.md 指纹校验
+        run: |
+          echo "d30aa90edb881a45168c397a6ca1ccfebc440a8d4c93b3d94d3123d27b260a1d  data-service/vendor/a-stock-data/SKILL.md" | shasum -a 256 -c

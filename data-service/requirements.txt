@@ -1,0 +1,22 @@
+# data-service — vendor a-stock-data 独立运行环境
+#
+# 钉死的上游：simonlin1212/a-stock-data V3.10.2 / commit 29b07d2e3700
+# 依赖清单依据 docs/research/a-stock-data-v3.10.md §5「依赖实测」+ §7.1 前置。
+#
+# ⚠️ 不装 mootdx。理由（ADR-0011 事实 1 + 本项目 2026-10 实测）：
+#   1. mootdx 锁 httpx<0.26（PyPI 元数据：httpx<0.26.0,>=0.25.0），
+#      与主环境 mcp>=1.9（要求 httpx>=0.27）硬冲突；
+#   2. 本机 mootdx 连财务也取不到：Quotes.factory 抛 ValueError（BESTIP bug），
+#      指定 server 后 finance 返回 0 行。上游 issue #52 确认 K 线/盘口/逐笔
+#      2026-09 起失效。vendor 版 SKILL.md 已把 K 线主源换成腾讯，不依赖 mootdx。
+# 若将来确需 mootdx，放进 data-service venv（本文件之外），不要 --no-deps 手改。
+#
+# stockstats 出现在上游文档依赖表但代码里没有 import，不装。
+
+pandas>=3.0
+numpy>=2.0
+requests>=2.31
+baostock>=0.9          # 估值历史 / 上市退市日 / ST 名单（TCP 客户端，53 处引用）
+xlrd>=2.0              # 交易所 xls（申万行业 / 社融 / 国证 / 两融）的 pd.read_excel 引擎
+openpyxl>=3.1          # 交易所 xlsx 的 pd.read_excel 引擎
+pytest>=8              # 上游 179 条离线测试在 V4 复用时的运行器

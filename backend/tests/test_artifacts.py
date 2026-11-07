@@ -11,12 +11,20 @@ from api.app import create_app
 from api.artifacts import ManifestError, ingest_run
 from api.store import Store
 
+_AGENT_PROV = {"kind": "agent", "runId": "r-1", "codeHash": "sha256:x",
+               "dataAsOf": "2026-10-21"}
+
 
 def _make_run(tmp: Path, manifest: dict, files: dict[str, str]) -> Path:
     run_dir = tmp / "runs" / "r-1"
     run_dir.mkdir(parents=True)
     for name, content in files.items():
         (run_dir / name).write_text(content, encoding="utf-8")
+    # 每个 artifact 补上 provenance：ADR-0012 §1 之后这是必填项。
+    # 默认用 agent 轨（这些测试关心的是 kind/path/payload 校验，不是盖章权——
+    # 盖章权另有 tests/test_provenance.py 专测）。
+    for art in manifest.get("artifacts", []):
+        art.setdefault("provenance", dict(_AGENT_PROV))
     (run_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     return run_dir
 

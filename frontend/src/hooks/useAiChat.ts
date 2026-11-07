@@ -1,4 +1,4 @@
-// useAiChat —— 一份对话的状态机（S5，移植自 Vibe-Research 的 core/ai/useAiChat）。
+// useAiChat —— 一份对话的状态机（S5，移植自上游项目的 core/ai/useAiChat）。
 //
 // 处理三类"看不出来但会出错"的坑：半截回答不落进下一轮、并发提交的竞态锁、
 // 换 key/关面板中止在跑的请求。对话按 key 分开；空回答不算回答。
@@ -8,23 +8,52 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiUrl } from "@/lib/base";
-import { authHeaders } from "@/lib/api";
+import { authHeaders, type SessionMessage } from "@/lib/api";
 
 export interface AiMsg {
   role: "user" | "assistant";
   content: string;
   /** 没收完就被中止的回答：界面照常显示已拿到的部分，但不进下一轮。 */
   partial?: boolean;
+  /**
+   * 思考过程 / 工具调用（可选）。从库里读历史时带上，流式的新消息暂不填。
+   * 形如 `{thinking?: string; tool_calls?: [...]}`，渲染交给 ChatMessage。
+   */
+  meta?: { thinking?: string; tool_calls?: { name: string; args?: string; result?: string }[] };
 }
 
 export interface AiChat {
   msgs: AiMsg[];
   key: string;
+  /** 当前对话对应的后端会话 id。切历史会话时由调用方传入，未建时为 null。 */
+  sessionId: string | null;
   loading: boolean;
+  /**
+   * 正在读历史消息（与 `loading` 严格分开）。
+   *
+   * 为什么必须分开：`loading` 的语义是「agent 正在回答」，submit 会因它而拒绝
+   * 新输入。曾经把「读历史」也塞进 `loading`，后果是打开一条历史会话后
+   * 第一时间打字发送 → 被静默吞掉（`submit` 直接 return，连报错都没有）。
+   * 界面看起来完全正常，只是没反应 —— 这种 bug 用户只会以为是「应用卡了」。
+   */
+  historyLoading: boolean;
   err: string | null;
   submit: (text: string, decorate?: (q: string) => string) => Promise<void>;
   clear: () => void;
   abort: () => void;
+}
+
+/**
+ * 对话的挂载点。
+ *
+ * `sessionId` 非空 = **打开一条已有会话**（C4 历史切换）：直接把消息从库里读出来，
+ * 后续 submit 续在同一条会话上，不新建。
+ *
+ * 为什么读库而不是读 Pi 的 session JSONL：硬规则 2 —— 产品真源是我们的数据库，
+ * 前端永不读 agent 的会话文件。
+ */
+export interface AiChatOptions {
+  sessionId?: string | null;
 }
 
 // 对话 key → 后端 session：每个 chat（key#epoch）惰性建一个后端会话并缓存复用（见 _sessionCache）。
@@ -119,10 +148,12 @@ async function ensureBackendSession(cacheKey: string, signal: AbortSignal): Prom
   return sid;
 }
 
-export function useAiChat(key: string): AiChat {
+export function useAiChat(key: string, opts: AiChatOptions = {}): AiChat {
+  const fixedSid = opts.sessionId ?? null;
   const [epoch, setEpoch] = useState(0);
   const [chat, setChat] = useState<{ key: string; msgs: AiMsg[] }>({ key, msgs: [] });
   const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const submittingRef = useRef<AbortController | null>(null);
@@ -167,12 +198,71 @@ export function useAiChat(key: string): AiChat {
   const cacheKeyRef = useRef(cacheKey);
   cacheKeyRef.current = cacheKey;
 
+  // 固定会话：给了 sessionId 就直接用，不再懒建（否则「打开历史会话」会新建一条空的，
+  // 用户看到的是空白页、以为历史丢了）。
+  const fixedSidRef = useRef(fixedSid);
+  fixedSidRef.current = fixedSid;
+
+  /**
+   * 历史加载的「作废令牌」。
+   *
+   * 真 bug（写完测试才暴露）：读历史的请求比「用户手速」慢。用户打开历史会话后
+   * 立刻打字发送，历史响应随后到达，`setChat({msgs: rows})` 把刚发出的消息
+   * **整段覆盖成历史内容**（历史为空时就是覆盖成空）—— 界面表现是「我发的消息
+   * 消失了」，而且 agent 那条其实还在跑，答完又冒出来，非常难解释。
+   *
+   * 修法：任何 submit 都让令牌 +1；历史响应落地前比对令牌，不一致就整段丢弃
+   * （历史没读到不致命，覆盖掉用户刚发的话才致命）。
+   */
+  const historyTokenRef = useRef(0);
+
+  /**
+   * 打开一条已有会话：把落库的消息读回来。
+   *
+   * `partial` 一律不置 —— 历史消息都是已完成的，标成 partial 会让界面显示
+   * 「还没回答完」的光标，且会被 submit 的替补逻辑误删。
+   */
+  useEffect(() => {
+    if (!fixedSid) return;
+    let alive = true;
+    const token = ++historyTokenRef.current;
+    setChat({ key, msgs: [] });
+    setHistoryLoading(true);
+    setErr(null);
+    (async () => {
+      try {
+        const resp = await fetch(apiUrl(`/api/sessions/${fixedSid}/messages`), {
+          headers: { ...authHeaders() },
+        });
+        if (!resp.ok) throw new Error(`读取会话历史失败 HTTP ${resp.status}`);
+        const rows = (await resp.json()) as SessionMessage[];
+        // 期间用户已经发过消息 → 令牌变了 → 丢弃这份历史（见 historyTokenRef 注释）
+        if (!alive || historyTokenRef.current !== token) return;
+        setChat({
+          key,
+          msgs: rows.map((r) => ({
+            role: r.role,
+            content: r.content ?? "",
+            ...(r.meta ? { meta: r.meta } : {}),
+          })),
+        });
+      } catch (e) {
+        if (alive) setErr(e instanceof Error ? e.message : "读取会话历史失败");
+      } finally {
+        if (alive) setHistoryLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [fixedSid, key]);
+
   const submit = useCallback(
     async (text: string, decorate?: (q: string) => string) => {
       const q = text.trim();
       if (!q || loading || submittingRef.current) return;
       const ac = new AbortController();
       submittingRef.current = ac;
+      // 让在飞的历史请求作废：否则它落地时会把这条刚发出的消息覆盖掉。
+      historyTokenRef.current += 1;
       setErr(null);
       setMsgs((m) => [...m, { role: "user", content: q }, { role: "assistant", content: "", partial: true }]);
       setLoading(true);
@@ -186,7 +276,8 @@ export function useAiChat(key: string): AiChat {
       const alive = () => abortRef.current === ac && !ac.signal.aborted;
 
       try {
-        const sid = await ensureBackendSession(cacheKeyRef.current, ac.signal);
+        const sid =
+          fixedSidRef.current ?? (await ensureBackendSession(cacheKeyRef.current, ac.signal));
         const reply = await runTurn(sid, decorate ? decorate(q) : q, ac.signal, (t) => {
           // 实时增量：只在本请求仍是当前请求时追加（避免迟到增量写进别的对话）。
           if (alive()) patchLast((m) => ({ ...m, content: m.content + t }));
@@ -219,5 +310,15 @@ export function useAiChat(key: string): AiChat {
     [loading, setMsgs],
   );
 
-  return { msgs: chat.msgs, key: chat.key, loading, err, submit, clear, abort };
+  return {
+    msgs: chat.msgs,
+    key: chat.key,
+    sessionId: fixedSid,
+    loading,
+    historyLoading,
+    err,
+    submit,
+    clear,
+    abort,
+  };
 }

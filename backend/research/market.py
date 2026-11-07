@@ -157,56 +157,35 @@ def get_overview() -> dict:
     return _cached("overview", build, valid=lambda v: bool(v.get("sentiment") or v.get("sectors")))
 
 
-def _emotion() -> dict:
-    """短线情绪（聚合口径，**零个股名**）：连板梯队 / 最高连板 / 炸板率 / 封板率 / 晋级率 / 涨跌停家数。
+def _emotion_for_date(resolved: str) -> dict:
+    """算**指定交易日**（YYYYMMDD）的情绪聚合。
 
-    数据源＝东财涨停板四池（push2ex）。只把池子聚合成计数与比率，
-    **不输出任何个股 code/name**——守产品「零标的」红线（个股清单是甩名单，不做）。
+    为什么抽出来：当日实时（`_emotion`）与历史回填（scripts/backfill-emotion.py）
+    必须用**同一段计算逻辑**。各写一份的话，两者算出的「封板率」迟早会不一致，
+    而图表上分不出哪个是对的。
+
+    只把池子聚合成计数与比率，**不输出任何个股 code/name** —— 守产品「零标的」红线。
+    返回 {} 表示这一天没有涨停（非交易日/未开盘）。
     """
-    # 定位最近交易日：从今天往前回溯，第一日有涨停池即取（非交易日/盘前返空则继续回溯）。
-    today = datetime.now(BEIJING).date()
-    resolved, zt = "", []
-    for back in range(8):
-        d = (today - timedelta(days=back)).strftime("%Y%m%d")
-        zt = astock.em_zt_topic_pool("getTopicZTPool", d, "fbt:asc")
-        if zt:
-            resolved = d
-            break
-    if not resolved:
+    zt = astock.em_zt_topic_pool("getTopicZTPool", resolved, "fbt:asc")
+    if not zt:
         return {}
 
+    # 跌停池**必须** sort=fund:asc：其他排序（含默认）会返回空数组而不报错，
+    # 让人误以为「当天没跌停」。实测 2026-10-21：默认排序 0 条，fund:asc 5 条。
     zb = astock.em_zt_topic_pool("getTopicZBPool", resolved, "fbt:asc")    # 炸板池
     dt = astock.em_zt_topic_pool("getTopicDTPool", resolved, "fund:asc")   # 跌停池
     yzt = astock.em_zt_topic_pool("getYesterdayZTPool", resolved, "zs:desc")  # 昨涨停池
 
     boards = [_num(p.get("lbc")) or 1 for p in zt]      # 每只连板数（缺省按 1 板）
     lianban = [b for b in boards if b >= 2]             # 2 板及以上（连板）
-    # 连板梯队：2/3/4/5+ 各多少家（5 代表 5 板及以上），只保留有家数的档
     tiers = Counter(min(b, 5) for b in lianban)
     ladder = [{"boards": b, "count": tiers[b], "plus": b >= 5} for b in sorted(tiers)]
-
-    # 连板股清单（2 板+，客观公开榜单数据；按连板数、成交额降序）。
-    # 产品定位调整（2026-07-05）：从「零标的」→「展示客观榜单但不推荐/不预测/不评分」。
-    reasons = _fetch_zt_reasons(resolved)  # 涨停原因题材串（问财；缺 key/失败 → {}，reason 留 None）
-    lianban_stocks = sorted(
-        ({
-            "code": str(p.get("c", "")), "name": p.get("n", ""),
-            "boards": _num(p.get("lbc")) or 1,
-            "price": round((astock._numf(p.get("p")) or 0) / 1000, 2),
-            "pct": round(astock._numf(p.get("zdp")) or 0, 2),
-            "amount": astock._numf(p.get("amount")),      # 成交额,元（'-' 占位归一为 None，防排序对 str 取负崩溃）
-            "float_cap": astock._numf(p.get("ltsz")),     # 流通市值,元
-            "industry": p.get("hybk", ""),  # 概念/行业
-            "reason": reasons.get(str(p.get("c", ""))) or None,  # 涨停原因题材串（无则 None，前端显示 —）
-        } for p in zt if (_num(p.get("lbc")) or 1) >= 2),
-        key=lambda x: (-x["boards"], -(x["amount"] or 0)),
-    )
 
     zt_count, zb_count, yzt_count = len(zt), len(zb), len(yzt)
     attempts = zt_count + zb_count                       # 尝试涨停 = 封住 + 炸板
     seal_rate = round(zt_count / attempts, 3) if attempts else None      # 封板率
     break_rate = round(zb_count / attempts, 3) if attempts else None     # 炸板率
-    # 晋级率＝今日 2 板+（＝昨涨停今又停）÷ 昨日涨停家数
     promotion_rate = round(len(lianban) / yzt_count, 3) if yzt_count else None
 
     return {
@@ -217,12 +196,56 @@ def _emotion() -> dict:
         "max_boards": max(boards) if boards else 0,
         "lianban_count": len(lianban),
         "ladder": ladder,
-        "lianban_stocks": lianban_stocks,
         "seal_rate": seal_rate,
         "break_rate": break_rate,
         "promotion_rate": promotion_rate,
         "yzt_count": yzt_count,
     }
+
+
+def _emotion() -> dict:
+    """短线情绪（**当日**）：连板梯队 / 最高连板 / 炸板率 / 封板率 / 晋级率 / 涨跌停家数。
+
+    数据源＝东财涨停板四池（push2ex）。计算逻辑在 `_emotion_for_date`，
+    与历史回填共用（见那里的注释）。
+
+    与旧版的区别：旧版内联了一整套计算，现在只负责「定位最近交易日」+ 补个股名，
+    聚合的部分全部交出去。
+    """
+    # 定位最近交易日：从今天往前回溯，第一日有涨停池即取（非交易日/盘前返空则继续回溯）。
+    today = datetime.now(BEIJING).date()
+    resolved: str | None = None
+    for back in range(8):
+        d = (today - timedelta(days=back)).strftime("%Y%m%d")
+        if astock.em_zt_topic_pool("getTopicZTPool", d, "fbt:asc"):
+            resolved = d
+            break
+    if not resolved:
+        return {}
+
+    agg = _emotion_for_date(resolved)
+    if not agg:
+        return {}
+
+    # 连板股清单（2 板+，客观公开榜单数据；按连板数、成交额降序）。
+    # 产品定位调整（2026-07-05）：从「零标的」→「展示客观榜单但不推荐/不预测/不评分」。
+    # 注意：**这一部分不进历史表**（api/emotion_store.py 只存聚合计数）。
+    zt = astock.em_zt_topic_pool("getTopicZTPool", resolved, "fbt:asc")
+    reasons = _fetch_zt_reasons(resolved)  # 涨停原因题材串（问财；缺 key/失败 → {}）
+    lianban_stocks = sorted(
+        ({
+            "code": str(p.get("c", "")), "name": p.get("n", ""),
+            "boards": _num(p.get("lbc")) or 1,
+            "price": round((astock._numf(p.get("p")) or 0) / 1000, 2),
+            "pct": round(astock._numf(p.get("zdp")) or 0, 2),
+            "amount": astock._numf(p.get("amount")),      # 成交额,元
+            "float_cap": astock._numf(p.get("ltsz")),     # 流通市值,元
+            "industry": p.get("hybk", ""),
+            "reason": reasons.get(str(p.get("c", ""))) or None,
+        } for p in zt if (_num(p.get("lbc")) or 1) >= 2),
+        key=lambda x: (-x["boards"], -(x["amount"] or 0)),
+    )
+    return {**agg, "lianban_stocks": lianban_stocks}
 
 
 def get_short_term_emotion() -> dict:

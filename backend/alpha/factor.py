@@ -1,9 +1,19 @@
 """alpha.factor —— 相关性分析因子（T43，ADR-0007 承诺 A/B）。
 
 三个经 registry 白名单登记的纯函数，前端「相关性分析」页按 analysis_ref.fn 调用：
-  correlation.overlay  归一化叠加走势（多标的对齐起点=100 看相对强弱）
+  correlation.overlay  归一化叠加走势（多标的对齐起点=100 看相对强弱）—— **多条** series
   correlation.matrix   日收益率皮尔逊相关矩阵热力图
-  correlation.rolling  前两标的滚动窗口收益率相关折线
+  correlation.rolling  前两标的滚动窗口收益率相关折线 —— **单条** series
+
+渲染分工（ROUND3 D5 / ADR-0014 §6）：这三个 fn 仍然只产出「数字形状」（html 无关的
+ECharts option 结构），renderer 由 api.page_spec.RENDERER_BY_FN 裁决：
+  · overlay / rolling → `lwc`（用户要 TradingView 式十字光标 / 拖拽缩放）——
+    api 层额外调用 alpha.lwc.lwc_payload 产 {series:[{name,points}], drawdown}，
+    前端直接吃 points，不反解 option。二者量纲相同（起点 100 / 相关系数），
+    多条 series 叠在**同一 pane**，不做 pane 分区。
+  · matrix → `echarts`（热力图，LWC 无此图形）。
+相关性**不是净值**，没有「回撤」这个概念 —— 它们**不在** page_spec.DRAWDOWN_FNS 里
+（曾因默认按净值算回撤，同一屏出现两份回撤）。
 
 关键正确性（金融口径，非可选）：
   · 相关必须基于【日收益率】而非价格——价格非平稳，直接算价格相关会产生伪高相关。
@@ -86,8 +96,7 @@ def _normalize_100(values: list[float]) -> list[float]:
 
 def _fetch(symbols: list[str], range: str) -> list[list[tuple[str, float]]]:
     """按标的取带日期收盘价。range 目前只作根数上的粗粒度映射（区间语义在 data 层演进）。"""
-    count = {"3m": 63, "6m": 126, "1y": 250}.get(range, 250)
-    return [data.closes_with_dates(code, count=count) for code in symbols]
+    return [data.closes_for_range(code, range) for code in symbols]
 
 
 def _display_labels(symbols: list[str]) -> list[str]:
@@ -119,9 +128,11 @@ def _display_labels(symbols: list[str]) -> list[str]:
     ],
 )
 def correlation_overlay(symbols: list[str], range: str) -> dict:
-    """归一化叠加走势图（起点=100），返回 ECharts line option。
+    """归一化叠加走势图（起点=100），返回 ECharts line option（renderer=lwc）。
 
     对齐日期交集后各标的除以自身首值×100，同图叠加看相对强弱。
+    每个标的一条 series —— 前端 MultiLineChart 把它们叠在同一 pane，
+    颜色按序列循环取 palette（不在这里指定颜色：颜色真源只有 tokens.ts）。
     """
     dates, cols = _align(_fetch(symbols, range))
     labels = _display_labels(symbols)
@@ -159,9 +170,10 @@ def correlation_matrix(symbols: list[str], range: str) -> dict:
     ],
 )
 def correlation_rolling(symbols: list[str], window: int, range: str) -> dict:
-    """前两标的滚动 window 日收益率相关折线，返回 ECharts line option。
+    """前两标的滚动 window 日收益率相关折线，返回 ECharts line option（renderer=lwc）。
 
     对齐 → 收益率 → 滑动窗口逐点算皮尔逊。用于观察相关性随时间变化（非恒定）。
+    只有一条 series → 前端走 PriceChart（line 模式），不是 MultiLineChart。
     """
     if len(symbols) < 2:
         raise ValueError("correlation.rolling 需要至少 2 个标的")

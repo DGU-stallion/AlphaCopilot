@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Optional
 
 import research.astock as astock
 
@@ -52,7 +51,7 @@ def _cached(key: str, ttl: float, build):
     return val
 
 
-def _pool(kind: str, ymd: str) -> Optional[list[dict]]:
+def _pool(kind: str, ymd: str) -> list[dict] | None:
     """取东财涨停板四池之一。走未加锁出口；拿不到返回 None（不把失败当成 0 家）。"""
     fetch = getattr(astock, "_pool_unpinned", None) or getattr(astock, "em_zt_topic_pool", None)
     if fetch is None:
@@ -63,7 +62,7 @@ def _pool(kind: str, ymd: str) -> Optional[list[dict]]:
         return None
 
 
-def _rate(hit: int, total: int) -> Optional[float]:
+def _rate(hit: int, total: int) -> float | None:
     return round(hit / total, 4) if total else None
 
 
@@ -98,8 +97,8 @@ def snapshot() -> dict:
                     lambda: _pool("getTopicZTPool", prev_day.replace("-", "")))
             if prev_day else None)
     today_codes = {str(p.get("c")) for p in zt}
-    promo: Optional[float] = None
-    promo_base: Optional[int] = None
+    promo: float | None = None
+    promo_base: int | None = None
     if prev:
         promo_base = len(prev)
         promo = _rate(sum(1 for p in prev if str(p.get("c")) in today_codes), promo_base)

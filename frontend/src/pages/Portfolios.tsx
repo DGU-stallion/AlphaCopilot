@@ -1,12 +1,12 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2, Loader2, X, CalendarClock } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { GlassCard } from "@/components/ui/GlassCard";
-import { Disclaimer } from "@/components/ui/Disclaimer";
-import { AskAiButton } from "@/components/ui/AskAiButton";
+import { Panel } from "@/components/ui/Panel";
 import { Caliber } from "@/components/ui/Caliber";
 import { EChart } from "@/components/ui/EChart";
-import { useCachedResource, dropCache } from "@/lib/cache";
+import { Num } from "@/components/Num";
+import { TTL, dropCache, useCachedResource } from "@/lib/cache";
+import { useAiPage } from "@/lib/ai-page";
 import {
   listPortfolios, createPortfolio, deletePortfolio, addRebalance, portfolioNav,
   type Portfolio, type NavResult,
@@ -20,7 +20,8 @@ import { ApiError } from "@/lib/api";
 interface WeightRow { code: string; weight: string }
 
 export function Portfolios() {
-  const list = useCachedResource<Portfolio[]>("pf:list", () => listPortfolios());
+  const list = useCachedResource<Portfolio[]>(
+    "pf:list", () => listPortfolios(), { ttlMs: TTL.DEFAULT });
   const [selected, setSelected] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -37,6 +38,24 @@ export function Portfolios() {
 
   const portfolios = list.data ?? [];
   const active = portfolios.find((p) => p.id === selected) ?? portfolios[0] ?? null;
+
+  // 向全局 AI 浮标登记本页确定性数据快照，作对话上下文。
+  // 净值数字由 PortfolioDetail 从同一缓存 key 读出后回填这里（同 key 不重复请求）。
+  const [navSummary, setNavSummary] = useState<string>("");
+  // 切组合/调仓后先清掉旧组合的净值汇总，避免新数据回来前快照里张冠李戴
+  useEffect(() => { setNavSummary(""); }, [active?.id, active?.rebalances.length]);
+  useAiPage({
+    key: `pf:${active?.id ?? "none"}:${active?.rebalances.length ?? 0}:${navSummary}`,
+    title: "模拟组合",
+    context:
+      list.loading && portfolios.length === 0 ? "组合列表加载中…"
+      : portfolios.length === 0 ? "尚无组合"
+      : `我的组合 ${portfolios.length} 个：${portfolios.map((p) => `${p.name}（${p.rebalances.length} 次调仓）`).join("、")}\n` +
+        (active
+          ? `当前查看：${active.name}，基准 ${active.benchmark}\n${navSummary || "净值计算中…"}`
+          : ""),
+    suggestions: ["当前组合的净值表现怎么解读", "调仓权重怎么设计更合理", "组合跑赢基准了吗"],
+  });
 
   const reloadList = useCallback(() => { dropCache("pf:list"); list.refresh(); }, [list]);
 
@@ -94,13 +113,12 @@ export function Portfolios() {
       <PageHeader
         title="模拟组合"
         subtitle="雪球式调仓事件驱动净值 · 组合净值 vs 沪深300 · 确定性计算"
-        actions={<AskAiButton context="模拟组合结构解读" label="问 AI" />}
       />
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         {/* 左：组合列表 + 新建 */}
         <div className="space-y-4">
-          <GlassCard>
+          <Panel>
             <h3 className="mb-3 text-sm font-semibold">新建组合</h3>
             <div className="space-y-2">
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="组合名，如 白酒龙头"
@@ -110,13 +128,13 @@ export function Portfolios() {
               <input type="date" value={createdOn} onChange={(e) => setCreatedOn(e.target.value)}
                 className="w-full rounded-lg border border-border bg-black/20 px-3 py-2 text-sm outline-none focus:border-primary/50" />
               <button onClick={create} disabled={creating}
-                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary/15 px-4 py-2 text-sm font-medium text-primary shadow-glow hover:bg-primary/25 disabled:opacity-50">
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary/15 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/25 disabled:opacity-50">
                 {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} 创建
               </button>
             </div>
-          </GlassCard>
+          </Panel>
 
-          <GlassCard>
+          <Panel>
             <h3 className="mb-2 text-sm font-semibold">我的组合</h3>
             {list.loading && portfolios.length === 0 ? (
               <p className="py-4 text-center text-sm text-muted-foreground/60">加载中…</p>
@@ -134,17 +152,17 @@ export function Portfolios() {
                 ))}
               </div>
             )}
-          </GlassCard>
+          </Panel>
         </div>
 
         {/* 右：净值曲线 + 调仓 */}
         <div className="space-y-4">
-          {active ? <PortfolioDetail portfolio={active} /> : (
-            <GlassCard><p className="py-16 text-center text-sm text-muted-foreground/60">选择或新建一个组合查看净值曲线。</p></GlassCard>
+          {active ? <PortfolioDetail portfolio={active} onNavSummary={setNavSummary} /> : (
+            <Panel><p className="py-16 text-center text-sm text-muted-foreground/60">选择或新建一个组合查看净值曲线。</p></Panel>
           )}
 
           {active && (
-            <GlassCard>
+            <Panel>
               <div className="mb-3 flex items-center gap-2">
                 <h3 className="text-sm font-semibold">添加调仓事件</h3>
                 <Caliber text={"调仓在生效日按当日收盘价换算虚拟持股数；事件之间持股不变、权重随价格漂移。权重和不足 1 的部分视为现金。"} />
@@ -170,30 +188,56 @@ export function Portfolios() {
               <div className="mt-3 flex items-center gap-2">
                 <button onClick={() => setRows([...rows, { code: "", weight: "" }])} className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"><Plus className="h-3.5 w-3.5" /> 加一行</button>
                 <button onClick={submitRebalance} disabled={rebalancing}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-4 py-1.5 text-sm font-medium text-primary shadow-glow hover:bg-primary/25 disabled:opacity-50">
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary/15 px-4 py-1.5 text-sm font-medium text-primary hover:bg-primary/25 disabled:opacity-50">
                   {rebalancing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />} 提交调仓
                 </button>
               </div>
-            </GlassCard>
+            </Panel>
           )}
         </div>
       </div>
 
       {err && <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{err}</div>}
-      <Disclaimer />
     </div>
   );
 }
 
 // 单组合详情：净值曲线（自带缓存，按 pid + 调仓次数 key，调仓后变 key 自然重取）+ 调仓事件列表。
-function PortfolioDetail({ portfolio }: { portfolio: Portfolio }) {
+// 同一 key 与父组件共享缓存：这里把最新的净值/累计收益率汇总回填给父组件的 AI 登记快照。
+function PortfolioDetail({ portfolio, onNavSummary }: { portfolio: Portfolio; onNavSummary: (s: string) => void }) {
   const key = `pf:nav:${portfolio.id}:${portfolio.rebalances.length}`;
-  const nav = useCachedResource<NavResult>(key, () => portfolioNav(portfolio.id));
+  const nav = useCachedResource<NavResult>(
+    key, () => portfolioNav(portfolio.id), { ttlMs: TTL.COMPUTE });
   const option = nav.data?.option ?? null;
+
+  useEffect(() => {
+    const seriesArr = Array.isArray((option as { series?: unknown })?.series)
+      ? ((option as { series: { name?: string; data?: number[] }[] }).series)
+      : [];
+    const dates = Array.isArray((option as { xAxis?: { data?: unknown } })?.xAxis?.data)
+      ? ((option as { xAxis: { data: string[] } }).xAxis.data)
+      : [];
+    if (!dates.length) { onNavSummary(""); return; }
+    const parts: string[] = [];
+    for (const s of seriesArr) {
+      const name = typeof s.name === "string" ? s.name : "";
+      const data = Array.isArray(s.data) ? s.data : [];
+      const first = data[0];
+      const last = data[data.length - 1];
+      if (typeof first === "number" && typeof last === "number") {
+        const ret = first !== 0 ? ((last - first) / first) * 100 : null;
+        parts.push(`${name || "系列"}：起点 ${first.toFixed(3)} → 最新 ${last.toFixed(3)}${ret != null ? `（区间 ${ret > 0 ? "+" : ""}${ret.toFixed(1)}%）` : ""}`);
+      }
+    }
+    onNavSummary(
+      `区间：${dates[0]} ~ ${dates[dates.length - 1]}\n` +
+      (parts.length ? parts.join("；") : "净值序列暂缺"),
+    );
+  }, [option, onNavSummary]);
 
   return (
     <>
-      <GlassCard glow>
+      <Panel>
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-semibold">{portfolio.name} · 净值曲线</h3>
           <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[11px] text-muted-foreground">基准 {portfolio.benchmark}</span>
@@ -205,9 +249,9 @@ function PortfolioDetail({ portfolio }: { portfolio: Portfolio }) {
         ) : (
           <EChart option={option} height={360} />
         )}
-      </GlassCard>
+      </Panel>
 
-      <GlassCard>
+      <Panel>
         <h3 className="mb-2 text-sm font-semibold">调仓事件</h3>
         {portfolio.rebalances.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground/60">尚无调仓事件。用下方表单添加一次调仓，净值才会开始计算。</p>
@@ -218,14 +262,14 @@ function PortfolioDetail({ portfolio }: { portfolio: Portfolio }) {
                 <p className="font-mono text-xs text-muted-foreground">{rb.effective_on}</p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {Object.entries(rb.weights).map(([c, w]) => (
-                    <span key={c} className="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[11px] text-primary">{c} {(w * 100).toFixed(0)}%</span>
+                    <span key={c} className="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[11px] text-primary">{c} <Num v={w * 100} digits={0} inheritColor />%</span>
                   ))}
                 </div>
               </div>
             ))}
           </div>
         )}
-      </GlassCard>
+      </Panel>
     </>
   );
 }

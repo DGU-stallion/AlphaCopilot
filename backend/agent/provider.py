@@ -1,8 +1,8 @@
 """Agent Provider 防腐层契约（ADR-0007）——**契约桩，签名已定稿，实现见 providers/**。
 
-这是业务层与具体 agent 运行时（dsh / 未来的 Claude Code 等）之间的唯一边界。
+这是业务层与具体 agent 运行时（当前是 Pi，未来可能是别的）之间的唯一边界。
 api 层只依赖本模块的 AgentEvent / AgentProvider / ProviderSpec 三个抽象，
-不得 import 任何 provider 具体实现，不得出现 dsh 私有词汇（cordis/session_root/
+不得 import 任何 provider 具体实现，不得出现任何运行时的私有词汇（如 cordis/session_root/
 text-delta/thinking 等）。
 
 替换 provider = 新增 providers/<name>.py 实现 AgentProvider，不改业务层。
@@ -12,15 +12,18 @@ text-delta/thinking 等）。
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, AsyncIterator, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 # ---- 中立事件 kind（前端与 api 层只认这些字符串）----
 # text_delta   : 助手回复的增量文本（payload: {"text": str}）
 # tool_started : 工具开始执行（payload: {"name": str, "args": dict}）
 # tool_result  : 工具返回（payload: {"name": str, "result": Any}）
 # turn_end     : 本轮结束（payload: {"final_text": str, "finish_reason": str}）
+#                  finish_reason 取值："stop"（正常说完）/ "aborted"（用户中止）/
+#                  "error" / "eof"（进程提前退出）/ "unknown"
 # error        : 出错（payload: {"error": str}）
 EVENT_TEXT_DELTA = "text_delta"
 EVENT_TOOL_STARTED = "tool_started"
@@ -53,10 +56,10 @@ class McpServerSpec:
 
 @dataclass
 class ProviderSpec:
-    """中立的运行参数。不含任何 provider 私有词汇（cordis/session_root/thinking）。
+    """中立的运行参数。不含任何 provider 私有词汇（如 cordis/session_root/thinking）。
 
-    provider 实现内部自行把这些映射到各自的配置（dsh 映射到 cordis.yml + env）。
-    模型私有调参（如 dsh 的 thinking/reasoningEffort）由 provider 内部按目标端点
+    provider 实现内部自行把这些映射到各自的配置（Pi 映射到命令行参数 + .pi/mcp.json）。
+    模型私有调参（如思考强度）由 provider 内部按目标端点
     能力决定是否启用，**不在本 spec 暴露**。
     """
 
@@ -65,6 +68,18 @@ class ProviderSpec:
     mcp_servers: list[McpServerSpec] = field(default_factory=list)
     skills_dir: Path | None = None
     model: str | None = None
+    # 会话 id：跨进程续接的抓手。
+    #
+    # 为什么放在 spec 而不是 provider 实例上：id 属于**业务层**——是它知道
+    # "这是同一个会话"（我们的 session 表有一行）。放在实例里，进程一重启就丢了，
+    # agent 也就失忆了：界面上一整条对话历史都在，它却什么都不记得。
+    #
+    # None 表示「开新会话」；start() 之后可以从 provider.session_id 读到
+    # Pi 实际分配的 id，业务层负责把它存下来供下次用。
+    session_id: str | None = None
+    # 下面两个字段**仅为向后兼容保留**，PiProvider 不使用它们：
+    # Pi 从 `~/.pi/agent/models.json` + `auth.json` 读端点与凭据，
+    # 传进来也不起作用。要换端点请改 models.json。
     base_url: str | None = None
     api_key: str | None = None
     request_timeout_seconds: float = 120.0
@@ -84,6 +99,21 @@ class AgentProvider(Protocol):
 
     def close(self) -> None:
         """关闭运行时。幂等。"""
+        ...
+
+    def abort(self, reason: str = "") -> None:
+        """中止进行中的那一轮 turn。
+
+        语义要求：
+        - **同步、不阻塞**：可能在事件循环里的 HTTP handler 中调用。
+        - **幂等**：没有进行中的 turn 时调用不得抛异常。
+        - **不杀进程**：中止的是这一轮，不是整个会话。
+        - 被中止的流仍以 `turn_end` 收尾，`finish_reason == "aborted"`，
+          且已收到的 `final_text` 保留。
+
+        这些约束写在契约里而不是各 provider 自己决定，是因为它们会直接影响
+        用户看到的行为（半句回复是否保留、停止后能否继续聊）。
+        """
         ...
 
     def is_alive(self) -> bool:

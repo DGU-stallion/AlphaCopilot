@@ -1,12 +1,16 @@
 [project]
 name = "alphacopilot"
 version = "0.2.0"
-description = "AlphaCopilot — 对话驱动的量化投研工作台：research 数据层 + alpha 分析库 + api 会话编排 + agent(dsh 适配) + mcp 工具层。"
+description = "AlphaCopilot — 对话驱动的量化投研工作台：research 数据层 + alpha 分析库 + api 会话编排 + agent(Pi 适配) + mcp 工具层。"
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.31",
     "pydantic>=2.0",
     "fastapi>=0.110",
+    # 研报归档的文件上传（B4）。FastAPI 的 UploadFile 依赖它，
+    # 缺了会在**启动时**报 "Form data requires python-multipart"，
+    # 而不是等到调用上传端点才报 —— 装不上就是整个后端起不来。
+    "python-multipart>=0.0.9",
     "jsonschema>=4.0",
     "mcp>=1.9,<2",
 ]

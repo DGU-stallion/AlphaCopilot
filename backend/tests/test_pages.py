@@ -111,15 +111,27 @@ def test_backtest_page_registered(client):
 
 def test_render_backtest_blocks(client):
     # client fixture 已 patch data.closes_with_dates 为确定性假数据（价格递增）。
-    blocks = client.post("/api/pages/backtest/render",
-                         json={"symbol": "600519", "fast": 5, "slow": 10, "range": "1y"}).json()["blocks"]
+    blocks = client.post(
+        "/api/pages/backtest/render",
+        json={"symbol": "600519", "fast": 5, "slow": 10, "range": "1y"},
+    ).json()["blocks"]
     kinds = [b["kind"] for b in blocks]
-    assert kinds == ["metric", "chart", "chart"]
+    # M4-2 之后 backtest 页多了两个 tearsheet 图（滚动 Sharpe / 月度热力图），
+    # 所以是 1 metric + 4 chart。这里断言「指标在首位、其余都是 chart」，
+    # 而不是写死块数 —— 写死个数会让每次加图都要改测试，
+    # 而这条测试真正要守的是「指标卡在图前面 + 净值图有两条线」。
+    # backtest 页现在是：指标卡 → 净值/回撤/滚动Sharpe/月度热力图 → 归因指标 → 归因图。
+    # 断言「种类合法 + 首块是指标卡 + 图上必有净值」，而不是写死个数或顺序 ——
+    # 写死会让每次加图都要改测试，而这条测试真正要守的是「指标在前、净值图有两条线」。
+    assert kinds[0] == "metric"
+    assert set(kinds) <= {"metric", "chart"}
+    assert kinds.count("chart") >= 3                  # 净值 + 回撤 + 至少一个分析图
     # 指标卡含总收益/夏普
     labels = [it["label"] for it in blocks[0]["metric"]["items"]]
     assert "总收益" in labels and "夏普" in labels
-    # 净值图有策略 + 买入持有两条线
-    assert len(blocks[1]["option"]["series"]) == 2
+    # 净值图有策略 + 买入持有两条线（按 title 找，不按位置找）
+    equity = next(b for b in blocks if "净值" in (b.get("title") or ""))
+    assert len(equity["option"]["series"]) == 2
 
 
 def test_render_backtest_degrades_when_no_data(client, monkeypatch):
@@ -166,3 +178,117 @@ def test_run_dispatches_by_strategy_name(monkeypatch):
     # 未知策略名：不取数、直接降级
     res2, reason2 = bp._run("600519", 5, 10, "1y", "not_a_strategy")
     assert res2 is None and "不支持" in reason2
+
+
+class TestPageDelete:
+    """删页面（ADR-0016 的配套能力）。
+
+    为什么必须有：页面从「手写 TSX」变成「库里的数据」之后，**建一个页面成本
+    极低**（agent 一条 POST 就够了）。没有删除就等于只增不减 —— 实验性页面会
+    永久占着导航栏。这是功能不完整，不是小瑕疵。
+    """
+
+    def _spec(self, slug="tmp-page", title="临时页"):
+        return {
+            "slug": slug,
+            "title": title,
+            "kind": "user",
+            "layout": "grid",
+            "params": [],
+            "blocks": [
+                {"kind": "metric", "span": 3, "analysis_ref": {"fn": "backtest.metrics"}},
+            ],
+        }
+
+    def test_delete_removes_page(self, client):
+        pid = client.post("/api/pages", json={"spec": self._spec()}).json()["page_id"]
+        assert client.get("/api/pages/tmp-page").status_code == 200
+
+        r = client.delete(f"/api/pages/{pid}")
+        assert r.status_code == 200
+        assert client.get("/api/pages/tmp-page").status_code == 404
+
+    def test_delete_missing_page_404(self, client):
+        assert client.delete("/api/pages/p-does-not-exist").status_code == 404
+
+    def test_delete_refuses_builtin(self, client):
+        """内置页不能删：它们由 register_builtin_pages 幂等 upsert，
+        删了会在下次启动时重新出现，用户会以为「删不掉」。"""
+        rows = client.get("/api/pages").json()
+        builtin = [r for r in rows if r["kind"] == "builtin"]
+        assert builtin, "测试前提：应有内置页"
+        r = client.delete(f"/api/pages/{builtin[0]['id']}")
+        assert r.status_code == 400
+        assert "内置" in r.json()["detail"]
+
+    def test_deleted_slug_can_be_reused(self, client):
+        """删掉后同名 slug 能重建 —— 否则「删了想改一下再建」会撞 UNIQUE。"""
+        pid = client.post("/api/pages", json={"spec": self._spec()}).json()["page_id"]
+        client.delete(f"/api/pages/{pid}")
+        r = client.post("/api/pages", json={"spec": self._spec()})
+        assert r.status_code == 200
+
+
+class TestPageSoftDelete:
+    """软删除 + 恢复（ROUND2 §9 事故后补）。
+
+    为什么改软删除：这条链路曾经是**硬 DELETE**，且前端没有确认框 ——
+    我当时写的理由是「页面内容是 spec，可再生」。**这个判断是错的**：
+    用户手写的页面不是可再生资源。实际后果是用户的一个自定义页被删掉且
+    无法恢复（SQLite 页面重用，扫不到残留）。
+
+    软删除让「误删」变成「临时看不见」，代价只是一列时间戳。
+    """
+
+    def _spec(self, slug="keep-me", title="别删我"):
+        return {
+            "slug": slug,
+            "title": title,
+            "kind": "user",
+            "layout": "grid",
+            "params": [],
+            "blocks": [
+                {"kind": "metric", "span": 3, "analysis_ref": {"fn": "backtest.metrics"}},
+            ],
+        }
+
+    def test_soft_deleted_page_disappears_from_list(self, client):
+        pid = client.post("/api/pages", json={"spec": self._spec()}).json()["page_id"]
+        client.delete(f"/api/pages/{pid}")
+        slugs = [p["slug"] for p in client.get("/api/pages").json()]
+        assert "keep-me" not in slugs
+
+    def test_soft_deleted_page_is_404_on_get(self, client):
+        pid = client.post("/api/pages", json={"spec": self._spec()}).json()["page_id"]
+        client.delete(f"/api/pages/{pid}")
+        assert client.get("/api/pages/keep-me").status_code == 404
+
+    def test_restore_brings_page_back(self, client):
+        pid = client.post("/api/pages", json={"spec": self._spec()}).json()["page_id"]
+        client.delete(f"/api/pages/{pid}")
+        r = client.post(f"/api/pages/{pid}/restore")
+        assert r.status_code == 200
+        assert client.get("/api/pages/keep-me").status_code == 200
+        slugs = [p["slug"] for p in client.get("/api/pages").json()]
+        assert "keep-me" in slugs
+
+    def test_soft_delete_frees_the_slug(self, client):
+        """删掉后同名 slug 能重建 —— 否则「删了想改一下再建」会撞 UNIQUE。"""
+        pid = client.post("/api/pages", json={"spec": self._spec()}).json()["page_id"]
+        client.delete(f"/api/pages/{pid}")
+        r = client.post("/api/pages", json={"spec": self._spec(title="重建的")})
+        assert r.status_code == 200
+        assert client.get("/api/pages/keep-me").json()["title"] == "重建的"
+
+    def test_restore_conflicts_when_slug_taken(self, client):
+        """软删后重建了同名页，就不能再恢复旧的 —— slug 是 URL，不能有两个。"""
+        pid = client.post("/api/pages", json={"spec": self._spec()}).json()["page_id"]
+        client.delete(f"/api/pages/{pid}")
+        client.post("/api/pages", json={"spec": self._spec(title="新的")})
+        r = client.post(f"/api/pages/{pid}/restore")
+        assert r.status_code == 409
+
+    def test_delete_builtin_still_refused(self, client):
+        rows = client.get("/api/pages").json()
+        builtin = [r for r in rows if r["kind"] == "builtin"][0]
+        assert client.delete(f"/api/pages/{builtin['id']}").status_code == 400

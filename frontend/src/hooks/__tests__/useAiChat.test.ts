@@ -82,3 +82,58 @@ describe("useAiChat", () => {
     expect(result.current.msgs).toHaveLength(0);
   });
 });
+
+/**
+ * 打开已有会话（ROUND2 §13，C4）。
+ *
+ * 真风险：给了 sessionId 却仍然走「懒建新会话」，用户点历史会话看到一片空白，
+ * 会以为「历史丢了」。所以这里必须断言**不会**发起 POST /api/sessions。
+ */
+describe("useAiChat 打开已有会话", () => {
+  it("给 sessionId 时读库里的历史，且不新建会话", async () => {
+    const posts: string[] = [];
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") posts.push(url);
+      if (url.endsWith("/api/sessions/s-old/messages")) {
+        return jsonResponse([
+          { id: "m1", role: "user", content: "上次问的", created_at: 1 },
+          { id: "m2", role: "assistant", content: "上次答的", created_at: 2,
+            meta: { thinking: "先看白酒", tool_calls: [{ name: "get_quote", args: "600519" }] } },
+        ]);
+      }
+      throw new Error(`unexpected: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useAiChat("global", { sessionId: "s-old" }));
+    await waitFor(() => expect(result.current.msgs).toHaveLength(2));
+
+    expect(result.current.msgs[0]).toMatchObject({ role: "user", content: "上次问的" });
+    expect(result.current.msgs[1].meta?.thinking).toBe("先看白酒");
+    // 历史消息都是已完成的，不能带 partial（否则界面显示"未答完"且会被替补逻辑误删）
+    expect(result.current.msgs[1].partial).toBeUndefined();
+    expect(result.current.sessionId).toBe("s-old");
+    expect(posts.filter((u) => u.endsWith("/api/sessions"))).toEqual([]);
+  });
+
+  it("在已有会话里继续提问，续在同一条会话上（不新建）", async () => {
+    const posts: string[] = [];
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") posts.push(url);
+      if (url.endsWith("/api/sessions/s-old/messages") && init?.method !== "POST") {
+        return jsonResponse([]);
+      }
+      if (url.includes("/s-old/stream")) {
+        return sseResponse(['event: message/committed\ndata: {"content":"接着答"}\n\n']);
+      }
+      if (url.includes("/s-old/messages") && init?.method === "POST") return jsonResponse({ ok: true });
+      throw new Error(`unexpected: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useAiChat("global", { sessionId: "s-old" }));
+    await act(async () => { await result.current.submit("继续"); });
+    expect(result.current.msgs.at(-1)?.content).toBe("接着答");
+    expect(posts.filter((u) => u.endsWith("/api/sessions"))).toEqual([]);
+  });
+});

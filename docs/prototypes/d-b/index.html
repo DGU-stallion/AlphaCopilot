@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>D-B · Linear / Vercel · 复盘看板 + 宏观看板</title>
+<style>
+  /* ------------------------------------------------------------------
+     D-B「Linear / Vercel」原型
+     主字号 13 / 次字号 12 / 行高 1.4 / panel 间距 12px
+     颜色全部来自 frontend/src/theme/tokens.ts 的 DARK 调色板，无其它色值
+     禁：渐变 / box-shadow 光晕 / backdrop-filter / 圆角 > 6px
+  ------------------------------------------------------------------ */
+  :root {
+    --bg: #0B0E14;
+    --panel: #12161F;
+    --raised: #1A1F2B;
+    --border: #232936;
+    --border-strong: #2E3546;
+    --text: #E6E9EF;
+    --text-2: #9BA3B4;
+    --text-3: #6B7385;
+    --text-4: #4A5162;
+    --accent: #3B82F6;
+    --up: #D9534F;      /* A 股口径：涨 = 红 */
+    --down: #3FAE7A;    /* 跌 = 绿 */
+    --warn: #D99A4E;
+    --info: #5B8DEF;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.4 -apple-system, "SF Pro Text", "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+  }
+  .num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+
+  /* 顶栏 -------------------------------------------------------------- */
+  .topbar {
+    height: 44px; display: flex; align-items: center; gap: 20px;
+    padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  .brand { font-size: 13px; font-weight: 600; letter-spacing: .2px; }
+  .brand em { font-style: normal; color: var(--accent); }
+  .nav { display: flex; gap: 2px; font-size: 12px; }
+  .nav a {
+    color: var(--text-2); text-decoration: none; padding: 4px 10px;
+    border-radius: 4px;
+  }
+  .nav a.active { color: var(--text); background: var(--raised); }
+  .top-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .search {
+    width: 168px; font-size: 12px; color: var(--text-3);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 3px 10px;
+  }
+  .asof { font-size: 11px; color: var(--text-3); }
+  .asof b { color: var(--text-2); font-weight: 500; }
+
+  /* 画布 -------------------------------------------------------------- */
+  main {
+    height: calc(100vh - 44px - 24px);
+    display: grid; grid-template-columns: minmax(0, 1fr) 400px;
+    gap: 12px; padding: 12px 16px;
+  }
+  .board { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+  .board-head { display: flex; align-items: baseline; gap: 10px; }
+  .board-head h1 { font-size: 16px; font-weight: 600; letter-spacing: .2px; }
+  .board-head .sub { font-size: 12px; color: var(--text-2); }
+  .spacer { flex: 1; }
+  .meta { font-size: 11px; color: var(--text-4); }
+  .chip {
+    font-size: 11px; line-height: 1.4; padding: 0 6px; border-radius: 2px;
+    border: 1px solid var(--border); background: var(--raised); color: var(--text-2);
+    white-space: nowrap;
+  }
+  .chip.warn { color: var(--warn); }
+  .chip.ai { color: var(--info); border-color: var(--info); background: var(--panel); }
+
+  /* 卡片 -------------------------------------------------------------- */
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .card-head {
+    display: flex; align-items: baseline; gap: 10px; padding: 8px 12px 0;
+  }
+  .ct { font-size: 12px; font-weight: 600; color: var(--text-2); }
+  .cn { font-size: 11px; color: var(--text-4); margin-left: auto; text-align: right; }
+
+  /* 关键指标行（标题 → 关键指标 → 明细 的第二层） */
+  .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+  .metric { background: var(--raised); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px 7px; }
+  .metric .k { font-size: 11px; color: var(--text-3); }
+  .metric .v { font-size: 20px; font-weight: 600; margin-top: 1px; letter-spacing: -.2px; }
+  .metric .v small { font-size: 11px; font-weight: 400; color: var(--text-3); margin-left: 1px; }
+  .metric .sep { color: var(--text-4); font-weight: 400; padding: 0 1px; }
+  .metric .s { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+
+  /* 中段：图 + 右侧情绪栈 */
+  .mid { display: grid; grid-template-columns: minmax(0, 1fr) 296px; gap: 12px; flex: 1; min-height: 0; }
+  .chart-card { flex: 1; }
+  .chart-wrap { flex: 1; min-height: 0; margin: 4px 6px 4px 4px; }
+  .chart-wrap svg { display: block; }
+  .ax { fill: var(--text-3); font-family: var(--mono); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .side { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+
+  .card-body { padding: 6px 12px 10px; }
+  .ratio-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .ratio-grid .k { font-size: 11px; color: var(--text-3); }
+  .ratio-grid .v { font-size: 16px; font-weight: 600; margin-top: 1px; }
+  .ratio-grid .hint { font-size: 11px; color: var(--text-4); margin-top: 1px; }
+  .gauge-row {
+    display: flex; gap: 24px; margin-top: 8px; padding-top: 7px;
+    border-top: 1px solid var(--raised);
+  }
+  .gauge .k { font-size: 11px; color: var(--text-3); margin-right: 6px; }
+  .gauge .gv { font-size: 13px; font-weight: 600; }
+
+  .lb-row {
+    display: flex; align-items: baseline; gap: 8px; font-size: 12px;
+    padding: 2.5px 0; border-bottom: 1px solid var(--raised);
+  }
+  .lb-row:last-of-type { border-bottom: none; }
+  .lb-row .lv { font-weight: 600; color: var(--up); width: 28px; }
+  .lb-row .nm { color: var(--text); }
+  .lb-row .code { font-family: var(--mono); font-size: 11px; color: var(--text-4); }
+  .lb-row .pct { margin-left: auto; }
+  .lb-more { font-size: 11px; color: var(--text-4); padding-top: 4px; }
+
+  /* 表格 -------------------------------------------------------------- */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th {
+    font-size: 11px; font-weight: 500; color: var(--text-3); text-align: left;
+    padding: 5px 12px; border-bottom: 1px solid var(--border-strong); white-space: nowrap;
+  }
+  td { padding: 4px 12px; border-bottom: 1px solid var(--raised); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  th.r, td.r { text-align: right; }
+  td .nm2 { color: var(--text); }
+  td .sub2 { font-size: 11px; color: var(--text-4); margin-left: 4px; }
+  td.dim { color: var(--text-2); }
+
+  /* 宏观看板 ----------------------------------------------------------- */
+  .q-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 8px 12px 10px; }
+  .q-card {
+    background: var(--raised); border: 1px solid var(--border); border-radius: 4px;
+    padding: 7px 9px; min-width: 0;
+  }
+  .q-name { font-size: 12px; color: var(--text-2); white-space: nowrap; }
+  .q-body { min-width: 0; }
+  .q-price { font-size: 15px; font-weight: 600; margin-top: 1px; }
+  .q-pct { font-size: 11px; margin-top: 0; }
+
+  .lrow {
+    display: flex; align-items: baseline; gap: 8px; font-size: 12px;
+    padding: 3.5px 12px; border-bottom: 1px solid var(--raised);
+  }
+  .lrow:last-child { border-bottom: none; }
+  .lrow .n { color: var(--text); }
+  .lrow .c { font-family: var(--mono); font-size: 11px; color: var(--text-4); }
+  .lrow .p { margin-left: auto; color: var(--text-2); }
+  .lrow .c2 { width: 60px; text-align: right; }
+
+  .yields-card { flex: 1; }
+  .chart-wrap2 { flex: 1; min-height: 0; margin: 4px 8px 6px 4px; }
+
+  .ai-note p { padding: 2px 12px 10px; font-size: 12px; color: var(--text-2); line-height: 1.4; }
+  .ai-note p b { color: var(--text); font-weight: 500; }
+
+  /* 底栏 -------------------------------------------------------------- */
+  .statusbar {
+    height: 24px; display: flex; align-items: center; gap: 18px;
+    padding: 0 16px; background: var(--panel); border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums;
+  }
+  .statusbar .sep { color: var(--text-4); }
+  .statusbar .right { margin-left: auto; color: var(--text-4); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <span class="brand">Alpha<em>Copilot</em></span>
+  <nav class="nav">
+    <a class="active" href="#">复盘</a>
+    <a href="#">宏观</a>
+    <a href="#">相关性</a>
+    <a href="#">回测</a>
+    <a href="#">运行</a>
+  </nav>
+  <div class="top-right">
+    <span class="search">搜索标的或页 ⌘K</span>
+    <span class="asof">数据截至 <b class="num">2026-10-22 15:05</b> · 收盘</span>
+  </div>
+</header>
+
+<main>
+  <!-- ============================== 复盘看板 ============================== -->
+  <section class="board">
+    <div class="board-head">
+      <h1>复盘看板</h1>
+      <span class="sub">2026-10-22 · 已收盘 · 沪深京 A</span>
+      <span class="chip warn">收盘定稿</span>
+      <span class="spacer"></span>
+      <span class="meta">涨停 / 跌停 / 活跃度取自乐咕乐股 · 更新于 15:05</span>
+    </div>
+
+    <!-- 关键指标 -->
+    <div class="metrics">
+      <div class="metric">
+        <p class="k">上证指数</p>
+        <p class="v num">3,321.45</p>
+        <p class="s"><span class="up num">+1.23%</span> · 深成指 <span class="up num">+1.68%</span></p>
+      </div>
+      <div class="metric">
+        <p class="k">两市成交额</p>
+        <p class="v num">18,542<small>亿</small></p>
+        <p class="s">较昨日 <span class="up num">+12.4%</span></p>
+      </div>
+      <div class="metric">
+        <p class="k">涨跌家数</p>
+        <p class="v num"><span class="up">3,247</span><span class="sep">/</span><span class="down">1,856</span></p>
+        <p class="s">平盘 94 · 宽度 偏强</p>
+      </div>
+      <div class="metric">
+        <p class="k">涨停 / 跌停</p>
+        <p class="v num"><span class="up">78</span><span class="sep">/</span><span class="down">6</span></p>
+        <p class="s">真实 71 / 4</p>
+      </div>
+      <div class="metric">
+        <p class="k">最高连板</p>
+        <p class="v num">5<small>板</small></p>
+        <p class="s">连板 32 家 · 晋级率 <span class="num">32.5%</span></p>
+      </div>
+    </div>
+
+    <!-- 明细：走势 + 情绪 -->
+    <div class="mid">
+      <div class="card chart-card">
+        <div class="card-head">
+          <span class="ct">上证指数 · 近 60 日收盘</span>
+          <span class="cn">日 K 收盘价 · 单位 点</span>
+        </div>
+        <div id="idx-chart" class="chart-wrap"></div>
+      </div>
+      <div class="side">
+        <div class="card">
+          <div class="card-head">
+            <span class="ct">打板情绪</span>
+            <span class="cn">分母为摸板家数</span>
+          </div>
+          <div class="card-body">
+            <div class="ratio-grid">
+              <div><p class="k">封板率</p><p class="v num up">71.2%</p><p class="hint">封住 / 摸板</p></div>
+              <div><p class="k">炸板率</p><p class="v num down">28.8%</p><p class="hint">炸板 / 摸板</p></div>
+              <div><p class="k">晋级率</p><p class="v num up">32.5%</p><p class="hint">昨涨停今又封</p></div>
+            </div>
+            <div class="gauge-row">
+              <span class="gauge"><span class="k">大盘宽度</span><span class="gv">偏强</span></span>
+              <span class="gauge"><span class="k">题材投机</span><span class="gv">活跃</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="flex:1;">
+          <div class="card-head">
+            <span class="ct">连板梯队</span>
+            <span class="cn">客观公开榜单 · 非推荐</span>
+          </div>
+          <div class="card-body">
+            <div class="lb-row"><span class="lv num">5板</span><span class="nm">联创光电</span><span class="code">600363</span><span class="pct up num">+10.03%</span></div>
+            <div class="lb-row"><span class="lv num">4板</span><span class="nm">大千生态</span><span class="code">603955</span><span class="pct up num">+9.98%</span></div>
+            <div class="lb-row"><span class="lv num">4板</span><span class="nm">渤海股份</span><span class="code">000605</span><span class="pct up num">+10.02%</span></div>
+            <div class="lb-row"><span class="lv num">3板</span><span class="nm">东方碳素</span><span class="code">832175</span><span class="pct up num">+10.01%</span></div>
+            <div class="lb-row"><span class="lv num">3板</span><span class="nm">中超控股</span><span class="code">002471</span><span class="pct up num">+9.97%</span></div>
+            <p class="lb-more">… 其余 27 家（2 板 24 家）</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 明细：板块资金 -->
+    <div class="card">
+      <div class="card-head">
+        <span class="ct">板块资金 · 按今日净流入排序</span>
+        <span class="cn">同花顺行业资金流 · 盘中口径，非主力净流入 · 单位 亿元</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>行业</th><th class="r">涨跌%</th><th class="r">今日净流入</th>
+            <th class="r">流入</th><th class="r">流出</th><th class="r">成分股数</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="nm2">半导体</span></td><td class="r num up">+3.85</td><td class="r num up">+86.42</td><td class="r num dim">412.56</td><td class="r num dim">326.14</td><td class="r num dim">168</td></tr>
+          <tr><td><span class="nm2">证券</span></td><td class="r num up">+2.31</td><td class="r num up">+64.18</td><td class="r num dim">289.34</td><td class="r num dim">225.16</td><td class="r num dim">54</td></tr>
+          <tr><td><span class="nm2">汽车零部件</span></td><td class="r num up">+1.72</td><td class="r num up">+38.55</td><td class="r num dim">176.28</td><td class="r num dim">137.73</td><td class="r num dim">231</td></tr>
+          <tr><td><span class="nm2">光伏设备</span></td><td class="r num up">+1.46</td><td class="r num up">+27.94</td><td class="r num dim">148.62</td><td class="r num dim">120.68</td><td class="r num dim">87</td></tr>
+          <tr><td><span class="nm2">软件开发</span></td><td class="r num up">+1.18</td><td class="r num up">+19.63</td><td class="r num dim">132.41</td><td class="r num dim">112.78</td><td class="r num dim">296</td></tr>
+          <tr><td><span class="nm2">白酒</span></td><td class="r num down">-0.86</td><td class="r num down">-18.32</td><td class="r num dim">96.54</td><td class="r num dim">114.86</td><td class="r num dim">20</td></tr>
+          <tr><td><span class="nm2">银行</span></td><td class="r num down">-0.42</td><td class="r num down">-22.15</td><td class="r num dim">88.72</td><td class="r num dim">110.87</td><td class="r num dim">42</td></tr>
+          <tr><td><span class="nm2">医药商业</span></td><td class="r num down">-0.94</td><td class="r num down">-12.47</td><td class="r num dim">67.18</td><td class="r num dim">79.65</td><td class="r num dim">28</td></tr>
+          <tr><td><span class="nm2">房地产开发</span></td><td class="r num down">-1.23</td><td class="r num down">-31.08</td><td class="r num dim">104.23</td><td class="r num dim">135.31</td><td class="r num dim">116</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================== 宏观看板 ============================== -->
+  <section class="board">
+    <div class="board-head">
+      <h1>宏观看板</h1>
+      <span class="sub">股市 · 债市 · 大宗 · 汇率</span>
+      <span class="chip">红涨绿跌</span>
+      <span class="spacer"></span>
+      <span class="meta">美股为 10-21 收盘</span>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <span class="ct">A 股大盘</span>
+        <span class="cn">10-22 收盘</span>
+      </div>
+      <div class="q-grid">
+        <div class="q-card">
+          <div class="q-body">
+            <p class="q-name">深证成指</p>
+            <p class="q-price num up">10,587.62</p>
+            <p class="q-pct num up">+1.68%</p>
+          </div>
+
+        </div>
+        <div class="q-card">
+          <div class="q-body">
+            <p class="q-name">创业板指</p>
+            <p class="q-price num up">2,203.14</p>
+            <p class="q-pct num up">+2.01%</p>
+          </div>
+
+        </div>
+        <div class="q-card">
+          <div class="q-body">
+            <p class="q-name">科创 50</p>
+            <p class="q-price num up">1,087.35</p>
+            <p class="q-pct num up">+1.94%</p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <span class="ct">隔夜外围</span>
+        <span class="cn">对比各自前一交易日收盘</span>
+      </div>
+      <div class="lrow"><span class="n">纳斯达克</span><span class="c">IXIC</span><span class="p num">20,145.28</span><span class="c2 num up">+0.82%</span></div>
+      <div class="lrow"><span class="n">标普 500</span><span class="c">SPX</span><span class="p num">6,128.55</span><span class="c2 num up">+0.64%</span></div>
+      <div class="lrow"><span class="n">道琼斯</span><span class="c">DJI</span><span class="p num">44,210.31</span><span class="c2 num up">+0.41%</span></div>
+      <div class="lrow"><span class="n">恒生指数</span><span class="c">HSI</span><span class="p num">26,412.30</span><span class="c2 num up">+1.02%</span></div>
+    </div>
+
+    <div class="card yields-card">
+      <div class="card-head">
+        <span class="ct">美债收益率</span>
+        <span class="cn">财政部每日曲线 · 较上周 10Y −2bp</span>
+      </div>
+      <div id="ust-chart" class="chart-wrap2"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <span class="ct">大宗商品</span>
+        <span class="cn">国际报价</span>
+      </div>
+      <div class="lrow"><span class="n">布伦特原油</span><span class="c">BRN</span><span class="p num">76.28</span><span class="c2 num up">+1.12%</span></div>
+      <div class="lrow"><span class="n">WTI 原油</span><span class="c">CL</span><span class="p num">72.45</span><span class="c2 num up">+0.98%</span></div>
+      <div class="lrow"><span class="n">COMEX 黄金</span><span class="c">GC</span><span class="p num">2,735.40</span><span class="c2 num up">+0.53%</span></div>
+      <div class="lrow"><span class="n">COMEX 白银</span><span class="c">SI</span><span class="p num">34.62</span><span class="c2 num up">+1.24%</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <span class="ct">汇率</span>
+        <span class="cn">主要货币对</span>
+      </div>
+      <div class="lrow"><span class="n">美元指数</span><span class="c">DXY</span><span class="p num">104.32</span><span class="c2 num down">-0.21%</span></div>
+      <div class="lrow"><span class="n">离岸人民币</span><span class="c">USDCNH</span><span class="p num">7.1185</span><span class="c2 num down">-0.15%</span></div>
+      <div class="lrow"><span class="n">人民币中间价</span><span class="c">USDCNY</span><span class="p num">7.1042</span><span class="c2 num down">-0.08%</span></div>
+    </div>
+
+    <div class="card ai-note">
+      <div class="card-head">
+        <span class="ct">盘面速记</span>
+        <span class="chip ai">AI</span>
+        <span class="cn">provenance: agent</span>
+      </div>
+      <p>隔夜美股三大指数<b>集体收涨</b>（纳指 <b class="num up">+0.82%</b>）；美元指数 <b class="num down">-0.21%</b>、10Y 美债较上周 <b class="num">-2bp</b>；黄金、白银延续反弹。</p>
+    </div>
+  </section>
+</main>
+
+<footer class="statusbar">
+  <span>数据源：东财 / 同花顺 / 乐咕乐股</span>
+  <span class="sep">·</span>
+  <span>口径：红涨绿跌（A 股）</span>
+  <span class="sep">·</span>
+  <span>as-of <span class="num">2026-10-22 15:05</span></span>
+  <span class="right">provenance：本页除「盘面速记」外均为 deterministic</span>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  var MONO = '"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace';
+
+  /* ---------------- 上证指数 · 近 60 日收盘（折线） ---------------- */
+  var IDX = [
+    3120.4, 3126.8, 3118.2, 3105.6, 3098.1, 3084.5, 3076.9, 3048.3, 3052.7, 3061.4,
+    3073.8, 3089.2, 3082.6, 3095.1, 3108.7, 3121.3, 3136.9, 3145.2, 3139.8, 3152.6,
+    3168.4, 3181.2, 3195.7, 3210.3, 3202.9, 3188.5, 3176.2, 3163.8, 3170.4, 3182.9,
+    3191.6, 3203.8, 3216.2, 3228.7, 3235.1, 3229.4, 3218.6, 3206.3, 3194.8, 3202.5,
+    3213.9, 3226.8, 3238.4, 3249.7, 3261.2, 3254.6, 3243.1, 3255.8, 3268.4, 3281.2,
+    3294.6, 3305.8, 3312.4, 3318.9, 3321.45
+  ];
+  var X_LABELS = ['08-06', '08-24', '09-11', '09-29', '10-22'];
+
+  function drawIdx() {
+    var wrap = document.getElementById('idx-chart');
+    var W = wrap.clientWidth, H = wrap.clientHeight;
+    var padL = 8, padR = 50, padT = 10, padB = 18;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    var min = Math.min.apply(null, IDX), max = Math.max.apply(null, IDX);
+    var lo = min - (max - min) * 0.08, hi = max + (max - min) * 0.08;
+    function x(i) { return padL + iw * i / (IDX.length - 1); }
+    function y(v) { return padT + ih * (1 - (v - lo) / (hi - lo)); }
+
+    var s = '';
+    /* 横向网格 + 右侧刻度 */
+    for (var g = 0; g <= 4; g++) {
+      var gv = lo + (hi - lo) * g / 4, gy = padT + ih * (1 - g / 4);
+      s += '<line x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (padL + iw) +
+        '" y2="' + gy.toFixed(1) + '" stroke="#232936" stroke-width="1"/>';
+      s += '<text x="' + (padL + iw + 8) + '" y="' + (gy + 3).toFixed(1) +
+        '" class="ax">' + Math.round(gv).toLocaleString('en-US') + '</text>';
+    }
+    /* 日期刻度 */
+    X_LABELS.forEach(function (d, i) {
+      var xx = padL + iw * i / (X_LABELS.length - 1);
+      var anchor = i === 0 ? 'start' : (i === X_LABELS.length - 1 ? 'end' : 'middle');
+      s += '<text x="' + xx.toFixed(1) + '" y="' + (H - 4) + '" class="ax" text-anchor="' + anchor + '">' + d + '</text>';
+    });
+    /* 面积（纯色低透明度，非渐变）+ 折线 + 末点 */
+    var pts = IDX.map(function (v, i) { return x(i).toFixed(1) + ',' + y(v).toFixed(1); });
+    s += '<polygon points="' + padL + ',' + (padT + ih) + ' ' + pts.join(' ') + ' ' +
+      (padL + iw) + ',' + (padT + ih) + '" fill="#3B82F6" fill-opacity="0.08"/>';
+    s += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="#3B82F6" stroke-width="1.5" stroke-linejoin="round"/>';
+    var lx = x(IDX.length - 1), ly = y(IDX[IDX.length - 1]);
+    s += '<circle cx="' + lx.toFixed(1) + '" cy="' + ly.toFixed(1) + '" r="2.5" fill="#3B82F6"/>';
+    wrap.innerHTML = '<svg width="' + W + '" height="' + H + '">' + s + '</svg>';
+  }
+
+  /* ---------------- 美债收益率（柱状） ---------------- */
+  function drawUST() {
+    var wrap = document.getElementById('ust-chart');
+    var W = wrap.clientWidth, H = wrap.clientHeight;
+    var vals = [3.92, 3.88, 4.06, 4.34];
+    var terms = ['2Y', '5Y', '10Y', '30Y'];
+    var padL = 8, padR = 36, padT = 16, padB = 16;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    var MAXV = 5;
+    var bw = 34, gap = (iw - bw * vals.length) / (vals.length + 1);
+
+    var s = '';
+    for (var g = 1; g <= 4; g++) {
+      var gy = padT + ih * (1 - g / MAXV);
+      s += '<line x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (padL + iw) +
+        '" y2="' + gy.toFixed(1) + '" stroke="#232936" stroke-width="1"/>';
+      s += '<text x="' + (padL + iw + 6) + '" y="' + (gy + 3).toFixed(1) +
+        '" class="ax">' + g + '%</text>';
+    }
+    s += '<line x1="' + padL + '" y1="' + (padT + ih) + '" x2="' + (padL + iw) +
+      '" y2="' + (padT + ih) + '" stroke="#2E3546" stroke-width="1"/>';
+    vals.forEach(function (v, i) {
+      var bx = padL + gap + i * (bw + gap);
+      var bh = ih * v / MAXV;
+      var by = padT + ih - bh;
+      s += '<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + bw +
+        '" height="' + bh.toFixed(1) + '" fill="#5B8DEF" fill-opacity="0.75"/>';
+      s += '<text x="' + (bx + bw / 2).toFixed(1) + '" y="' + (by - 4).toFixed(1) +
+        '" class="ax" text-anchor="middle" fill="#E6E9EF" font-size="11">' +
+        v.toFixed(2) + '</text>';
+      s += '<text x="' + (bx + bw / 2).toFixed(1) + '" y="' + (H - 4) +
+        '" class="ax" text-anchor="middle">' + terms[i] + '</text>';
+    });
+    wrap.innerHTML = '<svg width="' + W + '" height="' + H + '">' + s + '</svg>';
+  }
+
+  drawIdx();
+  drawUST();
+})();
+</script>
+</body>
+</html>

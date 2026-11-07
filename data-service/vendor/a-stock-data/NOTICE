@@ -1,0 +1,62 @@
+a-stock-data — A 股全栈数据工具包（vendor 原样拷贝）
+Upstream : https://github.com/simonlin1212/a-stock-data
+Version  : V3.10.2 (2026-10-11)
+Commit   : 29b07d2e3700
+License  : Apache License 2.0（见同目录 LICENSE）
+Synced   : 2026-10-21 by M3-V2（同步脚本 scripts/vendor-a-stock-data.sh 为后续任务 M3-V6）
+
+## SHA256（shasum -a 256，校验于 2026-10-21）
+
+```
+d30aa90edb881a45168c397a6ca1ccfebc440a8d4c93b3d94d3123d27b260a1d  SKILL.md
+199bab40163ad21135c2c4d5db43bffdadb14ed80762b048f04931cc48700bbf  LICENSE
+0a159869af1abd002636bf793505dc5ea7bdb47ce85ff8e58461f4447484e615  CHANGELOG.md
+f4c62fb65753dc68ce94fe613e96d44444ca358b33142535243067e5f8acf107  tests/test_official_data.py
+91e2fbef650d17b5c1129367b81764edbcb68c36c2902f3265e77b3b2ecdb646  tests/test_v310_sources.py
+70ee4f35e7bcbf9a838e7ef47f7fce4432d33d25c01011b64512b8b41669e62f  tests/test_v39_sources.py
+d22719e9deba2c6e7e783cccf53d59e3bb2d0e231296dc69fc613a2a8c152d61  tests/test_valuation.py
+```
+
+## 下载校验记录
+
+- SKILL.md：7585 行 / 434721 字节 / 91 个 ```python 代码块（与调研文档 §1 数字一致）
+- commit 29b07d2e3700 存在，作者日期 2026-10-11T12:47:29Z
+- CHANGELOG.md 首条为 `## v3.10.2 — 2026-10-11`，与版本声明一致
+- tests/ 目录经 GitHub contents API 核对，恰好 4 个文件（全部下载）：
+  test_valuation.py / test_official_data.py / test_v39_sources.py / test_v310_sources.py
+
+## 只读约定
+
+本目录内容为上游原样拷贝，未作任何修改。**禁止手工编辑**——CI 用
+`git diff --exit-code data-service/vendor/` 校验无本地改动。
+本地适配（loader / 缓存 / HTTP 暴露）写在 `data-service/src/` 内，
+保证同步脚本（M3-V6）可以无冲突覆盖整个本目录。
+
+## 2026-10-22 补录：README（M3-V4 需要）
+
+上游 `tests/test_v310_sources.py::test_section_references_point_at_the_defining_section`
+会用 README / README_en 校验 SKILL.md 里引用的章节号是否仍然存在。
+首次 vendor 只取了 SKILL.md + LICENSE + CHANGELOG + tests，漏了这两个，
+导致本地 `pytest vendor/a-stock-data/tests` 1 红（CI 只跑 backend/，所以 CI 是绿的
+—— 这是「CI 绿、本地红」的典型，不能靠 CI 掩盖）。
+
+    README.md    33b6f4a829571cf1fd4d3de127468cd0c59dace65ac77c8230b1b21fbaa4a9b9
+    README_en.md 523b3dfbca3265db8e00b5b19faace2ae87f8b40a02b2d5789693f6338787170
+
+补录后：179 passed / 4 skipped / 475 subtests（M3-V4 完成）。
+
+## 同步记录 2026-10-21T17:03:46Z
+
+来源: https://github.com/simonlin1212/a-stock-data/tree/29b07d2e3700
+下载校验（sha256）:
+    SKILL.md                                 d30aa90edb881a45168c397a6ca1ccfebc440a8d4c93b3d94d3123d27b260a1d
+    LICENSE                                  199bab40163ad21135c2c4d5db43bffdadb14ed80762b048f04931cc48700bbf
+    CHANGELOG.md                             0a159869af1abd002636bf793505dc5ea7bdb47ce85ff8e58461f4447484e615
+    README.md                                33b6f4a829571cf1fd4d3de127468cd0c59dace65ac77c8230b1b21fbaa4a9b9
+    README_en.md                             523b3dfbca3265db8e00b5b19faace2ae87f8b40a02b2d5789693f6338787170
+    tests/test_valuation.py                  d22719e9deba2c6e7e783cccf53d59e3bb2d0e231296dc69fc613a2a8c152d61
+    tests/test_official_data.py              f4c62fb65753dc68ce94fe613e96d44444ca358b33142535243067e5f8acf107
+    tests/test_v39_sources.py                70ee4f35e7bcbf9a838e7ef47f7fce4432d33d25c01011b64512b8b41669e62f
+    tests/test_v310_sources.py               91e2fbef650d17b5c1129367b81764edbcb68c36c2902f3265e77b3b2ecdb646
+
+上游测试: 通过（见步骤 3）

@@ -36,8 +36,9 @@ _DEFAULT_STRATEGY = "dual_ma"
 
 def _load(symbol: str, range: str) -> tuple[list[str], list[float]]:
     """取带日期收盘价。数据源不可用时返回 ([], [])。"""
-    count = _RANGE_COUNT.get(range, 250)
-    rows = data.closes_with_dates(symbol, count=count)
+    # range 可能是 ISO 日期区间 —— 必须走 closes_for_range，否则日期被静默忽略
+    # （旧实现是 _RANGE_COUNT.get(range, 250)，键对不上就默默取最近 250 天）。
+    rows = data.closes_for_range(symbol, range)
     dates = [d for d, _ in rows]
     closes = [c for _, c in rows]
     return dates, closes

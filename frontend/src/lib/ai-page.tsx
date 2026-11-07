@@ -4,7 +4,7 @@
  * 右下角全局浮标由外壳渲染一份、覆盖所有页；页面只**登记**自己的确定性数据快照，
  * 浮标从这里读，显示「当前页面: XXX」并把快照作为将来（S5）对话的上下文。
  *
- * 移植自 Vibe-Research/desktop 的 core/ai/pageContext，按本项目精简。
+ * 移植自上游产品的 desktop core/ai/pageContext，按本项目精简。
  */
 import {
   type Dispatch,

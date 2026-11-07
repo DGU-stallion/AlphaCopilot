@@ -24,7 +24,14 @@ def client(tmp_path):
 def test_indices_wraps_data(client, monkeypatch):
     from research import astock
     monkeypatch.setattr(astock, "index_quote",
-                        lambda: [{"name": "上证指数", "price": 3200.0, "change_pct": 0.5, "change_amt": 16.0}])
+                        lambda: [
+                            {
+                                "name": "上证指数",
+                                "price": 3200.0,
+                                "change_pct": 0.5,
+                                "change_amt": 16.0,
+                            }
+                        ])
     r = client.get("/api/indices")
     assert r.status_code == 200
     body = r.json()
@@ -42,7 +49,9 @@ def test_indices_degrades_to_empty(client, monkeypatch):
 
 def test_quote_wraps_data(client, monkeypatch):
     from research import astock
-    monkeypatch.setattr(astock, "tencent_quote", lambda codes: {c: {"name": "x", "price": 1.0} for c in codes})
+    monkeypatch.setattr(
+        astock, "tencent_quote", lambda codes: {c: {"name": "x", "price": 1.0} for c in codes}
+    )
     r = client.get("/api/quote?codes=600519,000858")
     assert r.status_code == 200
     assert set(r.json()["data"].keys()) == {"600519", "000858"}
@@ -59,7 +68,11 @@ def test_quote_rejects_bad_codes(client):
 def test_market_overview_wraps_data(client, monkeypatch):
     from research import market
     monkeypatch.setattr(market, "get_overview",
-                        lambda: {"sentiment": {"up": 3000}, "sectors": [], "updated": "2026-09-05 18:00"})
+                        lambda: {
+                            "sentiment": {"up": 3000},
+                            "sectors": [],
+                            "updated": "2026-09-05 18:00",
+                        })
     r = client.get("/api/market/overview")
     assert r.status_code == 200
     assert r.json()["data"]["sentiment"]["up"] == 3000
@@ -78,7 +91,12 @@ def test_market_overview_degrades(client, monkeypatch):
 def test_market_emotion_wraps_data(client, monkeypatch):
     from research import market
     monkeypatch.setattr(market, "get_short_term_emotion",
-                        lambda: {"date": "2026-09-05", "zt_count": 42, "ladder": [], "lianban_stocks": []})
+                        lambda: {
+                            "date": "2026-09-05",
+                            "zt_count": 42,
+                            "ladder": [],
+                            "lianban_stocks": [],
+                        })
     r = client.get("/api/market/emotion")
     assert r.status_code == 200
     assert r.json()["data"]["zt_count"] == 42
@@ -95,7 +113,10 @@ def test_market_emotion_degrades_empty(client, monkeypatch):
 def test_market_turnover_top_wraps_data(client, monkeypatch):
     from research import market
     monkeypatch.setattr(market, "get_turnover_top",
-                        lambda: {"stocks": [{"code": "600519", "name": "贵州茅台"}], "updated": "x"})
+                        lambda: {
+                            "stocks": [{"code": "600519", "name": "贵州茅台"}],
+                            "updated": "x",
+                        })
     r = client.get("/api/market/turnover-top")
     assert r.status_code == 200
     assert r.json()["data"]["stocks"][0]["code"] == "600519"

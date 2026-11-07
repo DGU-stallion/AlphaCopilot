@@ -2,6 +2,7 @@
 
 两个 kind=builtin 固定页，create_app 时经 register_builtin_pages 幂等 upsert 入库：
   correlation   相关性分析（三图：叠加走势 / 相关矩阵 / 滚动相关），analysis_ref 走白名单
+                —— 叠加走势与滚动相关走 LWC（ROUND3 D5），相关矩阵走 ECharts
   backtest      回测（指标 + 净值 + 回撤），支持多策略
 
 注：盘面数据 / 每日复盘 / 涨停样本统计已改由前端直连专用端点
@@ -16,8 +17,12 @@ from __future__ import annotations
 
 from typing import Any
 
+import alpha.attribution  # noqa: F401 —— 触发 attribution.* 注册
 import alpha.backtest_page  # noqa: F401 —— 触发 backtest.* 注册
 import alpha.factor  # noqa: F401 —— 触发 correlation.* 注册
+import alpha.factor_lab  # noqa: F401 —— 触发 factorlab.* 注册
+import alpha.param_scan  # noqa: F401 —— 触发 paramscan.* 注册（M4-3）
+import alpha.tearsheet  # noqa: F401 —— 触发 tearsheet.* 注册（M4-2）
 from api.store import Store
 
 CORRELATION_SPEC: dict[str, Any] = {
@@ -38,9 +43,15 @@ CORRELATION_SPEC: dict[str, Any] = {
         {"name": "range", "type": "date_range", "label": "区间", "default": "1y"},
     ],
     "blocks": [
-        {"kind": "chart", "span": 2, "analysis_ref": {"fn": "correlation.overlay"}},
-        {"kind": "chart", "span": 1, "analysis_ref": {"fn": "correlation.matrix"}},
-        {"kind": "chart", "span": 1, "analysis_ref": {"fn": "correlation.rolling"}},
+        # M2-7：renderer 由服务端映射裁决（api.page_spec.RENDERER_BY_FN）。
+        # ROUND3 D5：overlay / rolling 两条**走势**已迁 LWC（TradingView 式交互）；
+        # matrix 是热力图，LWC 画不出来，仍走 ECharts。
+        {"kind": "chart", "span": 2, "renderer": "lwc",
+         "analysis_ref": {"fn": "correlation.overlay"}},
+        {"kind": "chart", "span": 1, "renderer": "echarts",
+         "analysis_ref": {"fn": "correlation.matrix"}},
+        {"kind": "chart", "span": 1, "renderer": "lwc",
+         "analysis_ref": {"fn": "correlation.rolling"}},
     ],
     "refresh": {"mode": "manual"},
 }
@@ -61,8 +72,24 @@ BACKTEST_SPEC: dict[str, Any] = {
     ],
     "blocks": [
         {"kind": "metric", "span": 3, "analysis_ref": {"fn": "backtest.metrics"}},
-        {"kind": "chart", "span": 2, "analysis_ref": {"fn": "backtest.equity"}},
-        {"kind": "chart", "span": 1, "analysis_ref": {"fn": "backtest.drawdown"}},
+        # M2-7：净值/回撤是金融时间序列（ADR-0014 §6），ADR-0012 裁决产 LWC 输入。
+        # payload 现仍为 ECharts option，换 LWC 输入属 M2-6/M2-8 范围；renderer 先行表态。
+        {"kind": "chart", "span": 2, "renderer": "lwc",
+         "analysis_ref": {"fn": "backtest.equity"}},
+        {"kind": "chart", "span": 1, "renderer": "lwc",
+         "analysis_ref": {"fn": "backtest.drawdown"}},
+        # M4-2 Tear sheet：滚动 Sharpe（时间序列 → lwc）+ 月度收益热力图（聚合 → echarts）。
+        {"kind": "chart", "span": 2, "renderer": "lwc",
+         "analysis_ref": {"fn": "tearsheet.rolling_sharpe"}},
+        {"kind": "chart", "span": 1, "renderer": "echarts",
+         "analysis_ref": {"fn": "tearsheet.monthly_heatmap"}},
+        # M4-5：收益归因（选股 vs 择时）。放在最后：先看总成绩（指标卡），
+        # 再看曲线（净值/回撤），最后才问「这些收益是靠什么赚的」——
+        # 归因是解释，不该抢在最前面。
+        {"kind": "metric", "span": 3,
+         "analysis_ref": {"fn": "attribution.summary"}},
+        {"kind": "chart", "span": 1, "renderer": "echarts",
+         "analysis_ref": {"fn": "attribution.split"}},
     ],
     "refresh": {"mode": "manual"},
 }

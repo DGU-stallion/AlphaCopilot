@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mcpserver.sandbox import run_python as _run
+from mcpserver.runner import run_python as _run
 
 
 def run_python(code: str, timeout: float = 30.0) -> dict[str, Any]:

@@ -6,6 +6,10 @@
 
 安全（ADR-0007 决策 3）：validate_spec 必须校验每个 analysis_ref.fn 都已在
 alpha.registry 注册；未注册即拒（业务层不信任 AI 建的 draft spec）。
+
+M2-7（ADR-0012 未决 1 缝合 ADR-0014 §6）：chart block 必须声明 renderer
+（"lwc" | "echarts"），且必须与本文件的 RENDERER_BY_FN 白名单映射一致——
+fn 与 renderer 的绑定由服务端裁决，不信任 agent/调用方自行声明。
 """
 
 from __future__ import annotations
@@ -16,7 +20,100 @@ from jsonschema import Draft7Validator, ValidationError
 
 from alpha import registry
 
+# ---------------------------------------------------------------------------
+# fn → renderer 白名单映射（M2-7 裁决表）
+#
+# 判据（ADR-0014 §6 的图形分工，按「图形语义」而非「当前 payload 格式」）：
+#   · lwc     —— 时间序列轨迹类：K 线 / 净值 / 回撤 / 买卖点。需要金融坐标轴、
+#                时间缩放、十字光标、pane 分区（净值+回撤同实例）。
+#   · echarts —— 二维聚合 / 统计对比类：热力图 / 分层 / 散点 / 归因 / 矩阵。
+#
+# ADR-0012「未决 1」的明确裁决：backtest.equity / backtest.drawdown 产 LWC 输入，
+# correlation.matrix 产 ECharts option。逐 fn 理由：
+#
+#   backtest.equity      → lwc      净值曲线（含策略 vs 买入持有多条线），
+#                                   金融时间序列，未来与回撤同 chart 多 pane（M2-6）。
+#   backtest.drawdown    → lwc      回撤曲线，净值域内同一金融坐标语义，pane 1。
+#   correlation.overlay  → lwc      多标的归一化相对强弱叠加：时间序列轨迹，用户要
+#                                   TradingView 式十字光标/拖拽缩放（ROUND3 D5）。
+#                                   **多条 series 叠在同一 pane**（量纲同为「起点=100」），
+#                                   前端由 MultiLineChart 渲染；相关性与「回撤」无关，
+#                                   故不进 DRAWDOWN_FNS。
+#   correlation.matrix   → echarts  相关矩阵热力图，二维聚合，LWC 无此图形。
+#   correlation.rolling  → lwc      滚动相关系数随时间变化（单条序列）—— 同样是时间
+#                                   序列轨迹，与 overlay 一起迁到 LWC（ROUND3 D5）。
+#                                   单条走 PriceChart（line 模式），多条走 MultiLineChart；
+#                                   同样不进 DRAWDOWN_FNS（不是净值，没有回撤）。
+#
+# 不在表里的：backtest.metrics 是 metric block（非 chart，无 renderer）；
+# 未注册的 fn 根本到不了这里（registry 校验先行）。
+#
+# 新增 fn 的纪律：注册进 alpha.registry 时必须同时在这里登记 renderer，
+# 否则引用它的 chart spec 全部拒收（见 validate_spec）。
+# ---------------------------------------------------------------------------
+RENDERER_LWC = "lwc"
+RENDERER_ECHARTS = "echarts"
+ALLOWED_RENDERERS = (RENDERER_LWC, RENDERER_ECHARTS)
+
+RENDERER_BY_FN: dict[str, str] = {
+    # LWC 语义：金融时间序列轨迹
+    "backtest.equity": RENDERER_LWC,
+    "backtest.drawdown": RENDERER_LWC,
+    # ROUND3 D5：相关性走势（叠加 / 滚动）迁 LWC —— 用户要 TradingView 式交互
+    "correlation.overlay": RENDERER_LWC,      # 多标的归一化叠加（MultiLineChart，单 pane 多线）
+    "correlation.rolling": RENDERER_LWC,      # 滚动相关单线（PriceChart line 模式）
+    # ECharts 语义：二维聚合 / 统计对比（LWC 无热力图）
+    "correlation.matrix": RENDERER_ECHARTS,
+    # M4-1 因子实验室
+    "factorlab.ic_series": RENDERER_LWC,            # IC 时间序列
+    "factorlab.ic_decay": RENDERER_LWC,             # 衰减曲线（横轴为期限 t+N）
+    "factorlab.quantile_returns": RENDERER_ECHARTS,  # 分层收益柱状图
+    "factorlab.quantile_heatmap": RENDERER_ECHARTS,  # 分层收益热力图
+    # M4-2 Tear sheet
+    "tearsheet.rolling_sharpe": RENDERER_LWC,        # 滚动 Sharpe 时间序列（金融时间轴）
+    "tearsheet.drawdown": RENDERER_LWC,              # 回撤（净值域序列，同 backtest.drawdown）
+    "tearsheet.monthly_heatmap": RENDERER_ECHARTS,   # 月度收益热力图（年份×月份二维聚合）
+    # M4-5 归因
+    "attribution.split": RENDERER_ECHARTS,           # 选股 vs 择时：两个并列量，柱状图
+    # M4-3 参数扫描
+    "paramscan.heatmap": RENDERER_ECHARTS,           # 参数网格热力图（fast×slow 二维聚合）
+    # M4-4 Walk-forward
+    "walkforward.oos_equity": RENDERER_LWC,          # 样本外拼接净值（金融时间轴）
+}
+
+
+def renderer_for_fn(fn: str | None) -> str | None:
+    """已注册 fn 的权威 renderer；未注册/未登记返回 None。"""
+    if fn is None:
+        return None
+    return RENDERER_BY_FN.get(fn)
+
+
+# ---------------------------------------------------------------------------
+# 「这个 fn 的载荷要不要带回撤」白名单。
+#
+# 为什么要单独一张表而不默认都算：回撤只对**净值类**曲线有意义。
+# 默认都算曾经导致一个真 bug（截图发现）——同一屏出现两份回撤：
+#   · backtest.equity 自带回撤 → EquityChart 加回撤 pane（正确，ADR-0014 §6）
+#   · backtest.drawdown 被再算一份「回撤的回撤」→ 又画一遍
+#   · tearsheet.rolling_sharpe 被算了「Sharpe 的回撤」→ 毫无意义
+#
+# 判据：曲线本身是「从 1.0 起算的资产价值」才谈得上回撤。
+# IC 序列、滚动 Sharpe、回撤曲线本身都不是。
+# ---------------------------------------------------------------------------
+DRAWDOWN_FNS: frozenset[str] = frozenset({
+    "backtest.equity",
+    "walkforward.oos_equity",
+})
+
+
+def wants_drawdown(fn: str | None) -> bool:
+    """该 fn 的 lwc 载荷是否该带回撤数组。"""
+    return fn in DRAWDOWN_FNS
+
 # 完整 page spec 的 JSON schema（校验形状；fn 白名单校验在 validate_spec 里另做）。
+# M2-7：renderer 只做形状外的语义校验（值域 + 与 fn 的映射一致性），schema 不锁它，
+# 因为「非 chart 不允许带 renderer」是跨 block 字段约束，jsonschema 层表达不了。
 PAGE_SPEC_SCHEMA: dict[str, Any] = {
     "type": "object",
     "required": ["slug", "title", "kind", "layout", "blocks"],
@@ -82,7 +179,18 @@ PAGE_SPEC_SCHEMA: dict[str, Any] = {
 
 
 def validate_spec(spec: dict[str, Any]) -> dict[str, Any]:
-    """校验 page spec：① 符合 schema ② 每个 analysis_ref.fn 已在 alpha.registry 注册。
+    """校验 page spec：① 符合 schema ② analysis_ref.fn 已注册 ③ renderer 判别符（M2-7）。
+
+    renderer 三条规则：
+      a) kind=="chart" 必须显式声明 renderer ∈ ALLOWED_RENDERERS（不能默认猜——
+         猜错就是同一图形两套实现，违背 ADR-0014 图表分工）。
+      b) 非 chart 块（table/markdown/metric）不允许带 renderer（防噪音字段扩散——
+         agent 写入时多带字段会变成事实上的弱 schema）。
+      c) chart.renderer 必须与 RENDERER_BY_FN 映射一致；fn 已注册但未进映射 → 拒，
+         报错要求先登记（不默认放行，避免「没人裁决」的歧义 fn 溜进渲染层）。
+
+    注意 c) 只对「fn 已注册」的 analysis_ref 生效；只有 artifact_id / 无 fn 的 chart
+    块（agent 产物引用）仍须声明 renderer，但不做 fn 一致性校验。
 
     不符合抛 ValueError（api 层转 400，不信任 AI 建的 draft）。返回原 spec。
 
@@ -95,11 +203,65 @@ def validate_spec(spec: dict[str, Any]) -> dict[str, Any]:
 
     for i, block in enumerate(spec.get("blocks", [])):
         ref = block.get("analysis_ref")
-        if ref is None:
-            continue
-        fn = ref.get("fn")
-        if not registry.is_registered(fn):
+        fn: str | None = None
+        if ref is not None:
+            fn = ref.get("fn")
+            if not registry.is_registered(fn):
+                raise ValueError(
+                    f"blocks[{i}].analysis_ref.fn 未注册: {fn!r}（不在 alpha.registry 白名单内）"
+                )
+        if block.get("kind") == "chart":
+            renderer = block.get("renderer")
+            if renderer is None:
+                raise ValueError(
+                    f"blocks[{i}] kind=chart 缺 renderer 判别符（必填：'lwc' | 'echarts'，"
+                    "不允许默认猜；ADR-0014 §6 图表分工由服务端裁决）"
+                )
+            if renderer not in ALLOWED_RENDERERS:
+                raise ValueError(
+                    f"blocks[{i}].renderer 非法: {renderer!r}（只允许 'lwc' | 'echarts'）"
+                )
+            declared = RENDERER_BY_FN.get(fn) if fn else None
+            if fn is not None and declared is None:
+                raise ValueError(
+                    f"blocks[{i}].analysis_ref.fn 已注册但未登记 renderer 映射: {fn!r}——"
+                    "请先在 api.page_spec.RENDERER_BY_FN 登记，再在 spec 中引用"
+                )
+            if declared is not None and renderer != declared:
+                raise ValueError(
+                    f"blocks[{i}] renderer 与 fn 不匹配: fn={fn!r} 属 {declared!r} 语义，"
+                    f"却声明了 {renderer!r}（映射见 api.page_spec.RENDERER_BY_FN）"
+                )
+        elif "renderer" in block and block["renderer"] is not None:
             raise ValueError(
-                f"blocks[{i}].analysis_ref.fn 未注册: {fn!r}（不在 alpha.registry 白名单内）"
+                f"blocks[{i}] kind={block['kind']!r} 不允许带 renderer（只 chart 块有权声明）"
             )
     return spec
+
+
+def normalize_spec(spec: dict[str, Any]) -> dict[str, Any]:
+    """老 spec 读时兼容（M2-7）：chart 块缺 renderer 时按 RENDERER_BY_FN 补全。
+
+    策略：读时补全，不写迁移脚本。理由：
+      · builtin 页在每次 create_app 时幂等 upsert（spec 已含 renderer），自愈；
+      · user 页/历史 draft 无法保证有序迁移（备份恢复、agent 写入跨越版本），
+        一旦有读路径绕过迁移脚本，校验就会撕裂；读时补全天然幂等、覆盖一切来源，
+        且写路径 validate_spec 永远要求显式声明，两者不冲突。
+      · 代价：未注册 fn（os.system 等非法 spec）补不了 renderer——返回原样，
+        让上层渲染按缺失处理，不做兜底猜测（默认值即裁决，不能在读路径暗改）。
+
+    不修改传入 spec，返回浅拷贝 + 新 blocks 列表（读路径安全加固）。
+    """
+    blocks: list[Any] = []
+    changed = False
+    for block in spec.get("blocks", []):
+        if block.get("kind") == "chart" and "renderer" not in block:
+            ref = block.get("analysis_ref")
+            r = renderer_for_fn(ref.get("fn")) if ref else None
+            if r is not None:
+                block = {**block, "renderer": r}
+                changed = True
+        blocks.append(block)
+    if not changed:
+        return spec
+    return {**spec, "blocks": blocks}
